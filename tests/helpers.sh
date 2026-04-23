@@ -13,10 +13,13 @@ make_test_home() {
     echo "$tmp"
 }
 
-# Remove a test home created by make_test_home.
+# Remove a test home created by make_test_home. Always returns 0 so safe in traps.
 cleanup_test_home() {
     local home_dir="$1"
-    [[ -n "$home_dir" && -d "$home_dir" ]] && rm -rf "$home_dir"
+    if [[ -n "$home_dir" && -d "$home_dir" ]]; then
+        rm -rf "$home_dir"
+    fi
+    return 0
 }
 
 # Install a fake `gh` that records its args and returns success.
@@ -28,30 +31,31 @@ mock_gh_path() {
     cat > "$bindir/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "gh $*" >> "${GH_CALL_LOG:-/tmp/gh_calls.log}"
+
+handle_repo_create() {
+    local name="$1"; shift
+    local source_dir=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --source) source_dir="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    local bare="$(dirname "$source_dir")/${name}.git"
+    git init --bare --initial-branch=main "$bare" >/dev/null
+    git -C "$source_dir" remote add origin "$bare"
+    git -C "$source_dir" push -u origin HEAD >/dev/null 2>&1 || true
+}
+
 case "$1" in
     auth)
-        # `gh auth status` succeeds
         exit 0
         ;;
     repo)
-        # `gh repo create <name> --private --source <dir> --push`
-        # simulate by setting a remote to a local bare repo and pushing
         shift
-        if [[ "$1" == "create" ]]; then
+        if [[ "${1:-}" == "create" ]]; then
             shift
-            local name="$1"; shift
-            # find --source
-            local source_dir=""
-            while [[ $# -gt 0 ]]; do
-                case "$1" in
-                    --source) source_dir="$2"; shift 2 ;;
-                    *) shift ;;
-                esac
-            done
-            local bare="$(dirname "$source_dir")/${name}.git"
-            git init --bare "$bare" >/dev/null
-            git -C "$source_dir" remote add origin "$bare"
-            git -C "$source_dir" push -u origin HEAD >/dev/null 2>&1 || true
+            handle_repo_create "$@"
         fi
         exit 0
         ;;
