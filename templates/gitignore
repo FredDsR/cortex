@@ -1,0 +1,3 @@
+# tracking-work device-local files — do not sync
+.active.*
+.meta
