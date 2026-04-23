@@ -1,2 +1,2 @@
-# transient test artifacts
-tests/tmp/
+# transient test artifacts from skills/*/tests/
+skills/*/tests/tmp/
