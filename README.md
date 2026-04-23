@@ -13,12 +13,25 @@ Portable bundle of file-based work-tracking skills for AI coding agents. Designe
 
 ## Install
 
+### Primary path — symlink install (any harness)
+
 Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`, `~/.gemini/`) and symlinks each skill into their respective `skills/` directories.
 
 ```bash
 git clone git@github.com:FredDsR/tracking-work-skills.git ~/Workspace/agentic/tracking-work-skills
 bash ~/Workspace/agentic/tracking-work-skills/install.sh
 ```
+
+### Alternate path — Claude Code `/plugin` (experimental)
+
+A `.claude-plugin/marketplace.json` + `plugin.json` are included so this repo is also addable as a Claude Code plugin marketplace:
+
+```
+/plugin marketplace add FredDsR/tracking-work-skills
+/plugin install tracking-work
+```
+
+Note: some cross-skill invocations in the main skill hardcode `$HOME/.claude/skills/<sub-skill>/...` paths, so the symlink path is the first-class install. The plugin route is provided as a convenience for Claude-Code-only users who prefer the `/plugin` UX; behavior is best-effort.
 
 ## Update
 

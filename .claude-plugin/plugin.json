@@ -1,0 +1,11 @@
+{
+  "name": "tracking-work",
+  "description": "File-based session/task tracking for AI coding agents. Bundles main skill + github/migration/sync sub-skills. Works with Claude Code, Codex, Gemini CLI, Copilot CLI (any harness reading SKILL.md).",
+  "version": "1.0.0",
+  "author": {
+    "name": "FredDsR"
+  },
+  "homepage": "https://github.com/FredDsR/tracking-work-skills",
+  "repository": "https://github.com/FredDsR/tracking-work-skills",
+  "license": "MIT"
+}

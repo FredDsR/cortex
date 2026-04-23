@@ -1,0 +1,15 @@
+{
+  "name": "tracking-work-skills",
+  "owner": {
+    "name": "FredDsR"
+  },
+  "description": "FredDsR's personal agentic-skills marketplace. Starts with the tracking-work suite; may grow.",
+  "plugins": [
+    {
+      "name": "tracking-work",
+      "source": ".",
+      "description": "Main tracking-work skill plus sub-skills (github, migration, sync).",
+      "version": "1.0.0"
+    }
+  ]
+}
