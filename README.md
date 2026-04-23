@@ -24,6 +24,26 @@ bash ~/tracking-work-skills/install.sh
 
 Put the clone anywhere you like — `install.sh` uses its own directory as the source, so symlinks will always point at wherever you cloned.
 
+### Global vs project-scoped
+
+Agents support skills at two scopes:
+- **Global**: `$HOME/.<harness>/skills/<name>/` — visible to every project.
+- **Project**: `<repo>/.<harness>/skills/<name>/` — visible only when the agent is run from that project.
+
+`install.sh` supports both:
+
+```bash
+# Global (default) — all your agent sessions see these skills
+bash install.sh
+
+# Project-scoped — only this repo's agent sessions see them
+cd ~/some-repo
+bash /path/to/tracking-work-skills/install.sh --project            # defaults to $PWD
+bash /path/to/tracking-work-skills/install.sh --project ~/some-repo  # or explicit path
+```
+
+Project-scoped install creates `<repo>/.claude/skills/`, `<repo>/.codex/skills/`, etc. as needed (but only for harnesses you already use globally, detected via presence of `$HOME/.<harness>/`). Re-run after `git pull` in the skills clone to refresh.
+
 ### Alternate path — Claude Code `/plugin` (experimental)
 
 A `.claude-plugin/marketplace.json` + `plugin.json` are included so this repo is also addable as a Claude Code plugin marketplace:

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Install / update tracking-work skills into every detected agent harness.
-# Symlinks each skill in ./skills/ into the harness's skills directory.
+# Install / update tracking-work skills.
+# Default: global install — symlinks each skill into $HOME/.<harness>/skills/.
+# --project [path]: project-local install — symlinks into <path>/.<harness>/skills/.
 # Idempotent — safe to re-run after `git pull`.
 set -euo pipefail
 
@@ -12,7 +13,42 @@ if [[ ! -d "$SKILLS_SRC" ]]; then
     exit 1
 fi
 
-# harness → skills-dir-under-$HOME
+usage() {
+    cat <<EOF
+Usage: install.sh [--project [path]]
+  (no flags)        Global install into \$HOME/.<harness>/skills/ for each detected harness.
+  --project [path]  Project-scoped install into <path>/.<harness>/skills/. Defaults to \$PWD.
+                    Only installs for harnesses you already use globally (\$HOME/.<harness>/ exists).
+  -h, --help        Show this help.
+EOF
+}
+
+MODE="global"
+TARGET_ROOT="$HOME"
+
+case "${1:-}" in
+    --project)
+        MODE="project"
+        TARGET_ROOT="${2:-$PWD}"
+        if [[ ! -d "$TARGET_ROOT" ]]; then
+            echo "error: $TARGET_ROOT does not exist" >&2
+            exit 1
+        fi
+        TARGET_ROOT="$(cd "$TARGET_ROOT" && pwd)"
+        ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    "")
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+# harness → skills-dir-under-<root>
 HARNESSES=(
     "claude-code:.claude/skills"
     "codex:.codex/skills"
@@ -23,11 +59,12 @@ HARNESSES=(
 install_into() {
     local harness="$1"
     local rel_skills_dir="$2"
-    local harness_root="$HOME/${rel_skills_dir%/skills}"
-    local dest_root="$HOME/$rel_skills_dir"
+    local user_harness_root="$HOME/${rel_skills_dir%/skills}"
+    local dest_root="$TARGET_ROOT/$rel_skills_dir"
 
-    if [[ ! -d "$harness_root" ]]; then
-        echo "[$harness] $harness_root not present, skipping"
+    # Presence of $HOME/.<harness>/ is the proxy for "user uses this harness".
+    if [[ ! -d "$user_harness_root" ]]; then
+        echo "[$harness] $user_harness_root not present, skipping"
         return 0
     fi
 
@@ -40,7 +77,7 @@ install_into() {
 
         if [[ -L "$dest" ]]; then
             ln -sfn "$skill_dir" "$dest"
-            echo "[$harness] relinked $skill_name"
+            echo "[$harness] relinked $skill_name → $dest"
         elif [[ -e "$dest" ]]; then
             local backup="${dest}.bak.$(date +%s)"
             mv "$dest" "$backup"
@@ -48,10 +85,13 @@ install_into() {
             echo "[$harness] replaced $skill_name (backup: ${backup##*/})"
         else
             ln -s "$skill_dir" "$dest"
-            echo "[$harness] installed $skill_name"
+            echo "[$harness] installed $skill_name → $dest"
         fi
     done
 }
+
+echo "Mode: $MODE | target root: $TARGET_ROOT"
+echo ""
 
 for entry in "${HARNESSES[@]}"; do
     harness="${entry%%:*}"
