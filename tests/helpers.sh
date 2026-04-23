@@ -65,7 +65,7 @@ EOF
 # Create a bare git repo and return its path (used as a fake remote to clone from).
 make_fake_remote() {
     local dir="$1"
-    git init --bare "$dir" >/dev/null
+    git init --bare --initial-branch=main "$dir" >/dev/null
     echo "$dir"
 }
 
