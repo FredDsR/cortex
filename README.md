@@ -18,9 +18,11 @@ Portable bundle of file-based work-tracking skills for AI coding agents. Designe
 Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`, `~/.gemini/`) and symlinks each skill into their respective `skills/` directories.
 
 ```bash
-git clone git@github.com:FredDsR/tracking-work-skills.git ~/Workspace/agentic/tracking-work-skills
-bash ~/Workspace/agentic/tracking-work-skills/install.sh
+git clone git@github.com:FredDsR/tracking-work-skills.git ~/tracking-work-skills
+bash ~/tracking-work-skills/install.sh
 ```
+
+Put the clone anywhere you like — `install.sh` uses its own directory as the source, so symlinks will always point at wherever you cloned.
 
 ### Alternate path — Claude Code `/plugin` (experimental)
 
@@ -36,7 +38,7 @@ Note: some cross-skill invocations in the main skill hardcode `$HOME/.claude/ski
 ## Update
 
 ```bash
-cd ~/Workspace/agentic/tracking-work-skills
+cd <wherever-you-cloned-it>
 git pull
 # install.sh uses symlinks, so `git pull` alone is usually enough.
 # Re-run install.sh only if a new skill directory was added or you added a new harness.
