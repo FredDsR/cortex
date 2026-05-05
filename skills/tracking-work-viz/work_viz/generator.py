@@ -1,6 +1,8 @@
 """Render a one-shot self-contained HTML viewer for a workspace."""
 from __future__ import annotations
+import datetime as _dt
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 
@@ -28,5 +30,46 @@ def generate_one_shot(workspaces_root: Path, slug: str, out_dir: Path = DEFAULT_
     })
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{slug}.html"
+    out_path.write_text(html, encoding="utf-8")
+    return out_path
+
+
+def _summarize(workspaces_root: Path) -> dict:
+    out: dict = {"workspaces": []}
+    if not workspaces_root.is_dir():
+        return out
+    for ws_dir in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
+        slug = ws_dir.name
+        ws = parse_workspace(workspaces_root, slug)
+        session_count = len([s for s in ws.sessions if not s.archived])
+        task_count = sum(len(s.tasks) for s in ws.sessions if not s.archived)
+        last_mtime = 0.0
+        for dp, _, fns in os.walk(ws_dir):
+            for fn in fns:
+                try:
+                    mt = (Path(dp) / fn).stat().st_mtime
+                    if mt > last_mtime:
+                        last_mtime = mt
+                except OSError:
+                    pass
+        last_iso = (
+            _dt.datetime.fromtimestamp(last_mtime).strftime("%Y-%m-%d %H:%M")
+            if last_mtime else ""
+        )
+        out["workspaces"].append({
+            "slug": slug,
+            "session_count": session_count,
+            "task_count": task_count,
+            "last_updated": last_iso,
+            "agent_count": len(ws.active_session_slugs),
+        })
+    return out
+
+
+def generate_dashboard(workspaces_root: Path, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
+    payload = json.dumps(_summarize(workspaces_root), ensure_ascii=False)
+    html = _render("dashboard.html", {"@@DATA@@": payload})
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "dashboard.html"
     out_path.write_text(html, encoding="utf-8")
     return out_path

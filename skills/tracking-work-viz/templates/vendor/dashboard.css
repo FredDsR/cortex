@@ -1,0 +1,8 @@
+body { font-family: -apple-system, sans-serif; margin: 0; padding: 16px; }
+h1 { font-size: 16px; margin: 0 0 12px 0; }
+.row { display: grid; grid-template-columns: 1fr 80px 80px 160px 80px; gap: 12px; padding: 8px; border-bottom: 1px solid #eee; align-items: center; }
+.row:hover { background: #fafafa; }
+.row a { text-decoration: none; color: #1976d2; font-weight: 600; }
+.row .num { text-align: right; font-variant-numeric: tabular-nums; }
+.row .ts { color: #666; font-size: 12px; }
+.row .agents { color: #1976d2; }

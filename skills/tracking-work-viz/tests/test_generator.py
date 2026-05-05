@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from work_viz.generator import generate_one_shot
+from work_viz.generator import generate_dashboard
 
 
 def test_one_shot_writes_self_contained_html(workspaces_root: Path, tmp_path: Path):
@@ -16,3 +17,11 @@ def test_one_shot_writes_self_contained_html(workspaces_root: Path, tmp_path: Pa
     assert '"slug": "demo"' in text or '"slug":"demo"' in text
     # Vendor links should be relative
     assert 'src="vendor/cytoscape.min.js"' in text
+
+
+def test_dashboard_lists_workspaces(workspaces_root: Path, tmp_path: Path):
+    out = generate_dashboard(workspaces_root, out_dir=tmp_path)
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert "@@DATA@@" not in text
+    assert '"slug": "demo"' in text or '"slug":"demo"' in text

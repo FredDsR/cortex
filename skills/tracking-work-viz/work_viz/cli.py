@@ -30,9 +30,10 @@ def main(argv: list | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.workspace_flag == "all" or args.workspace == "all":
-        # Dashboard mode is wired in Task 12.
-        print("dashboard mode not yet implemented", file=sys.stderr)
-        return 2
+        from .generator import generate_dashboard
+        out = generate_dashboard(args.workspaces_root)
+        print(out)
+        return 0
 
     if not args.workspace:
         parser.error("workspace slug is required (or use --workspace=all)")
