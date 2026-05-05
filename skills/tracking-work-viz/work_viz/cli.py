@@ -48,6 +48,7 @@ def main(argv: list | None = None) -> int:
         print("watch mode not yet implemented", file=sys.stderr)
         return 2
 
-    # One-shot mode is wired in Task 8.
-    print("one-shot mode not yet implemented", file=sys.stderr)
-    return 2
+    from .generator import generate_one_shot
+    out = generate_one_shot(args.workspaces_root, args.workspace)
+    print(out)
+    return 0
