@@ -98,5 +98,12 @@ RUNTIME_DIR="$HOME/.work/viz"
 mkdir -p "$RUNTIME_DIR/vendor"
 cp "$VIZ_VENDOR/"*.js "$RUNTIME_DIR/vendor/" 2>/dev/null || true
 
+# Copy first-party JS/CSS (committed in templates/vendor/) to the runtime vendor dir
+SRC_VENDOR="$REPO_DIR/skills/tracking-work-viz/templates/vendor"
+if [ -d "$SRC_VENDOR" ]; then
+  cp "$SRC_VENDOR/"*.js "$RUNTIME_DIR/vendor/" 2>/dev/null || true
+  cp "$SRC_VENDOR/"*.css "$RUNTIME_DIR/vendor/" 2>/dev/null || true
+fi
+
 echo "tracking-work-viz: installed. Add $VIZ_DIR to PATH if not already, then run: work-viz <workspace>"
 # --- end tracking-work-viz install ---

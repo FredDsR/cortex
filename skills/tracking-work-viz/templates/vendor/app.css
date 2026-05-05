@@ -1,0 +1,79 @@
+:root {
+  --pane-bg: #fafafa;
+  --pane-border: #e0e0e0;
+  --status-open: #999;
+  --status-in-progress: #1976d2;
+  --status-blocked: #d32f2f;
+  --status-resolved: #388e3c;
+  --status-unknown: #ccc;
+  --content-bg: #fff;
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; height: 100%; font-family: var(--font-stack); font-size: 14px; }
+
+#topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px; border-bottom: 1px solid var(--pane-border);
+  background: var(--pane-bg);
+  height: 44px;
+}
+
+#topbar h1 { margin: 0; font-size: 14px; font-weight: 600; }
+#topbar .spacer { flex: 1; }
+#topbar button { padding: 4px 8px; border: 1px solid var(--pane-border); background: white; cursor: pointer; border-radius: 4px; }
+#topbar select { padding: 4px; }
+
+#layout {
+  display: grid;
+  grid-template-columns: 280px 1fr 420px;
+  height: calc(100% - 44px);
+}
+
+.pane { overflow: auto; border-right: 1px solid var(--pane-border); }
+.pane:last-child { border-right: none; }
+
+#tree-pane { background: var(--pane-bg); }
+#tree-pane.hidden { display: none; }
+#graph-pane.hidden { display: none; }
+
+.tree-section { padding: 4px 8px; }
+.tree-session { font-weight: 600; cursor: pointer; padding: 4px 0; user-select: none; }
+.tree-session .caret { display: inline-block; width: 12px; }
+.tree-task { cursor: pointer; padding: 2px 0 2px 24px; font-weight: 400; }
+.tree-task.selected, .tree-session.selected { background: #fff3b0; }
+
+.status-pill {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+}
+.status-pill.open { background: var(--status-open); }
+.status-pill.in_progress { background: var(--status-in-progress); }
+.status-pill.blocked { background: var(--status-blocked); }
+.status-pill.resolved { background: var(--status-resolved); }
+.status-pill.unknown { background: var(--status-unknown); }
+
+.agent-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  background: #1976d2;
+  color: white;
+  border-radius: 8px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+#content-pane { background: var(--content-bg); padding: 16px; }
+.content-fields {
+  font-size: 12px;
+  border-bottom: 1px solid var(--pane-border);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; gap: 12px;
+}
+.content-fields .field strong { color: #555; }
+
+.archived-tag { color: #888; font-style: italic; margin-left: 6px; }
