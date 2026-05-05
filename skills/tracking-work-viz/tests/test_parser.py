@@ -67,4 +67,4 @@ def test_active_agent_count(workspaces_root: Path):
 
 def test_workspace_active_session_slugs(workspaces_root: Path):
     ws = parse_workspace(workspaces_root, "demo")
-    assert "feature-x" in ws.active_session_slugs
+    assert ws.active_session_slugs == ["feature-x"]

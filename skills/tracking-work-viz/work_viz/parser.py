@@ -109,7 +109,7 @@ def _read_active_session_slugs(ws_dir: Path) -> list:
             text = f.read_text(encoding="utf-8").strip()
         except OSError:
             continue
-        if text:
+        if text and text not in slugs:
             slugs.append(text)
     return slugs
 
@@ -129,7 +129,7 @@ def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
             t_slug = task_path.stem
             inline = _parse_inline_fields(body)
             status = status_map.get(t_slug)
-            if not status:
+            if status is None:
                 status = _fallback_status_from_inline(inline.get("Status", ""))
             sess.tasks.append(Task(
                 slug=t_slug,
