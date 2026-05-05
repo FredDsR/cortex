@@ -7,3 +7,6 @@ skills/tracking-work-viz/vendor/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Python virtualenv
+.venv/
