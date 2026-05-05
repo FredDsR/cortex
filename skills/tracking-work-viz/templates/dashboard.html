@@ -20,6 +20,13 @@
       <div class="right">agents</div>
     </div>
     <div id="rows"></div>
+    <div id="idle-section" class="idle-section" style="display:none;">
+      <button id="idle-toggle" class="idle-toggle" type="button">
+        <span class="caret">&#9656;</span>
+        <span id="idle-toggle-label">Idle workspaces</span>
+      </button>
+      <div id="idle-rows"></div>
+    </div>
   </main>
   <script>
     window.VIZ_DASHBOARD_DATA = @@DATA@@;

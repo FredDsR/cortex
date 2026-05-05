@@ -201,3 +201,107 @@ class VizServer:
         if self._server is not None:
             self._server.shutdown()
             self._server.server_close()
+
+
+class DashboardServer:
+    """Serves ~/.work/viz/ over HTTP, regenerating dashboard + per-workspace pages on each request.
+
+    Designed to bypass snap-confined browsers' file:// restrictions by exposing the same content
+    over http://127.0.0.1:<port>/. Stdlib only.
+    """
+
+    def __init__(self, workspaces_root: Path, port: int = 0,
+                 viz_dir: Optional[Path] = None) -> None:
+        self.workspaces_root = workspaces_root
+        self.viz_dir = viz_dir or (Path.home() / ".work" / "viz")
+        self.port = port or _pick_port(preferred_range=(8800, 8810))
+        self._server: Optional[ThreadingHTTPServer] = None
+        self._serve_thread: Optional[threading.Thread] = None
+
+    def _build_handler(self):
+        viz_dir = self.viz_dir
+        workspaces_root = self.workspaces_root
+
+        # Track when we last regenerated to avoid hammering on rapid asset requests.
+        regen_lock = threading.Lock()
+        last_regen = [0.0]
+        REGEN_DEBOUNCE = 1.0  # seconds
+
+        def maybe_regen():
+            with regen_lock:
+                now = time.monotonic()
+                if now - last_regen[0] < REGEN_DEBOUNCE:
+                    return
+                last_regen[0] = now
+            try:
+                from .generator import generate_dashboard
+                generate_dashboard(workspaces_root, out_dir=viz_dir)
+            except Exception as exc:
+                print(f"warning: regenerate failed: {exc}")
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args, **_kwargs):
+                return
+
+            def do_GET(self):
+                # Regenerate when the user lands on / or /dashboard.html (cheap snapshot).
+                if self.path in ("/", "/dashboard.html", "/index.html"):
+                    maybe_regen()
+                    target = viz_dir / "dashboard.html"
+                    if target.is_file():
+                        self._send_file(target, "text/html; charset=utf-8")
+                        return
+                    self.send_error(HTTPStatus.NOT_FOUND, "dashboard.html missing; run install.sh first")
+                    return
+
+                # Workspace pages: regenerate then serve.
+                if self.path.endswith(".html") and "/" not in self.path[1:]:
+                    rel = self.path.lstrip("/")
+                    maybe_regen()
+                    target = viz_dir / rel
+                    if target.is_file():
+                        self._send_file(target, "text/html; charset=utf-8")
+                        return
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+
+                # Vendor assets: serve raw, with traversal protection.
+                if self.path.startswith("/vendor/"):
+                    rel = self.path[len("/vendor/"):]
+                    base = (viz_dir / "vendor").resolve()
+                    try:
+                        fp = (base / rel).resolve()
+                        fp.relative_to(base)
+                    except (ValueError, OSError):
+                        self.send_error(HTTPStatus.NOT_FOUND)
+                        return
+                    if fp.is_file():
+                        ctype = "text/javascript" if fp.suffix == ".js" else "text/css"
+                        self._send_file(fp, ctype)
+                        return
+
+                self.send_error(HTTPStatus.NOT_FOUND)
+
+            def _send_file(self, fp: Path, ctype: str):
+                data = fp.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(data)))
+                # Disable caching so a fresh-regenerated dashboard is always shown.
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+
+        return Handler
+
+    def start(self) -> None:
+        Handler = self._build_handler()
+        self._server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self.port = self._server.server_address[1]
+        self._serve_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._serve_thread.start()
+
+    def stop(self) -> None:
+        if self._server is not None:
+            self._server.shutdown()
+            self._server.server_close()

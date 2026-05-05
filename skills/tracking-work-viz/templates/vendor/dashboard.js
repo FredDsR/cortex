@@ -63,9 +63,20 @@
   // Sort: most recently touched first
   workspaces.sort((a, b) => (b.last_mtime || 0) - (a.last_mtime || 0));
 
-  const rowsEl = document.getElementById("rows");
-  rowsEl.innerHTML = "";
-  for (const ws of workspaces) {
+  // A workspace is "idle" if it has no in-progress / blocked / open work AND is older than 7 days,
+  // OR it has zero tasks AND zero agents AND is older than 7 days.
+  const SEVEN_DAYS = 7 * 86400;
+  const now = Date.now() / 1000;
+  function isIdle(ws) {
+    const sc = ws.status_counts || {};
+    const live = (sc.in_progress || 0) + (sc.blocked || 0) + (sc.open || 0);
+    const stale = !ws.last_mtime || (now - ws.last_mtime) > SEVEN_DAYS;
+    if (ws.agent_count > 0) return false;
+    if (live > 0) return false;
+    return stale;
+  }
+
+  function buildRow(ws) {
     const counts = ws.status_counts || {};
     const total = ws.task_count || 0;
     const row = document.createElement("div");
@@ -93,6 +104,27 @@
           : '<span class="empty">idle</span>'}
       </div>
     `;
-    rowsEl.appendChild(row);
+    return row;
+  }
+
+  const active = workspaces.filter(ws => !isIdle(ws));
+  const idle = workspaces.filter(ws => isIdle(ws));
+
+  const rowsEl = document.getElementById("rows");
+  rowsEl.innerHTML = "";
+  for (const ws of active) rowsEl.appendChild(buildRow(ws));
+
+  const idleSection = document.getElementById("idle-section");
+  const idleRowsEl = document.getElementById("idle-rows");
+  const idleToggle = document.getElementById("idle-toggle");
+  const idleLabel = document.getElementById("idle-toggle-label");
+  if (idle.length > 0 && idleSection) {
+    idleSection.style.display = "block";
+    idleLabel.textContent = `${idle.length} idle workspace${idle.length === 1 ? "" : "s"}`;
+    for (const ws of idle) idleRowsEl.appendChild(buildRow(ws));
+    idleToggle.addEventListener("click", () => {
+      const open = idleRowsEl.classList.toggle("open");
+      idleToggle.classList.toggle("open", open);
+    });
   }
 })();

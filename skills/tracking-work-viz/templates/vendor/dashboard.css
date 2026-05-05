@@ -145,6 +145,39 @@ main {
 
 .row.empty-row .tasks { color: var(--text-muted); font-weight: 500; font-size: 13px; }
 
+.idle-section {
+  margin-top: 18px;
+}
+.idle-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.idle-toggle:hover { color: var(--text-primary); }
+.idle-toggle .caret {
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.idle-toggle.open .caret { transform: rotate(90deg); }
+#idle-rows { padding-top: 4px; display: none; }
+#idle-rows.open { display: block; }
+#idle-rows .row {
+  opacity: 0.7;
+  background: #fbfcfd;
+}
+#idle-rows .row .slug a { color: var(--text-muted); }
+#idle-rows .row:hover { opacity: 1; }
+
+
 .thead {
   display: grid;
   grid-template-columns: minmax(180px, 1.4fr) 200px 70px 130px 110px;

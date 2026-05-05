@@ -2,6 +2,7 @@ import json
 import shutil
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -67,3 +68,44 @@ def test_server_emits_sse_change_on_file_modification(writable_workspaces: Path)
     srv.stop()
 
     assert any("change" in m for m in received), f"received={received}"
+
+
+from work_viz.server import DashboardServer
+
+
+def test_dashboard_server_serves_dashboard(writable_workspaces: Path, tmp_path: Path):
+    viz_out = tmp_path / "viz"
+    srv = DashboardServer(workspaces_root=writable_workspaces, port=0, viz_dir=viz_out)
+    srv.start()
+    try:
+        url = f"http://127.0.0.1:{srv.port}/dashboard.html"
+        with urllib.request.urlopen(url, timeout=5) as r:
+            body = r.read().decode("utf-8")
+        assert "@@DATA@@" not in body
+        assert '"slug": "demo"' in body or '"slug":"demo"' in body
+        # Fetching index should also work and trigger regeneration.
+        url2 = f"http://127.0.0.1:{srv.port}/"
+        with urllib.request.urlopen(url2, timeout=5) as r:
+            assert r.status == 200
+        # Per-workspace page is generated on demand.
+        url3 = f"http://127.0.0.1:{srv.port}/demo.html"
+        with urllib.request.urlopen(url3, timeout=5) as r:
+            demo_body = r.read().decode("utf-8")
+        assert '"slug": "demo"' in demo_body or '"slug":"demo"' in demo_body
+    finally:
+        srv.stop()
+
+
+def test_dashboard_server_blocks_path_traversal(writable_workspaces: Path, tmp_path: Path):
+    viz_out = tmp_path / "viz"
+    srv = DashboardServer(workspaces_root=writable_workspaces, port=0, viz_dir=viz_out)
+    srv.start()
+    try:
+        url = f"http://127.0.0.1:{srv.port}/vendor/../../etc/passwd"
+        try:
+            with urllib.request.urlopen(url, timeout=5) as r:
+                assert False, f"expected 404, got {r.status}"
+        except urllib.error.HTTPError as e:
+            assert e.code == 404
+    finally:
+        srv.stop()

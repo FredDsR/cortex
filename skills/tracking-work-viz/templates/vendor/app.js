@@ -314,6 +314,8 @@ function rewriteIntraTaskLinks(rootEl, sessionSlug) {
 function render() {
   renderTopbar();
   renderTree();
+  // Re-fit the graph after a pane toggle since the available width changes.
+  if (window._cyRefit) window._cyRefit();
   renderGraph();
   renderContent();
 }
@@ -464,6 +466,19 @@ function renderGraph() {
     cy.ready(() => {
       cy.fit(undefined, 24);
     });
+    // Re-fit on window resize / pane toggle so the graph keeps using the full area.
+    if (!window._cyResizeAttached) {
+      window._cyResizeAttached = true;
+      let _resizeT = null;
+      const refit = () => {
+        if (_resizeT) clearTimeout(_resizeT);
+        _resizeT = setTimeout(() => {
+          if (cy && !state.graphCollapsed) { cy.resize(); cy.fit(undefined, 24); }
+        }, 100);
+      };
+      window.addEventListener("resize", refit);
+      window._cyRefit = refit;
+    }
     cy.on("tap", "node", (ev) => {
       const d = ev.target.data();
       if (d.kind === "task") {
