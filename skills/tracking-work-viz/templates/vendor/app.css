@@ -34,13 +34,56 @@ html, body {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
-#topbar h1 {
+#topbar h1,
+#topbar .ws-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
-#topbar h1 .ws-prefix { color: var(--text-muted); font-weight: 500; margin-right: 4px; }
+#topbar .ws-prefix { color: var(--text-muted); font-weight: 500; margin-right: 4px; }
+#topbar .ws-slug-static { color: var(--text-primary); font-weight: 700; }
+#topbar .ws-switcher {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid var(--pane-border);
+  background-color: white;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 7px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  margin-left: 4px;
+}
+#topbar .ws-switcher:hover { border-color: #c7d2e0; background-color: var(--accent-bg); }
+
+#topbar .search-group {
+  flex: 0 1 320px;
+  padding: 0 16px;
+  border-left: 1px solid var(--pane-border);
+}
+#topbar .search-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 5px 10px;
+  border: 1px solid var(--pane-border);
+  border-radius: 4px;
+  outline: none;
+  color: var(--text-primary);
+  background: white;
+}
+#topbar .search-input:focus {
+  border-color: var(--status-in-progress);
+  box-shadow: 0 0 0 2px rgba(31, 122, 224, 0.15);
+}
+#topbar .search-input::placeholder { color: var(--text-muted); }
 #topbar .back-link {
   display: inline-flex;
   align-items: center;
@@ -95,14 +138,34 @@ html, body {
 #layout {
   display: grid;
   grid-template-columns: 280px 1fr 460px;
+  grid-template-areas: "tree graph content";
   height: calc(100% - 48px);
-  transition: grid-template-columns 0.18s ease;
 }
-#layout.tree-collapsed { grid-template-columns: 0 1fr 460px; }
-#layout.graph-collapsed { grid-template-columns: 280px 0 1fr; }
-#layout.tree-collapsed.graph-collapsed { grid-template-columns: 0 0 1fr; }
+#tree-pane { grid-area: tree; }
+#graph-pane { grid-area: graph; }
+#content-pane { grid-area: content; }
 
-.pane { overflow: auto; border-right: 1px solid var(--pane-border); }
+#layout.tree-collapsed {
+  grid-template-columns: 1fr 460px;
+  grid-template-areas: "graph content";
+}
+#layout.graph-collapsed {
+  grid-template-columns: 280px 1fr;
+  grid-template-areas: "tree content";
+}
+#layout.tree-collapsed.graph-collapsed {
+  grid-template-columns: 1fr;
+  grid-template-areas: "content";
+}
+
+.pane {
+  overflow: auto;
+  border-right: 1px solid var(--pane-border);
+  /* min-width: 0 lets a `1fr` grid track actually shrink the item to the track size,
+     otherwise auto-min-width can pin the pane to its min-content width. */
+  min-width: 0;
+  min-height: 0;
+}
 .pane:last-child { border-right: none; }
 
 #tree-pane { background: var(--pane-bg); padding: 6px 0; }

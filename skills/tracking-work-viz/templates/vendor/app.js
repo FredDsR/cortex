@@ -12,6 +12,7 @@ const state = {
   showArchive: false,
   treeCollapsed: false,
   graphCollapsed: false,
+  search: "",             // free-text filter against session/task slugs
 };
 
 async function loadData() {
@@ -20,16 +21,33 @@ async function loadData() {
   return await r.json();
 }
 
+function _matchesSearch(slug) {
+  if (!state.search) return true;
+  return slug.toLowerCase().includes(state.search.toLowerCase());
+}
+
 function visibleTasks(session) {
   let tasks = session.tasks;
   if (state.hideClosed) {
     tasks = tasks.filter(t => t.status !== "resolved");
   }
+  if (state.search) {
+    // Show tasks that match OR keep all tasks if the parent session matches.
+    const sessMatches = _matchesSearch(session.slug);
+    if (!sessMatches) tasks = tasks.filter(t => _matchesSearch(t.slug));
+  }
   return tasks;
 }
 
 function visibleSessions(ws) {
-  return ws.sessions.filter(s => state.showArchive || !s.archived);
+  let sess = ws.sessions.filter(s => state.showArchive || !s.archived);
+  if (state.search) {
+    sess = sess.filter(s => {
+      if (_matchesSearch(s.slug)) return true;
+      return s.tasks.some(t => _matchesSearch(t.slug));
+    });
+  }
+  return sess;
 }
 
 function _toggleBtn(label, isActive, onClick) {
@@ -53,10 +71,51 @@ function renderTopbar() {
   back.textContent = "← dashboard";
   back.title = "Back to ~/.work/ overview";
   titleGroup.appendChild(back);
-  const h = document.createElement("h1");
-  h.innerHTML = `<span class="ws-prefix">workspace:</span> ${ws.slug}`;
+
+  const h = document.createElement("span");
+  h.className = "ws-title";
+  h.innerHTML = `<span class="ws-prefix">workspace:</span>`;
   titleGroup.appendChild(h);
+
+  const slugs = (ws.available_workspaces && ws.available_workspaces.length > 1)
+    ? ws.available_workspaces : null;
+  if (slugs) {
+    const sel = document.createElement("select");
+    sel.className = "ws-switcher";
+    sel.title = "Switch workspace";
+    for (const s of slugs) {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      if (s === ws.slug) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    sel.onchange = () => { window.location.href = `${sel.value}.html`; };
+    titleGroup.appendChild(sel);
+  } else {
+    const slugLbl = document.createElement("strong");
+    slugLbl.className = "ws-slug-static";
+    slugLbl.textContent = ws.slug;
+    titleGroup.appendChild(slugLbl);
+  }
+
   bar.appendChild(titleGroup);
+
+  // Search box (middle)
+  const searchGroup = document.createElement("div");
+  searchGroup.className = "group search-group";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Filter sessions / tasks...";
+  searchInput.value = state.search;
+  searchInput.className = "search-input";
+  searchInput.oninput = (e) => {
+    state.search = e.target.value;
+    // Only re-render the body; leave the topbar alone so the input keeps focus.
+    renderBody();
+  };
+  searchGroup.appendChild(searchInput);
+  bar.appendChild(searchGroup);
 
   const spacer = document.createElement("span");
   spacer.className = "spacer";
@@ -320,19 +379,23 @@ function rewriteIntraTaskLinks(rootEl, sessionSlug) {
   }
 }
 
-function render() {
+function renderBody() {
   // Sync layout grid to current pane state so collapsed panes don't reserve empty space.
   const layoutEl = document.getElementById("layout");
   if (layoutEl) {
     layoutEl.classList.toggle("tree-collapsed", state.treeCollapsed);
     layoutEl.classList.toggle("graph-collapsed", state.graphCollapsed);
   }
-  renderTopbar();
   renderTree();
   // Re-fit the graph after a pane toggle since the available width changes.
   if (window._cyRefit) window._cyRefit();
   renderGraph();
   renderContent();
+}
+
+function render() {
+  renderTopbar();
+  renderBody();
 }
 
 function _shortTaskLabel(slug) {

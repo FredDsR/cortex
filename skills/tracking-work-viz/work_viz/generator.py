@@ -21,9 +21,18 @@ def _render(template_name: str, replacements: dict) -> str:
     return out
 
 
+def _list_workspace_slugs(workspaces_root: Path) -> list:
+    if not workspaces_root.is_dir():
+        return []
+    return sorted(p.name for p in workspaces_root.iterdir() if p.is_dir())
+
+
 def generate_one_shot(workspaces_root: Path, slug: str, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
     ws = parse_workspace(workspaces_root, slug)
-    payload = json.dumps(asdict(ws), ensure_ascii=False)
+    data = asdict(ws)
+    # Embed sibling workspace slugs so the UI can render a switcher.
+    data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
+    payload = json.dumps(data, ensure_ascii=False)
     html = _render("index.html", {
         '"@@MODE@@"': '"static"',
         "@@DATA@@": payload,

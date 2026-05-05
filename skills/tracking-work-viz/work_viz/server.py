@@ -104,8 +104,11 @@ class VizServer:
                     self._send_text(html, "text/html; charset=utf-8")
                     return
                 if self.path == "/data.json":
+                    from .generator import _list_workspace_slugs
                     ws = parse_workspace(workspaces_root, slug)
-                    body = json.dumps(asdict(ws), ensure_ascii=False)
+                    data = asdict(ws)
+                    data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
+                    body = json.dumps(data, ensure_ascii=False)
                     self._send_text(body, "application/json; charset=utf-8")
                     return
                 if self.path == "/events":
