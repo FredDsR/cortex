@@ -109,3 +109,54 @@ def test_dashboard_server_blocks_path_traversal(writable_workspaces: Path, tmp_p
             assert e.code == 404
     finally:
         srv.stop()
+
+
+def test_dashboard_server_injects_hot_reload_script(writable_workspaces: Path, tmp_path: Path):
+    viz_out = tmp_path / "viz"
+    srv = DashboardServer(workspaces_root=writable_workspaces, port=0, viz_dir=viz_out)
+    srv.start()
+    try:
+        url = f"http://127.0.0.1:{srv.port}/dashboard.html"
+        with urllib.request.urlopen(url, timeout=5) as r:
+            body = r.read().decode("utf-8")
+        assert 'new EventSource("/events")' in body
+        assert "location.reload()" in body
+    finally:
+        srv.stop()
+
+
+def test_dashboard_server_emits_sse_change_on_workspace_modification(writable_workspaces: Path, tmp_path: Path):
+    viz_out = tmp_path / "viz"
+    srv = DashboardServer(workspaces_root=writable_workspaces, port=0, viz_dir=viz_out)
+    srv.start()
+    received = []
+    stop_evt = threading.Event()
+
+    def listen():
+        url = f"http://127.0.0.1:{srv.port}/events"
+        try:
+            with urllib.request.urlopen(url, timeout=10) as r:
+                for raw in r:
+                    if stop_evt.is_set():
+                        break
+                    line = raw.decode("utf-8").strip()
+                    if line.startswith("data: "):
+                        received.append(line[len("data: "):])
+                        if len(received) >= 1:
+                            break
+        except Exception:
+            pass
+
+    t = threading.Thread(target=listen, daemon=True)
+    t.start()
+    time.sleep(0.3)
+
+    # Touch a file under the workspace root
+    task_path = writable_workspaces / "demo" / "sessions" / "feature-x" / "tasks" / "task-foo.md"
+    task_path.write_text(task_path.read_text() + "\n<!-- touched -->\n")
+
+    t.join(timeout=5)
+    stop_evt.set()
+    srv.stop()
+
+    assert any("change" in m for m in received), f"received={received}"

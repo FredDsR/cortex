@@ -47,6 +47,12 @@ function renderTopbar() {
 
   const titleGroup = document.createElement("div");
   titleGroup.className = "group";
+  const back = document.createElement("a");
+  back.className = "back-link";
+  back.href = "dashboard.html";
+  back.textContent = "← dashboard";
+  back.title = "Back to ~/.work/ overview";
+  titleGroup.appendChild(back);
   const h = document.createElement("h1");
   h.innerHTML = `<span class="ws-prefix">workspace:</span> ${ws.slug}`;
   titleGroup.appendChild(h);

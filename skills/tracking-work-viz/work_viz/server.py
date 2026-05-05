@@ -203,8 +203,18 @@ class VizServer:
             self._server.server_close()
 
 
+_HOT_RELOAD_SCRIPT = b"""<script>
+(function () {
+  if (typeof EventSource === "undefined") return;
+  var es = new EventSource("/events");
+  es.addEventListener("change", function () { location.reload(); });
+})();
+</script>"""
+
+
 class DashboardServer:
-    """Serves ~/.work/viz/ over HTTP, regenerating dashboard + per-workspace pages on each request.
+    """Serves ~/.work/viz/ over HTTP, regenerating dashboard + per-workspace pages on demand,
+    with SSE-driven hot-reload when files under workspaces_root change.
 
     Designed to bypass snap-confined browsers' file:// restrictions by exposing the same content
     over http://127.0.0.1:<port>/. Stdlib only.
@@ -215,12 +225,16 @@ class DashboardServer:
         self.workspaces_root = workspaces_root
         self.viz_dir = viz_dir or (Path.home() / ".work" / "viz")
         self.port = port or _pick_port(preferred_range=(8800, 8810))
+        self._hub = _SSEHub()
         self._server: Optional[ThreadingHTTPServer] = None
         self._serve_thread: Optional[threading.Thread] = None
+        self._watch_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
 
     def _build_handler(self):
         viz_dir = self.viz_dir
         workspaces_root = self.workspaces_root
+        hub = self._hub
 
         # Track when we last regenerated to avoid hammering on rapid asset requests.
         regen_lock = threading.Lock()
@@ -244,12 +258,15 @@ class DashboardServer:
                 return
 
             def do_GET(self):
+                if self.path == "/events":
+                    self._serve_sse(hub)
+                    return
                 # Regenerate when the user lands on / or /dashboard.html (cheap snapshot).
                 if self.path in ("/", "/dashboard.html", "/index.html"):
                     maybe_regen()
                     target = viz_dir / "dashboard.html"
                     if target.is_file():
-                        self._send_file(target, "text/html; charset=utf-8")
+                        self._send_html(target)
                         return
                     self.send_error(HTTPStatus.NOT_FOUND, "dashboard.html missing; run install.sh first")
                     return
@@ -260,7 +277,7 @@ class DashboardServer:
                     maybe_regen()
                     target = viz_dir / rel
                     if target.is_file():
-                        self._send_file(target, "text/html; charset=utf-8")
+                        self._send_html(target)
                         return
                     self.send_error(HTTPStatus.NOT_FOUND)
                     return
@@ -282,17 +299,72 @@ class DashboardServer:
 
                 self.send_error(HTTPStatus.NOT_FOUND)
 
+            def _send_html(self, fp: Path):
+                """Inject the hot-reload SSE script before </body> and serve the result."""
+                data = fp.read_bytes()
+                injected = data.replace(b"</body>", _HOT_RELOAD_SCRIPT + b"</body>", 1)
+                if injected == data:
+                    injected = data + _HOT_RELOAD_SCRIPT
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(injected)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(injected)
+
             def _send_file(self, fp: Path, ctype: str):
                 data = fp.read_bytes()
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(data)))
-                # Disable caching so a fresh-regenerated dashboard is always shown.
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
 
+            def _serve_sse(self, hub: "_SSEHub"):
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
+                try:
+                    self.wfile.write(b": connected\n\n")
+                    self.wfile.flush()
+                except OSError:
+                    return
+                q = hub.register()
+                try:
+                    while True:
+                        try:
+                            event = q.get(timeout=15)
+                            payload = f"event: change\ndata: {event}\n\n"
+                            self.wfile.write(payload.encode("utf-8"))
+                            self.wfile.flush()
+                        except Empty:
+                            try:
+                                self.wfile.write(b": keepalive\n\n")
+                                self.wfile.flush()
+                            except OSError:
+                                break
+                        except OSError:
+                            break
+                finally:
+                    hub.unregister(q)
+
         return Handler
+
+    def _watch_loop(self):
+        target = self.workspaces_root
+        prev = _scan_mtimes(target)
+        debounce_until = 0.0
+        while not self._stop_event.wait(1.0):
+            now = _scan_mtimes(target)
+            if now != prev:
+                debounce_until = time.monotonic() + 0.25
+                prev = now
+            if debounce_until and time.monotonic() >= debounce_until:
+                debounce_until = 0.0
+                self._hub.broadcast("change")
 
     def start(self) -> None:
         Handler = self._build_handler()
@@ -300,8 +372,11 @@ class DashboardServer:
         self.port = self._server.server_address[1]
         self._serve_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._serve_thread.start()
+        self._watch_thread = threading.Thread(target=self._watch_loop, daemon=True)
+        self._watch_thread.start()
 
     def stop(self) -> None:
+        self._stop_event.set()
         if self._server is not None:
             self._server.shutdown()
             self._server.server_close()
