@@ -156,8 +156,8 @@ def parse_workspace(workspaces_root: Path, slug: str) -> Workspace:
     if archive_dir.exists():
         for ad in sorted(p for p in archive_dir.iterdir() if p.is_dir()):
             m = _ARCHIVE_DIR_RE.match(ad.name)
-            slug = m.group(1) if m else ad.name
-            sess = _parse_session(ad, slug=slug)
+            archived_slug = m.group(1) if m else ad.name
+            sess = _parse_session(ad, slug=archived_slug)
             sess.archived = True
             ws.sessions.append(sess)
     return ws

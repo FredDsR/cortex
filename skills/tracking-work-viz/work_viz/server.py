@@ -104,11 +104,30 @@ class VizServer:
                     self._send_text(html, "text/html; charset=utf-8")
                     return
                 if self.path == "/data.json":
-                    from .generator import _list_workspace_slugs
-                    ws = parse_workspace(workspaces_root, slug)
-                    data = asdict(ws)
-                    data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
-                    body = json.dumps(data, ensure_ascii=False)
+                    try:
+                        from .generator import _list_workspace_slugs
+                        ws = parse_workspace(workspaces_root, slug)
+                        data = asdict(ws)
+                        data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
+                        body = json.dumps(data, ensure_ascii=False)
+                    except FileNotFoundError as exc:
+                        body = json.dumps({"error": "workspace_not_found", "detail": str(exc)})
+                        self.send_response(HTTPStatus.NOT_FOUND)
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        data = body.encode("utf-8")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+                    except Exception as exc:
+                        body = json.dumps({"error": "parse_failed", "detail": str(exc)})
+                        self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        data = body.encode("utf-8")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
                     self._send_text(body, "application/json; charset=utf-8")
                     return
                 if self.path == "/events":

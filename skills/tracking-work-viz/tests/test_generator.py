@@ -25,3 +25,20 @@ def test_dashboard_lists_workspaces(workspaces_root: Path, tmp_path: Path):
     text = out.read_text(encoding="utf-8")
     assert "@@DATA@@" not in text
     assert '"slug": "demo"' in text or '"slug":"demo"' in text
+
+
+def test_script_tag_injection_neutralized(workspaces_root: Path, tmp_path: Path):
+    """A task body containing </script> must not break out of the inline <script> block."""
+    # Inject a malicious task body into a writable copy of the fixture
+    import shutil
+    dest = tmp_path / "ws"
+    shutil.copytree(workspaces_root, dest)
+    task_path = dest / "demo" / "sessions" / "feature-x" / "tasks" / "task-foo.md"
+    task_path.write_text(task_path.read_text() + "\n\n</script><script>window.PWNED=true</script>\n")
+    from work_viz.generator import generate_one_shot
+    out = generate_one_shot(dest, "demo", out_dir=tmp_path)
+    text = out.read_text(encoding="utf-8")
+    # The literal </script> in the body must be escaped in the inlined JSON.
+    assert "</script><script>window.PWNED=true</script>" not in text
+    # The escaped form should be present.
+    assert "<\\/script>" in text or "<\\/" in text
