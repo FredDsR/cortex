@@ -9,7 +9,7 @@ from .model import (
 
 
 _FRONTMATTER_DELIM = "---\n"
-_INLINE_FIELD_RE = re.compile(r"^\*\*([^*:]+):\*\*\s*(.*)$")
+_INLINE_FIELD_RE = re.compile(r"^\*\*([^*:]+?)(?::\*\*|\*\*:)\s*(.*)$")
 _HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
 _LINK_TASK_RE = re.compile(r"\[[^\]]+\]\(tasks/([a-z0-9-]+)\.md\)")
 _BARE_TASK_RE = re.compile(r"\b(task-[a-z0-9-]+)\b")
