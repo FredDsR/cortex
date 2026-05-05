@@ -113,7 +113,13 @@ class VizServer:
                     return
                 if self.path.startswith("/vendor/"):
                     rel = self.path[len("/vendor/"):]
-                    fp = runtime_dir / "vendor" / rel
+                    base = (runtime_dir / "vendor").resolve()
+                    try:
+                        fp = (base / rel).resolve()
+                        fp.relative_to(base)
+                    except (ValueError, OSError):
+                        self.send_error(HTTPStatus.NOT_FOUND)
+                        return
                     if fp.is_file():
                         ctype = "text/javascript" if fp.suffix == ".js" else "text/css"
                         self._send_bytes(fp.read_bytes(), ctype)
