@@ -68,3 +68,12 @@ def test_active_agent_count(workspaces_root: Path):
 def test_workspace_active_session_slugs(workspaces_root: Path):
     ws = parse_workspace(workspaces_root, "demo")
     assert ws.active_session_slugs == ["feature-x"]
+
+
+def test_archived_sessions_present(workspaces_root: Path):
+    ws = parse_workspace(workspaces_root, "demo")
+    archived = [s for s in ws.sessions if s.archived]
+    assert len(archived) == 1
+    s = archived[0]
+    assert s.slug == "old-feature"
+    assert s.archived is True

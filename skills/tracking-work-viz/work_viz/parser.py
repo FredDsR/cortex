@@ -14,6 +14,7 @@ _HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
 _LINK_TASK_RE = re.compile(r"\[[^\]]+\]\(tasks/([a-z0-9-]+)\.md\)")
 _BARE_TASK_RE = re.compile(r"\b(task-[a-z0-9-]+)\b")
 _BLOCKED_BY_RE = re.compile(r"^\s*\*?\*?\s*Blocked by:?\s*\*?\*?\s*(.+)$", re.IGNORECASE)
+_ARCHIVE_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 
 _HEADING_TO_STATUS = {
     "in progress": STATUS_IN_PROGRESS,
@@ -151,4 +152,12 @@ def parse_workspace(workspaces_root: Path, slug: str) -> Workspace:
     if sessions_dir.exists():
         for sd in sorted(p for p in sessions_dir.iterdir() if p.is_dir()):
             ws.sessions.append(_parse_session(sd))
+    archive_dir = ws_dir / "archive"
+    if archive_dir.exists():
+        for ad in sorted(p for p in archive_dir.iterdir() if p.is_dir()):
+            m = _ARCHIVE_DIR_RE.match(ad.name)
+            slug = m.group(1) if m else ad.name
+            sess = _parse_session(ad, slug=slug)
+            sess.archived = True
+            ws.sessions.append(sess)
     return ws
