@@ -306,11 +306,23 @@ function renderGraph() {
   }
 }
 
+function attachLiveReload() {
+  if (window.VIZ_MODE !== "dynamic" || typeof EventSource === "undefined") return;
+  const es = new EventSource("/events");
+  es.addEventListener("change", async () => {
+    state.data = await loadData();
+    render();
+  });
+  es.onerror = () => {
+    // Browser will auto-retry. Optional: show a small indicator.
+  };
+}
+
 (async function init() {
   state.data = await loadData();
-  // default selection: first non-archived session
   const ws = state.data;
   const firstSess = ws.sessions.find(s => !s.archived);
   if (firstSess) state.selection = { kind: "session", sessionSlug: firstSess.slug };
   render();
+  attachLiveReload();
 })();

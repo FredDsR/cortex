@@ -44,9 +44,27 @@ def main(argv: list | None = None) -> int:
         return 0
 
     if args.watch:
-        # Wired in Task 11.
-        print("watch mode not yet implemented", file=sys.stderr)
-        return 2
+        from .server import VizServer
+        srv = VizServer(workspaces_root=args.workspaces_root, slug=args.workspace,
+                         port=args.port)
+        srv.start()
+        url = f"http://127.0.0.1:{srv.port}/"
+        print(f"work-viz watch: serving {url}")
+        if not args.no_open:
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception:
+                pass
+        try:
+            while True:
+                import time as _t
+                _t.sleep(60)
+        except KeyboardInterrupt:
+            print("stopping")
+        finally:
+            srv.stop()
+        return 0
 
     from .generator import generate_one_shot
     out = generate_one_shot(args.workspaces_root, args.workspace)
