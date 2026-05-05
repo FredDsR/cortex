@@ -223,7 +223,7 @@ function buildGraphElements(ws) {
         label: sess.slug + (sess.active_agent_count > 1 ? `  (${sess.active_agent_count})` : ""),
         kind: "session",
         status: aggregateSessionStatus(sess),
-        archived: !!sess.archived,
+        archived: sess.archived ? "true" : "false",
       },
     });
     elements.push({ data: { id: `e:ws:${sess.slug}`, source: `ws:${ws.slug}`, target: sessId, kind: "contains" } });
@@ -290,9 +290,13 @@ function renderGraph() {
       render();
     });
   } else {
-    // Update elements without rebuilding (preserves zoom/pan).
+    // Save viewport before relayout (cy.layout.run() resets zoom/pan).
+    const _zoom = cy.zoom();
+    const _pan = cy.pan();
     cy.json({ elements: buildGraphElements(state.data) });
     cy.layout({ name: "dagre", rankDir: "TB" }).run();
+    cy.zoom(_zoom);
+    cy.pan(_pan);
   }
 
   // Sync selection ring to graph.

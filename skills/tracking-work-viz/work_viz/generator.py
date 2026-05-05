@@ -67,9 +67,16 @@ def _summarize(workspaces_root: Path) -> dict:
 
 
 def generate_dashboard(workspaces_root: Path, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
-    payload = json.dumps(_summarize(workspaces_root), ensure_ascii=False)
-    html = _render("dashboard.html", {"@@DATA@@": payload})
+    summary = _summarize(workspaces_root)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Also generate per-workspace pages so dashboard links resolve.
+    for entry in summary["workspaces"]:
+        try:
+            generate_one_shot(workspaces_root, entry["slug"], out_dir=out_dir)
+        except Exception as exc:
+            print(f"warning: failed to generate {entry['slug']}.html: {exc}", file=__import__("sys").stderr)
+    payload = json.dumps(summary, ensure_ascii=False)
+    html = _render("dashboard.html", {"@@DATA@@": payload})
     out_path = out_dir / "dashboard.html"
     out_path.write_text(html, encoding="utf-8")
     return out_path

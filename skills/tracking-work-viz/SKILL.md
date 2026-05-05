@@ -23,3 +23,8 @@ Use this when the user is overwhelmed by their `~/.work/` content and asks for a
 ## Read-only
 
 This skill never edits anything under `~/.work/`. Editing tasks stays in the existing `tracking-work` flow.
+
+## v1 limitations
+
+- The "focused session" indicator (highlighting which session each agent currently has selected, derived from workspace-level `.active.<id>` files) is not rendered in the UI. Agent badges show per-session count, not focus.
+- Watch mode does not auto-regenerate sibling workspace pages; if you switch workspaces, re-run the appropriate `work-viz` command.
