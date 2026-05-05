@@ -2,6 +2,8 @@
 
 const STATUS_ORDER = ["in_progress", "open", "blocked", "resolved", "unknown"];
 
+let cy = null;  // Cytoscape instance, lazily created
+
 const state = {
   data: null,
   selection: null,        // { kind: "session"|"task", sessionSlug, taskSlug? }
@@ -205,8 +207,103 @@ function rewriteIntraTaskLinks(rootEl, sessionSlug) {
 function render() {
   renderTopbar();
   renderTree();
-  // Graph wired in Task 10.
+  renderGraph();
   renderContent();
+}
+
+function buildGraphElements(ws) {
+  const elements = [];
+  // Workspace node
+  elements.push({ data: { id: `ws:${ws.slug}`, label: ws.slug, kind: "workspace" } });
+  for (const sess of visibleSessions(ws)) {
+    const sessId = `sess:${sess.slug}`;
+    elements.push({
+      data: {
+        id: sessId,
+        label: sess.slug + (sess.active_agent_count > 1 ? `  (${sess.active_agent_count})` : ""),
+        kind: "session",
+        status: aggregateSessionStatus(sess),
+        archived: !!sess.archived,
+      },
+    });
+    elements.push({ data: { id: `e:ws:${sess.slug}`, source: `ws:${ws.slug}`, target: sessId, kind: "contains" } });
+    const tasks = visibleTasks(sess);
+    for (const t of tasks) {
+      const tId = `task:${sess.slug}:${t.slug}`;
+      elements.push({
+        data: { id: tId, label: t.slug, kind: "task", status: t.status, sessionSlug: sess.slug, taskSlug: t.slug },
+      });
+      elements.push({ data: { id: `e:c:${sess.slug}:${t.slug}`, source: sessId, target: tId, kind: "contains" } });
+      for (const upstream of (t.blocked_by || [])) {
+        const upstreamId = `task:${sess.slug}:${upstream}`;
+        elements.push({
+          data: { id: `e:b:${sess.slug}:${t.slug}:${upstream}`, source: upstreamId, target: tId, kind: "blocks" },
+        });
+      }
+    }
+  }
+  return elements;
+}
+
+function renderGraph() {
+  const pane = document.getElementById("graph-pane");
+  pane.classList.toggle("hidden", state.graphCollapsed);
+  if (state.graphCollapsed) return;
+
+  if (!cy) {
+    // Register dagre extension once. The UMD bundle from unpkg exposes it as window.cytoscapeDagre.
+    if (window.cytoscape && window.cytoscapeDagre && !window._cyDagreRegistered) {
+      window.cytoscape.use(window.cytoscapeDagre);
+      window._cyDagreRegistered = true;
+    }
+    pane.innerHTML = '<div id="cy-host"></div>';
+    cy = window.cytoscape({
+      container: document.getElementById("cy-host"),
+      style: [
+        { selector: "node", style: { "label": "data(label)", "font-size": 11, "text-valign": "center", "color": "#fff" } },
+        { selector: 'node[kind = "workspace"]', style: { "shape": "round-rectangle", "background-color": "#444", "color": "#fff", "padding": 8 } },
+        { selector: 'node[kind = "session"]', style: { "shape": "round-rectangle", "background-color": "#1976d2" } },
+        { selector: 'node[kind = "session"][status = "blocked"]', style: { "background-color": "#d32f2f" } },
+        { selector: 'node[kind = "session"][status = "resolved"]', style: { "background-color": "#388e3c" } },
+        { selector: 'node[kind = "session"][status = "open"]', style: { "background-color": "#888" } },
+        { selector: 'node[archived = "true"]', style: { "opacity": 0.5 } },
+        { selector: 'node[kind = "task"]', style: { "shape": "ellipse", "background-color": "#888" } },
+        { selector: 'node[kind = "task"][status = "in_progress"]', style: { "background-color": "#1976d2" } },
+        { selector: 'node[kind = "task"][status = "blocked"]', style: { "background-color": "#d32f2f" } },
+        { selector: 'node[kind = "task"][status = "resolved"]', style: { "background-color": "#388e3c", "opacity": 0.6 } },
+        { selector: 'node[kind = "task"][status = "open"]', style: { "background-color": "#999" } },
+        { selector: ":selected", style: { "border-width": 3, "border-color": "#fdd835" } },
+        { selector: "edge", style: { "width": 1.5, "line-color": "#bbb", "target-arrow-shape": "triangle", "target-arrow-color": "#bbb", "curve-style": "bezier" } },
+        { selector: 'edge[kind = "blocks"]', style: { "line-color": "#d32f2f", "target-arrow-color": "#d32f2f", "line-style": "dashed" } },
+      ],
+      layout: { name: "dagre", rankDir: "TB" },
+      elements: buildGraphElements(state.data),
+    });
+    cy.on("tap", "node", (ev) => {
+      const d = ev.target.data();
+      if (d.kind === "task") {
+        state.selection = { kind: "task", sessionSlug: d.sessionSlug, taskSlug: d.taskSlug };
+      } else if (d.kind === "session") {
+        const slug = d.id.slice(5);
+        state.selection = { kind: "session", sessionSlug: slug };
+      }
+      render();
+    });
+  } else {
+    // Update elements without rebuilding (preserves zoom/pan).
+    cy.json({ elements: buildGraphElements(state.data) });
+    cy.layout({ name: "dagre", rankDir: "TB" }).run();
+  }
+
+  // Sync selection ring to graph.
+  cy.nodes().unselect();
+  if (state.selection) {
+    const id = state.selection.kind === "task"
+      ? `task:${state.selection.sessionSlug}:${state.selection.taskSlug}`
+      : `sess:${state.selection.sessionSlug}`;
+    const node = cy.getElementById(id);
+    if (node && node.length) node.select();
+  }
 }
 
 (async function init() {

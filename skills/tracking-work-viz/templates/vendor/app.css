@@ -77,3 +77,6 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: var(--font-stack)
 .content-fields .field strong { color: #555; }
 
 .archived-tag { color: #888; font-style: italic; margin-left: 6px; }
+
+#graph-pane { padding: 0; }
+#cy-host { width: 100%; height: 100%; }
