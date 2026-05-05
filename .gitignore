@@ -3,3 +3,7 @@ skills/*/tests/tmp/
 
 # vendored JS for tracking-work-viz (populated by install.sh)
 skills/tracking-work-viz/vendor/
+
+# Python bytecode
+__pycache__/
+*.pyc
