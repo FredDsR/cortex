@@ -32,35 +32,65 @@ function visibleSessions(ws) {
   return ws.sessions.filter(s => state.showArchive || !s.archived);
 }
 
+function _toggleBtn(label, isActive, onClick) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  if (isActive) b.classList.add("active");
+  b.onclick = onClick;
+  return b;
+}
+
 function renderTopbar() {
   const ws = state.data;
   const bar = document.getElementById("topbar");
   bar.innerHTML = "";
+
+  const titleGroup = document.createElement("div");
+  titleGroup.className = "group";
   const h = document.createElement("h1");
-  h.textContent = `Workspace: ${ws.slug}`;
-  bar.appendChild(h);
+  h.innerHTML = `<span class="ws-prefix">workspace:</span> ${ws.slug}`;
+  titleGroup.appendChild(h);
+  bar.appendChild(titleGroup);
 
-  const spacer = document.createElement("span"); spacer.className = "spacer"; bar.appendChild(spacer);
+  const spacer = document.createElement("span");
+  spacer.className = "spacer";
+  bar.appendChild(spacer);
 
-  const treeBtn = document.createElement("button");
-  treeBtn.textContent = state.treeCollapsed ? "Show tree" : "Hide tree";
-  treeBtn.onclick = () => { state.treeCollapsed = !state.treeCollapsed; render(); };
-  bar.appendChild(treeBtn);
+  const panes = document.createElement("div");
+  panes.className = "group";
+  const panesLbl = document.createElement("span");
+  panesLbl.className = "group-label";
+  panesLbl.textContent = "panes";
+  panes.appendChild(panesLbl);
+  panes.appendChild(_toggleBtn(
+    state.treeCollapsed ? "Show tree" : "Hide tree",
+    state.treeCollapsed,
+    () => { state.treeCollapsed = !state.treeCollapsed; render(); }
+  ));
+  panes.appendChild(_toggleBtn(
+    state.graphCollapsed ? "Show graph" : "Hide graph",
+    state.graphCollapsed,
+    () => { state.graphCollapsed = !state.graphCollapsed; render(); }
+  ));
+  bar.appendChild(panes);
 
-  const graphBtn = document.createElement("button");
-  graphBtn.textContent = state.graphCollapsed ? "Show graph" : "Hide graph";
-  graphBtn.onclick = () => { state.graphCollapsed = !state.graphCollapsed; render(); };
-  bar.appendChild(graphBtn);
-
-  const closedBtn = document.createElement("button");
-  closedBtn.textContent = state.hideClosed ? "Show closed" : "Hide closed";
-  closedBtn.onclick = () => { state.hideClosed = !state.hideClosed; render(); };
-  bar.appendChild(closedBtn);
-
-  const archBtn = document.createElement("button");
-  archBtn.textContent = state.showArchive ? "Hide archive" : "Show archive";
-  archBtn.onclick = () => { state.showArchive = !state.showArchive; render(); };
-  bar.appendChild(archBtn);
+  const filters = document.createElement("div");
+  filters.className = "group";
+  const filtersLbl = document.createElement("span");
+  filtersLbl.className = "group-label";
+  filtersLbl.textContent = "filters";
+  filters.appendChild(filtersLbl);
+  filters.appendChild(_toggleBtn(
+    "Hide closed",
+    state.hideClosed,
+    () => { state.hideClosed = !state.hideClosed; render(); }
+  ));
+  filters.appendChild(_toggleBtn(
+    "Show archive",
+    state.showArchive,
+    () => { state.showArchive = !state.showArchive; render(); }
+  ));
+  bar.appendChild(filters);
 }
 
 function statusPill(status) {
@@ -95,7 +125,11 @@ function renderTree() {
     caret.textContent = collapsed ? "+" : "-";
     sessRow.appendChild(caret);
     sessRow.appendChild(statusPill(aggregateSessionStatus(sess)));
-    sessRow.appendChild(document.createTextNode(sess.slug));
+    const sessLbl = document.createElement("span");
+    sessLbl.className = "tree-label";
+    sessLbl.textContent = sess.slug;
+    sessRow.title = sess.slug;
+    sessRow.appendChild(sessLbl);
     if (sess.active_agent_count > 1) {
       const badge = document.createElement("span");
       badge.className = "agent-badge";
@@ -129,7 +163,11 @@ function renderTree() {
           taskRow.classList.add("selected");
         }
         taskRow.appendChild(statusPill(t.status));
-        taskRow.appendChild(document.createTextNode(t.slug));
+        const taskLbl = document.createElement("span");
+        taskLbl.className = "tree-label";
+        taskLbl.textContent = t.slug;
+        taskRow.title = t.slug;
+        taskRow.appendChild(taskLbl);
         taskRow.onclick = () => {
           state.selection = { kind: "task", sessionSlug: sess.slug, taskSlug: t.slug };
           render();
@@ -140,31 +178,88 @@ function renderTree() {
   }
 }
 
+function _stripLeadingFields(body) {
+  // Strip the leading **Key:** value / **Key**: value lines that we already render in the fields panel.
+  // Stops at the first non-blank, non-field line so the rest of the body is preserved verbatim.
+  const lines = body.split("\n");
+  let i = 0;
+  // Skip the first leading H1 (task title) since we render it as content-title.
+  let titleSkipped = false;
+  if (i < lines.length && /^#\s+/.test(lines[i])) {
+    titleSkipped = true;
+    i++;
+    while (i < lines.length && lines[i].trim() === "") i++;
+  }
+  const fieldRe = /^\s*\*\*[^*:]+(?::\*\*|\*\*:)\s*.*$/;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === "") { i++; continue; }
+    if (fieldRe.test(line)) { i++; continue; }
+    break;
+  }
+  return { rest: lines.slice(i).join("\n"), strippedTitle: titleSkipped };
+}
+
+function _renderFields(parent, entries) {
+  if (!entries.length) return;
+  const grid = document.createElement("div");
+  grid.className = "content-fields";
+  for (const [k, v] of entries) {
+    const key = document.createElement("div");
+    key.className = "field-key";
+    key.textContent = k;
+    const val = document.createElement("div");
+    val.className = "field-val";
+    val.textContent = v;
+    grid.appendChild(key);
+    grid.appendChild(val);
+  }
+  parent.appendChild(grid);
+}
+
+function _bodyTitle(body, fallback) {
+  const m = body.match(/^#\s+(.+?)\s*$/m);
+  return m ? m[1] : fallback;
+}
+
 function renderContent() {
   const pane = document.getElementById("content-pane");
   pane.innerHTML = "";
   if (!state.selection) {
-    pane.textContent = "Select a session or task on the left.";
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Select a session or task on the left.";
+    pane.appendChild(empty);
     return;
   }
   const sess = state.data.sessions.find(s => s.slug === state.selection.sessionSlug);
-  if (!sess) { pane.textContent = "(no longer present)"; return; }
+  if (!sess) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "(no longer present)";
+    pane.appendChild(empty);
+    return;
+  }
 
   if (state.selection.kind === "session") {
-    const fields = document.createElement("div");
-    fields.className = "content-fields";
-    if (sess.summary_meta && Object.keys(sess.summary_meta).length) {
-      for (const [k, v] of Object.entries(sess.summary_meta)) {
-        const f = document.createElement("span");
-        f.className = "field";
-        f.innerHTML = `<strong>${k}:</strong> ${v}`;
-        fields.appendChild(f);
-      }
-    }
-    pane.appendChild(fields);
+    const header = document.createElement("div");
+    header.className = "content-header";
+    const kicker = document.createElement("div");
+    kicker.className = "content-kicker";
+    kicker.textContent = `session ${sess.archived ? "(archived)" : ""}`;
+    header.appendChild(kicker);
+    const title = document.createElement("h2");
+    title.className = "content-title";
+    title.appendChild(statusPill(aggregateSessionStatus(sess)));
+    title.appendChild(document.createTextNode(_bodyTitle(sess.summary_text || "", sess.slug)));
+    header.appendChild(title);
+    _renderFields(header, Object.entries(sess.summary_meta || {}));
+    pane.appendChild(header);
+
+    const { rest } = _stripLeadingFields(sess.summary_text || "");
     const md = document.createElement("div");
     md.className = "markdown-body";
-    md.innerHTML = window.marked.parse(sess.summary_text || "(empty SUMMARY.md)");
+    md.innerHTML = window.marked.parse(rest || "(empty SUMMARY.md)");
     pane.appendChild(md);
     rewriteIntraTaskLinks(md, sess.slug);
     return;
@@ -172,20 +267,32 @@ function renderContent() {
 
   // task
   const task = sess.tasks.find(t => t.slug === state.selection.taskSlug);
-  if (!task) { pane.textContent = "(task no longer present)"; return; }
-
-  const fields = document.createElement("div");
-  fields.className = "content-fields";
-  for (const [k, v] of Object.entries(task.inline_fields)) {
-    const f = document.createElement("span");
-    f.className = "field";
-    f.innerHTML = `<strong>${k}:</strong> ${v}`;
-    fields.appendChild(f);
+  if (!task) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "(task no longer present)";
+    pane.appendChild(empty);
+    return;
   }
-  pane.appendChild(fields);
+
+  const header = document.createElement("div");
+  header.className = "content-header";
+  const kicker = document.createElement("div");
+  kicker.className = "content-kicker";
+  kicker.textContent = `task in ${sess.slug}`;
+  header.appendChild(kicker);
+  const title = document.createElement("h2");
+  title.className = "content-title";
+  title.appendChild(statusPill(task.status));
+  title.appendChild(document.createTextNode(_bodyTitle(task.body || "", task.slug)));
+  header.appendChild(title);
+  _renderFields(header, Object.entries(task.inline_fields || {}));
+  pane.appendChild(header);
+
+  const { rest } = _stripLeadingFields(task.body || "");
   const md = document.createElement("div");
   md.className = "markdown-body";
-  md.innerHTML = window.marked.parse(task.body || "");
+  md.innerHTML = window.marked.parse(rest || "");
   pane.appendChild(md);
   rewriteIntraTaskLinks(md, sess.slug);
 }
@@ -211,16 +318,20 @@ function render() {
   renderContent();
 }
 
+function _shortTaskLabel(slug) {
+  return slug.startsWith("task-") ? slug.slice(5) : slug;
+}
+
 function buildGraphElements(ws) {
   const elements = [];
-  // Workspace node
   elements.push({ data: { id: `ws:${ws.slug}`, label: ws.slug, kind: "workspace" } });
   for (const sess of visibleSessions(ws)) {
     const sessId = `sess:${sess.slug}`;
+    const sessLabel = sess.slug + (sess.active_agent_count > 1 ? ` (${sess.active_agent_count})` : "");
     elements.push({
       data: {
         id: sessId,
-        label: sess.slug + (sess.active_agent_count > 1 ? `  (${sess.active_agent_count})` : ""),
+        label: sessLabel,
         kind: "session",
         status: aggregateSessionStatus(sess),
         archived: sess.archived ? "true" : "false",
@@ -231,7 +342,14 @@ function buildGraphElements(ws) {
     for (const t of tasks) {
       const tId = `task:${sess.slug}:${t.slug}`;
       elements.push({
-        data: { id: tId, label: t.slug, kind: "task", status: t.status, sessionSlug: sess.slug, taskSlug: t.slug },
+        data: {
+          id: tId,
+          label: _shortTaskLabel(t.slug),
+          kind: "task",
+          status: t.status,
+          sessionSlug: sess.slug,
+          taskSlug: t.slug,
+        },
       });
       elements.push({ data: { id: `e:c:${sess.slug}:${t.slug}`, source: sessId, target: tId, kind: "contains" } });
       for (const upstream of (t.blocked_by || [])) {
@@ -244,6 +362,16 @@ function buildGraphElements(ws) {
   }
   return elements;
 }
+
+const _DAGRE_LAYOUT = {
+  name: "dagre",
+  rankDir: "LR",
+  nodeSep: 14,
+  rankSep: 110,
+  edgeSep: 8,
+  padding: 28,
+  fit: true,
+};
 
 function renderGraph() {
   const pane = document.getElementById("graph-pane");
@@ -259,25 +387,82 @@ function renderGraph() {
     pane.innerHTML = '<div id="cy-host"></div>';
     cy = window.cytoscape({
       container: document.getElementById("cy-host"),
+      wheelSensitivity: 0.25,
       style: [
-        { selector: "node", style: { "label": "data(label)", "font-size": 11, "text-valign": "center", "color": "#fff" } },
-        { selector: 'node[kind = "workspace"]', style: { "shape": "round-rectangle", "background-color": "#444", "color": "#fff", "padding": 8 } },
-        { selector: 'node[kind = "session"]', style: { "shape": "round-rectangle", "background-color": "#1976d2" } },
-        { selector: 'node[kind = "session"][status = "blocked"]', style: { "background-color": "#d32f2f" } },
-        { selector: 'node[kind = "session"][status = "resolved"]', style: { "background-color": "#388e3c" } },
-        { selector: 'node[kind = "session"][status = "open"]', style: { "background-color": "#888" } },
-        { selector: 'node[archived = "true"]', style: { "opacity": 0.5 } },
-        { selector: 'node[kind = "task"]', style: { "shape": "ellipse", "background-color": "#888" } },
-        { selector: 'node[kind = "task"][status = "in_progress"]', style: { "background-color": "#1976d2" } },
-        { selector: 'node[kind = "task"][status = "blocked"]', style: { "background-color": "#d32f2f" } },
-        { selector: 'node[kind = "task"][status = "resolved"]', style: { "background-color": "#388e3c", "opacity": 0.6 } },
-        { selector: 'node[kind = "task"][status = "open"]', style: { "background-color": "#999" } },
-        { selector: ":selected", style: { "border-width": 3, "border-color": "#fdd835" } },
-        { selector: "edge", style: { "width": 1.5, "line-color": "#bbb", "target-arrow-shape": "triangle", "target-arrow-color": "#bbb", "curve-style": "bezier" } },
-        { selector: 'edge[kind = "blocks"]', style: { "line-color": "#d32f2f", "target-arrow-color": "#d32f2f", "line-style": "dashed" } },
+        // Workspace and session: rounded rectangles with the label inside the shape.
+        { selector: "node", style: {
+            "label": "data(label)",
+            "font-size": 11,
+            "font-family": "-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif",
+            "text-valign": "center",
+            "text-halign": "center",
+            "color": "#ffffff",
+            "text-outline-width": 0,
+        }},
+        { selector: 'node[kind = "workspace"]', style: {
+            "shape": "round-rectangle",
+            "background-color": "#37404a",
+            "width": "label",
+            "height": "label",
+            "padding": 10,
+            "font-weight": "bold",
+            "font-size": 12,
+        }},
+        { selector: 'node[kind = "session"]', style: {
+            "shape": "round-rectangle",
+            "background-color": "#1f7ae0",
+            "width": "label",
+            "height": "label",
+            "padding": 10,
+            "font-weight": "bold",
+            "font-size": 12,
+        }},
+        { selector: 'node[kind = "session"][status = "blocked"]', style: { "background-color": "#e53935" } },
+        { selector: 'node[kind = "session"][status = "resolved"]', style: { "background-color": "#2e9358" } },
+        { selector: 'node[kind = "session"][status = "open"]', style: { "background-color": "#8a929c" } },
+        { selector: 'node[archived = "true"]', style: { "opacity": 0.55 } },
+        // Task: small dot with label to the right (LR orientation puts each task on its own row).
+        { selector: 'node[kind = "task"]', style: {
+            "shape": "ellipse",
+            "background-color": "#8a929c",
+            "width": 16,
+            "height": 16,
+            "border-width": 2,
+            "border-color": "#ffffff",
+            "label": "data(label)",
+            "color": "#1f2933",
+            "text-valign": "center",
+            "text-halign": "right",
+            "text-margin-x": 6,
+            "font-size": 10.5,
+            "text-wrap": "none",
+        }},
+        { selector: 'node[kind = "task"][status = "in_progress"]', style: { "background-color": "#1f7ae0" } },
+        { selector: 'node[kind = "task"][status = "blocked"]', style: { "background-color": "#e53935" } },
+        { selector: 'node[kind = "task"][status = "resolved"]', style: { "background-color": "#2e9358", "opacity": 0.7 } },
+        { selector: 'node[kind = "task"][status = "open"]', style: { "background-color": "#9aa3ad" } },
+        { selector: ":selected", style: { "border-width": 3, "border-color": "#f1c40f" } },
+        { selector: "edge", style: {
+            "width": 1.4,
+            "line-color": "#cdd2da",
+            "target-arrow-shape": "triangle",
+            "target-arrow-color": "#cdd2da",
+            "arrow-scale": 0.8,
+            "curve-style": "bezier",
+        }},
+        { selector: 'edge[kind = "blocks"]', style: {
+            "line-color": "#e53935",
+            "target-arrow-color": "#e53935",
+            "line-style": "dashed",
+            "width": 1.8,
+        }},
       ],
-      layout: { name: "dagre", rankDir: "TB" },
+      layout: _DAGRE_LAYOUT,
       elements: buildGraphElements(state.data),
+    });
+    // Fit on initial render so the workspace uses the full pane.
+    cy.ready(() => {
+      cy.fit(undefined, 24);
     });
     cy.on("tap", "node", (ev) => {
       const d = ev.target.data();
@@ -294,7 +479,7 @@ function renderGraph() {
     const _zoom = cy.zoom();
     const _pan = cy.pan();
     cy.json({ elements: buildGraphElements(state.data) });
-    cy.layout({ name: "dagre", rankDir: "TB" }).run();
+    cy.layout(_DAGRE_LAYOUT).run();
     cy.zoom(_zoom);
     cy.pan(_pan);
   }

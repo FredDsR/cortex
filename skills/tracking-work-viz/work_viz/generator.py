@@ -41,8 +41,13 @@ def _summarize(workspaces_root: Path) -> dict:
     for ws_dir in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
         slug = ws_dir.name
         ws = parse_workspace(workspaces_root, slug)
-        session_count = len([s for s in ws.sessions if not s.archived])
-        task_count = sum(len(s.tasks) for s in ws.sessions if not s.archived)
+        active_sessions = [s for s in ws.sessions if not s.archived]
+        session_count = len(active_sessions)
+        all_tasks = [t for s in active_sessions for t in s.tasks]
+        task_count = len(all_tasks)
+        status_counts = {"in_progress": 0, "open": 0, "blocked": 0, "resolved": 0, "unknown": 0}
+        for t in all_tasks:
+            status_counts[t.status] = status_counts.get(t.status, 0) + 1
         last_mtime = 0.0
         for dp, _, fns in os.walk(ws_dir):
             for fn in fns:
@@ -61,7 +66,9 @@ def _summarize(workspaces_root: Path) -> dict:
             "session_count": session_count,
             "task_count": task_count,
             "last_updated": last_iso,
+            "last_mtime": last_mtime,
             "agent_count": len(ws.active_session_slugs),
+            "status_counts": status_counts,
         })
     return out
 
