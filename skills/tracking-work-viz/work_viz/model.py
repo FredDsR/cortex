@@ -1,6 +1,5 @@
 """Data model for parsed workspaces, sessions, and tasks."""
 from dataclasses import dataclass, field
-from typing import Optional
 
 STATUS_OPEN = "open"
 STATUS_IN_PROGRESS = "in_progress"
