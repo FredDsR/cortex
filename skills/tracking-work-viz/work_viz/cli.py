@@ -24,6 +24,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", dest="emit_json", action="store_true", help="Print parsed model JSON to stdout.")
     p.add_argument("--workspaces-root", type=Path, default=DEFAULT_WORKSPACES_ROOT,
                    help="Override the workspaces root (defaults to ~/.work/workspaces).")
+    p.add_argument("--out-dir", type=Path, default=None,
+                   help="Override the output directory for generated HTML (defaults to ~/.work/viz). "
+                        "Vendor JS/CSS must already be present in <out-dir>/vendor/ for the page to render.")
     p.add_argument("--port", type=int, default=0, help="Server port (0 picks 8765..8775 for watch, 8800..8810 for serve).")
     p.add_argument("--no-open", action="store_true", help="Server modes: don't auto-open the browser.")
     return p
@@ -33,13 +36,17 @@ def main(argv: list | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    # Resolve output dir: explicit --out-dir wins, otherwise fall back to the generator default.
+    from .generator import DEFAULT_OUT_DIR as _DEFAULT_OUT
+    out_dir = args.out_dir if args.out_dir is not None else _DEFAULT_OUT
+
     # `serve` either via positional `serve` or via --serve flag
     if args.serve or args.workspace == "serve":
         from .server import DashboardServer
         from .generator import generate_dashboard
         # Generate fresh content before serving so the dashboard reflects current state.
-        generate_dashboard(args.workspaces_root)
-        srv = DashboardServer(workspaces_root=args.workspaces_root, port=args.port)
+        generate_dashboard(args.workspaces_root, out_dir=out_dir)
+        srv = DashboardServer(workspaces_root=args.workspaces_root, port=args.port, viz_dir=out_dir)
         srv.start()
         url = f"http://127.0.0.1:{srv.port}/dashboard.html"
         print(f"work-viz serve: dashboard at {url}")
@@ -62,7 +69,7 @@ def main(argv: list | None = None) -> int:
 
     if args.workspace_flag == "all" or args.workspace == "all":
         from .generator import generate_dashboard
-        out = generate_dashboard(args.workspaces_root)
+        out = generate_dashboard(args.workspaces_root, out_dir=out_dir)
         print(out)
         return 0
 
@@ -78,7 +85,7 @@ def main(argv: list | None = None) -> int:
     if args.watch:
         from .server import VizServer
         srv = VizServer(workspaces_root=args.workspaces_root, slug=args.workspace,
-                         port=args.port)
+                         port=args.port, runtime_dir=out_dir)
         srv.start()
         url = f"http://127.0.0.1:{srv.port}/"
         print(f"work-viz watch: serving {url}")
@@ -99,6 +106,6 @@ def main(argv: list | None = None) -> int:
         return 0
 
     from .generator import generate_one_shot
-    out = generate_one_shot(args.workspaces_root, args.workspace)
+    out = generate_one_shot(args.workspaces_root, args.workspace, out_dir=out_dir)
     print(out)
     return 0
