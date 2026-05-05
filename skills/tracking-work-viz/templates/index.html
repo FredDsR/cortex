@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>work-viz</title>
+  <link rel="stylesheet" href="vendor/app.css">
+</head>
+<body>
+  <header id="topbar"></header>
+  <main id="layout">
+    <aside id="tree-pane" class="pane"></aside>
+    <section id="graph-pane" class="pane"></section>
+    <article id="content-pane" class="pane"></article>
+  </main>
+  <script>
+    window.VIZ_MODE = "@@MODE@@";
+    window.VIZ_DATA = @@DATA@@;
+  </script>
+  <script src="vendor/cytoscape.min.js"></script>
+  <script src="vendor/dagre.min.js"></script>
+  <script src="vendor/cytoscape-dagre.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/app.js"></script>
+</body>
+</html>
