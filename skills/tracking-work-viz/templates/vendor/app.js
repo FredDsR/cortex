@@ -234,7 +234,10 @@ function renderContent() {
   if (!state.selection) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Select a session or task on the left.";
+    const hasSessions = state.data && (state.data.sessions || []).some(s => !s.archived);
+    empty.textContent = hasSessions
+      ? "Select a session or task on the left."
+      : "This workspace has no sessions yet. Start one with the tracking-work skill.";
     pane.appendChild(empty);
     return;
   }
@@ -318,6 +321,12 @@ function rewriteIntraTaskLinks(rootEl, sessionSlug) {
 }
 
 function render() {
+  // Sync layout grid to current pane state so collapsed panes don't reserve empty space.
+  const layoutEl = document.getElementById("layout");
+  if (layoutEl) {
+    layoutEl.classList.toggle("tree-collapsed", state.treeCollapsed);
+    layoutEl.classList.toggle("graph-collapsed", state.graphCollapsed);
+  }
   renderTopbar();
   renderTree();
   // Re-fit the graph after a pane toggle since the available width changes.
@@ -468,10 +477,13 @@ function renderGraph() {
       layout: _DAGRE_LAYOUT,
       elements: buildGraphElements(state.data),
     });
-    // Fit on initial render so the workspace uses the full pane.
-    cy.ready(() => {
+    // Fit on initial render so the workspace uses the full pane (clamped so a single-node
+    // workspace doesn't blow up to fill the whole viewport).
+    const _fitClamped = () => {
       cy.fit(undefined, 24);
-    });
+      if (cy.zoom() > 1.4) { cy.zoom(1.4); cy.center(); }
+    };
+    cy.ready(_fitClamped);
     // Re-fit on window resize / pane toggle so the graph keeps using the full area.
     if (!window._cyResizeAttached) {
       window._cyResizeAttached = true;
@@ -479,7 +491,7 @@ function renderGraph() {
       const refit = () => {
         if (_resizeT) clearTimeout(_resizeT);
         _resizeT = setTimeout(() => {
-          if (cy && !state.graphCollapsed) { cy.resize(); cy.fit(undefined, 24); }
+          if (cy && !state.graphCollapsed) { cy.resize(); _fitClamped(); }
         }, 100);
       };
       window.addEventListener("resize", refit);

@@ -96,7 +96,11 @@ html, body {
   display: grid;
   grid-template-columns: 280px 1fr 460px;
   height: calc(100% - 48px);
+  transition: grid-template-columns 0.18s ease;
 }
+#layout.tree-collapsed { grid-template-columns: 0 1fr 460px; }
+#layout.graph-collapsed { grid-template-columns: 280px 0 1fr; }
+#layout.tree-collapsed.graph-collapsed { grid-template-columns: 0 0 1fr; }
 
 .pane { overflow: auto; border-right: 1px solid var(--pane-border); }
 .pane:last-child { border-right: none; }
