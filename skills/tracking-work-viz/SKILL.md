@@ -42,3 +42,7 @@ The viewer has a workspace-switcher dropdown in the topbar, so once a workspace 
 This skill never edits anything under `~/.work/`. Editing tasks stays in the existing `tracking-work` flow.
 
 For UI feature reference, screenshots, and v1 limitations, see `README.md`.
+
+## Sync interaction
+
+Output is written under `~/.work/viz/` by default. The `tracking-work-sync` template gitignore excludes `viz/`, so generated HTML and vendor assets are never pushed to the sync remote. If a pre-existing sync repo still tracks `viz/`, see the retrofit snippet in `tracking-work-sync/SKILL.md`.

@@ -44,9 +44,26 @@ See `templates/gitignore`:
 ```
 .active.*
 .meta
+viz/
 ```
 
-Rationale: `.active.<session-id>` is per-agent/shell and has no cross-device meaning; `.meta` holds a machine-specific `cwd:` path.
+Rationale:
+
+- `.active.<session-id>` is per-agent/shell and has no cross-device meaning.
+- `.meta` holds a machine-specific `cwd:` path.
+- `viz/` is `tracking-work-viz` output (per-workspace HTML and `vendor/` JS+CSS). Fully regenerable from `work-viz` + `install.sh`, so syncing it just bloats the repo.
+
+**Retrofitting an existing sync repo** (one already initialised before `viz/` was ignored):
+
+```bash
+# Append the line if missing.
+grep -qxF 'viz/' ~/.work/.gitignore || printf '\nviz/\n' >> ~/.work/.gitignore
+git -C ~/.work rm --cached -r viz/ 2>/dev/null || true
+bash $HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh \
+  "track: stop syncing tracking-work-viz output (gitignore viz/)"
+```
+
+Files stay on disk locally; only the index entries are removed.
 
 ## Tests
 
