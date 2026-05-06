@@ -30,7 +30,7 @@ def test_captures_summary_text(workspaces_root: Path):
     ws = parse_workspace(workspaces_root, "demo")
     sess = next(s for s in ws.sessions if s.slug == "feature-x")
     assert "# Session: Feature X" in sess.summary_text
-    assert sess.summary_meta.get("github") == "example/demo"
+    assert sess.summary_meta.get("Github") == "example/demo"
 
 
 def test_inline_fields_parsed(workspaces_root: Path):

@@ -134,7 +134,8 @@ def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
     summary_path = sess_dir / "SUMMARY.md"
     if summary_path.exists():
         raw = summary_path.read_text(encoding="utf-8")
-        sess.summary_meta, sess.summary_text = _split_frontmatter(raw)
+        meta, sess.summary_text = _split_frontmatter(raw)
+        sess.summary_meta = _frontmatter_to_display(meta)
     sess.active_agent_count = _count_active(sess_dir)
     status_map = _parse_summary_status_map(sess.summary_text)
     tasks_dir = sess_dir / "tasks"
