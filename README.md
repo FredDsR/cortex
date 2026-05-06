@@ -57,11 +57,31 @@ Note: some cross-skill invocations in the main skill hardcode `$HOME/.claude/ski
 
 ## Update
 
+Because `install.sh` symlinks each skill into the harness directories, a single
+`git pull` in this clone is enough for content changes; you only need to re-run
+`install.sh` when a new skill folder appears, a new harness is detected, or
+vendored assets need refreshing.
+
+The bundled `update-skills.sh` does both in one shot, fails fast on uncommitted
+changes, and prints which commits arrived:
+
+```bash
+bash <wherever-you-cloned-it>/update-skills.sh
+```
+
+It forwards extra arguments to `install.sh`, so project-scoped updates work the
+same way:
+
+```bash
+bash <wherever-you-cloned-it>/update-skills.sh --project ~/some-repo
+```
+
+Or do it manually:
+
 ```bash
 cd <wherever-you-cloned-it>
 git pull
-# install.sh uses symlinks, so `git pull` alone is usually enough.
-# Re-run install.sh only if a new skill directory was added or you added a new harness.
+bash install.sh   # only if a new skill / harness / vendor asset
 ```
 
 ## Uninstall
