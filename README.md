@@ -10,6 +10,7 @@ Portable bundle of file-based work-tracking skills for AI coding agents. Designe
 | `tracking-work-github` | Optional PR/commit drift detection via the `gh` CLI, invoked by the main skill when a session has `github:` frontmatter. |
 | `tracking-work-migration` | Move a session between the global store (`~/.work/`) and a repo-local store. |
 | `tracking-work-sync` | Optional cross-device sync of `~/.work/` via a private GitHub repo. See `skills/tracking-work-sync/docs/` for design. |
+| `tracking-work-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `work-viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
 
 ## Install
 
