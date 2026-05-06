@@ -25,6 +25,19 @@ work-viz <slug> --watch --port 8765 --no-open
 
 Both side panes are individually collapsible via the topbar. The topbar also has a workspace switcher dropdown, a search input, and filters for "Hide closed" and "Show archive".
 
+## UI panes
+
+- **Tree** pane: workspace > session > task, with status pills, per-session agent badges, and ellipsis-truncated long names.
+- **Graph** pane: Cytoscape with dagre LR layout. Status-colored nodes, dashed red blocker edges. Auto-fits on resize and pane toggle.
+- **Content** pane: kicker + title + status pill header, key/value field grid, rendered markdown body. Intra-task links navigate inside the UI.
+- **Search**: substring filter against session and task slugs; tree and graph both update live.
+- **Idle workspaces** on the dashboard: workspaces with no in-progress / blocked / open work, no active agents, and >7 days since last edit fold under an "N idle workspaces" expander.
+- **Hot reload**: in `--watch` and `serve`, an injected SSE listener does `location.reload()` (serve) or hot-swap (watch) when files under the workspace tree change.
+
+## Publishing to GitHub Pages
+
+`--out-dir` is intended for Pages workflows: `work-viz --workspace=all --out-dir _site` stages HTML + vendor in a build directory ready for `actions/upload-pages-artifact`. The published Pages site is a static snapshot; hot reload works only on the local `serve` mode.
+
 ## When to use which mode
 
 - `<slug>` (one-shot): you want an HTML file you can email or open later.

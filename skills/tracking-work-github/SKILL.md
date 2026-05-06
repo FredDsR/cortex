@@ -13,6 +13,16 @@ Invoked by the core `tracking-work` skill when a session is marked as GitHub-bac
 - User asks "overview" / "status" / "where are we"
 - User explicitly asks to reconcile with GitHub
 
+## `gh` recipes
+
+```bash
+# Per-PR detail used by drift detection.
+gh pr view <num> --json number,state,title,mergedAt,closedAt
+
+# Find a PR by ticket id when the task has no PR field yet.
+gh pr list --state all --search "<ticket-id>"
+```
+
 ## Drift Detection
 
 1. For each task file with a PR reference, call `gh pr view <num> --json number,state,title,mergedAt,closedAt` and compare.
@@ -38,6 +48,3 @@ Match results against the task and propose adding the PR link (with confirmation
 - Don't call `gh` on every checkpoint — batch queries at session start and on explicit overview requests.
 - Don't update a task's Status automatically on PR `closed` (unmerged) — that state is ambiguous (abandoned vs. superseded vs. reopening planned).
 
-## References
-
-- `commands.md` — `gh` command cheat sheet

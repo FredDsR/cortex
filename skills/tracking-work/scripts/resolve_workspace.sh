@@ -68,13 +68,26 @@ if [ -z "$slug" ]; then
   fi
 fi
 
-# Write/refresh .meta
+# Write/refresh .meta only when content changed.
+# Avoids dirtying ~/.work/ on every session start (relevant when sync is enabled).
 mkdir -p "$WORKSPACES/$slug"
-{
-  echo "cwd: $cwd"
-  echo "remote: $remote"
-  echo "source: $source_tag"
-  echo "updated: $(date -u +%Y-%m-%d)"
-} > "$WORKSPACES/$slug/.meta"
+meta_path="$WORKSPACES/$slug/.meta"
+today="$(date -u +%Y-%m-%d)"
+new_meta=$'cwd: '"$cwd"$'\nremote: '"$remote"$'\nsource: '"$source_tag"$'\nupdated: '"$today"
+
+write_needed=1
+if [ -f "$meta_path" ]; then
+  existing="$(cat "$meta_path")"
+  ex_cwd="$(awk -F': ' '$1=="cwd"{print $2}' "$meta_path" | head -n1)"
+  ex_remote="$(awk -F': ' '$1=="remote"{print $2}' "$meta_path" | head -n1)"
+  ex_source="$(awk -F': ' '$1=="source"{print $2}' "$meta_path" | head -n1)"
+  if [ "$ex_cwd" = "$cwd" ] && [ "$ex_remote" = "$remote" ] && [ "$ex_source" = "$source_tag" ]; then
+    write_needed=0
+  fi
+fi
+
+if [ "$write_needed" = "1" ]; then
+  printf '%s\n' "$new_meta" > "$meta_path"
+fi
 
 echo "$slug"
