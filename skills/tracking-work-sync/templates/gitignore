@@ -1,3 +1,6 @@
 # tracking-work device-local files — do not sync
 .active.*
 .meta
+
+# tracking-work-viz output (regenerable via work-viz + install.sh)
+viz/
