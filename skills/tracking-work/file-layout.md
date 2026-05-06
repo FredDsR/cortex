@@ -35,11 +35,16 @@ One line: the session slug this agent/shell is working on.
 
 ## `SUMMARY.md`
 
-Same shape as the previous skill. See `templates/SUMMARY.md`. Optional GitHub-sync opt-in via a frontmatter field:
+YAML frontmatter for structured fields, markdown body for the human view. See `templates/SUMMARY.md` for the canonical template.
 
 ```markdown
 ---
-github: <owner>/<repo>
+slug: <session-slug>
+started: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+status: Active
+branch: <optional>
+github: <owner>/<repo>   # optional; triggers tracking-work-github
 ---
 
 # Session: ...
@@ -47,11 +52,28 @@ github: <owner>/<repo>
 
 When `github:` is set, the core skill invokes `tracking-work-github` at appropriate checkpoints.
 
-**Regenerate (full rewrite):** when the user asks "overview" / "status" / "where are we". Rebuild from task files + `git log` (if a repo) + `gh` (if `github:` is set).
+**Regenerate (full rewrite):** when the user asks "overview" / "status" / "where are we". Rebuild from task files + `git log` (if a repo) + `gh` (if `github:` is set). For a cheap snapshot without a full regen, run `scripts/manifest.sh` first.
 
 ## `tasks/<task-slug>.md`
 
-Unchanged from the previous skill. See `templates/task.md`.
+YAML frontmatter for structured fields. See `templates/task.md`.
+
+```markdown
+---
+status: Open
+started: YYYY-MM-DD
+ticket: XXX-123
+ticket_url: https://...
+pr:
+pr_url:
+branch:
+---
+
+# <Title>
+...
+```
+
+Legacy `**Field:** value` bold-pair format is still parsed by the viz, but new files should use frontmatter. Run `scripts/migrate_to_frontmatter.py --apply` once to convert legacy files in place.
 
 ## `.meta` (global store only)
 

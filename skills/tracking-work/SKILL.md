@@ -1,6 +1,6 @@
 ---
 name: tracking-work
-description: Use when the user mentions tasks, priorities, status, blockers, overview, "where are we", progress tracking, work sessions, or starts non-trivial work that spans multiple steps. Tracks any kind of work (code, writing, research, ops) across concurrent agent sessions using a global store at ~/.work/ with optional per-repo stores.
+description: Tracks tasks, priorities, status, blockers, and progress across concurrent agent sessions, using ~/.work/ (global) or <repo>/.work/ (local). Use when the user mentions tasks, priorities, status, blockers, overview, "where are we", or starts non-trivial work that spans multiple steps.
 ---
 
 # Tracking Work
@@ -32,22 +32,26 @@ Not for: one-off questions, single-commit fixes, pure Q&A about existing code.
 
 ## Session Start Flow
 
-On trigger, always run these commands first — they are cheap and return the state you need:
+On trigger, run the bundled bootstrap. It resolves slug + session id, sweeps stale active pointers, conditionally pulls sync, and emits a structured header followed by the session list:
 
 ```bash
-SKILL_DIR="$HOME/.claude/skills/tracking-work"
-SYNC_DIR="$HOME/.claude/skills/tracking-work-sync"
-SLUG="$(bash "$SKILL_DIR/scripts/resolve_workspace.sh")"  # may exit 2 on collision
-SID="$(bash "$SKILL_DIR/scripts/resolve_session_id.sh" 2>/dev/null)"
-bash "$SKILL_DIR/scripts/sweep_active.sh" "$HOME/.work/workspaces/$SLUG" 7 >/dev/null
-# Pull remote changes before listing (no-op if sync not enabled or sub-skill absent).
-[[ -x "$SYNC_DIR/scripts/pull.sh" ]] && bash "$SYNC_DIR/scripts/pull.sh"
-bash "$SKILL_DIR/scripts/list_sessions.sh"
+bash "$HOME/.claude/skills/tracking-work/scripts/session_start.sh"
+```
+
+Output shape (TAB-separated):
+
+```
+WORKSPACE\t<slug>
+SESSION_ID\t<id>\t<source-tag>
+SYNC\t<ok|regenerate-needed|conflict|not-installed|disabled|error rc=N>
+SESSIONS
+<origin>\t<session-slug>\t<mtime>\t<active-ids-csv>
+...
 ```
 
 Then decide:
 
-1. **Collision (`resolve_workspace.sh` exits 2).** Read the existing CWD from its stderr and prompt using the wording in `slug-resolution.md`. Write the chosen slug into `~/.work/workspaces/<chosen>/.meta` with `cwd: <current>` before continuing.
+1. **Collision (`session_start.sh` exits 2).** Read the existing CWD from its stderr and prompt using the wording in `slug-resolution.md`. Write the chosen slug into `~/.work/workspaces/<chosen>/.meta` with `cwd: <current>` before retrying.
 2. **No sessions.** Ask the user if they want to start tracking. If yes, prompt for slug + global-vs-local store. Create `sessions/<slug>/SUMMARY.md` from the template and set `.active.<id>`.
 3. **One session.** Summarize it. Ask continue/switch/new.
 4. **Multiple sessions.** Render the `list_sessions.sh` output — tag each line with origin (`[local]` / `[global]`) and any active markers (`[claude:...]`, `[copilot:...]`, etc.). Ask which to continue or whether to start a new one.
@@ -57,16 +61,18 @@ Then decide:
 
 | Trigger | Action |
 |---------|--------|
-| Session start | Run the commands above. If the session has a `github:` frontmatter field, invoke `tracking-work-github` for drift detection. |
+| Session start | Run `session_start.sh` (above). If the session has a `github:` frontmatter field, invoke `tracking-work-github` for drift detection. If `SYNC` is `regenerate-needed` or `conflict`, follow the protocol in `tracking-work-sync/SKILL.md`. |
 | After a `git commit` on a tracked branch | Append commit subject to the active task's **Scope** or **Notes**. |
-| User asks "overview" / "status" / "where are we" | Regenerate SUMMARY.md from tasks/ + `git log` (if a repo). If GitHub is configured, also invoke `tracking-work-github`. |
+| User asks "overview" / "status" / "where are we" | Run `bash $SKILL_DIR/scripts/manifest.sh` for a one-row-per-task TSV snapshot; only read individual task files for In-Progress / Blocked items. Regenerate SUMMARY.md from tasks/ + `git log` (if a repo) only when the user asks for a full rewrite. If GitHub is configured, also invoke `tracking-work-github`. |
 | New work mentioned | Create `tasks/<slug>.md`, add to SUMMARY.md **Open** bucket. If multiple active sessions exist, ask which session. |
-| User says "blocked on X" | Add to SUMMARY.md **Blockers**, set task **Status: Blocked**. |
+| User says "blocked on X" | Add to SUMMARY.md **Blockers**, set task frontmatter `status: Blocked`. |
 | Blocker resolves | Remove from **Blockers**, unset **Blocked** on dependents. |
 | User asks to move a session between stores | Invoke `tracking-work-migration`. |
-| After any write to `tasks/*.md` or `SUMMARY.md` | If `tracking-work-sync` is installed, run `$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh "<message>"` with an appropriate `track: ...` message. |
+| After any write to `tasks/*.md` or `SUMMARY.md` | Run `commit_push.sh "<track: ... message>"`. |
 | `pull.sh` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
-| On session close (after archive move) | If sync is installed, run `commit_push.sh "track: archive session <slug>"`. |
+| On session close (after archive move) | Run `commit_push.sh "track: archive session <slug>"`. |
+
+All `tracking-work-sync/scripts/*` no-op when sync is unavailable, so checkpoints call them unconditionally. Full path: `$HOME/.claude/skills/tracking-work-sync/scripts/`.
 
 ## Closing a Session
 
@@ -75,7 +81,7 @@ Explicit action only. When the user says "close session X" / "X is done" / "arch
 1. List tasks that are not **Resolved**.
 2. For each, ask: mark Resolved, leave Open, or move to another session (existing or new).
 3. If a move targets a new session, prompt for slug + store.
-4. Update the closing session's SUMMARY with `Closed: YYYY-MM-DD` and `Session status: Closed`.
+4. Update the closing session's SUMMARY frontmatter: set `closed: YYYY-MM-DD` and `status: Closed`.
 5. Move `sessions/<slug>/` to `archive/YYYY-MM-DD-<slug>/` in the same store it lived in.
 6. Delete any `.active.<id>` file pointing at the closed session.
 
@@ -92,7 +98,7 @@ If a session's SUMMARY.md has a `github: <owner>/<repo>` frontmatter field, invo
 
 ## Sync (optional)
 
-If `~/.claude/skills/tracking-work-sync/` is installed and `~/.work/` is neither a git repo nor contains a `.sync-disabled` sentinel, invoke `$HOME/.claude/skills/tracking-work-sync/scripts/setup.sh` once before continuing. The user picks clone / create / skip. After that, subsequent invocations trust the recorded state and never prompt again.
+First-run bootstrap only: if `~/.claude/skills/tracking-work-sync/` is installed and `~/.work/` is neither a git repo nor contains a `.sync-disabled` sentinel, invoke `setup.sh` once. The user picks clone / create / skip; subsequent invocations trust the recorded state.
 
 See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 
@@ -110,3 +116,5 @@ See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 - `slug-resolution.md` — workspace slug algorithm + collision prompt
 - `session-id-resolution.md` — session ID layered resolver
 - `templates/` — starter SUMMARY.md and task.md
+- `scripts/manifest.sh`: one-row-per-task TSV; cheap snapshot for status questions.
+- `scripts/migrate_to_frontmatter.py`: one-shot legacy bold-pair to YAML frontmatter migrator.

@@ -34,11 +34,28 @@ def test_captures_summary_text(workspaces_root: Path):
 
 
 def test_inline_fields_parsed(workspaces_root: Path):
+    """task-foo uses YAML frontmatter; parser must surface Title-Case keys."""
     ws = parse_workspace(workspaces_root, "demo")
     sess = next(s for s in ws.sessions if s.slug == "feature-x")
     foo = next(t for t in sess.tasks if t.slug == "task-foo")
     assert foo.inline_fields["Status"] == "In Progress"
     assert foo.inline_fields["Started"] == "2026-04-20"
+
+
+def test_frontmatter_keys_normalized_to_title_case(workspaces_root: Path):
+    ws = parse_workspace(workspaces_root, "demo")
+    sess = next(s for s in ws.sessions if s.slug == "feature-x")
+    foo = next(t for t in sess.tasks if t.slug == "task-foo")
+    assert "status" not in foo.inline_fields  # raw lowercase keys not exposed
+    assert foo.body.startswith("# Foo")  # frontmatter stripped from body
+
+
+def test_legacy_bold_pair_still_parsed(workspaces_root: Path):
+    """task-bar uses the legacy bold-pair format. Must keep working."""
+    ws = parse_workspace(workspaces_root, "demo")
+    sess = next(s for s in ws.sessions if s.slug == "feature-x")
+    bar = next(t for t in sess.tasks if t.slug == "task-bar")
+    assert bar.inline_fields["Status"] == "Open"
 
 
 def test_status_from_summary_headings(workspaces_root: Path):

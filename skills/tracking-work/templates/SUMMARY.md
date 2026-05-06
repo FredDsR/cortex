@@ -1,10 +1,12 @@
-# Session: <human-readable title>
+---
+slug: <slug>
+started: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+status: Active
+branch: <optional git branch>
+---
 
-**Slug:** <slug>
-**Started:** YYYY-MM-DD
-**Last updated:** YYYY-MM-DD
-**Session status:** Active
-**Branch:** <optional git branch>
+# Session: <human-readable title>
 
 ## Tasks
 

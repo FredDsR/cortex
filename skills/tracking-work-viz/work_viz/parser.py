@@ -31,7 +31,7 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
     if end == -1:
         return {}, text
     fm_block = text[len(_FRONTMATTER_DELIM):end]
-    body = text[end + 1 + len(_FRONTMATTER_DELIM):]
+    body = text[end + 1 + len(_FRONTMATTER_DELIM):].lstrip("\n")
     meta: dict = {}
     for line in fm_block.splitlines():
         if ":" in line:
@@ -49,6 +49,20 @@ def _parse_inline_fields(body: str) -> dict:
             if key not in fields:
                 fields[key] = m.group(2).strip()
     return fields
+
+
+def _frontmatter_to_display(meta: dict) -> dict:
+    """Convert YAML frontmatter keys (snake_case lowercase) to display form
+    (Title Case with spaces) so the viz UI renders them like the legacy
+    bold-pair labels. Empty values are dropped."""
+    out: dict = {}
+    for k, v in meta.items():
+        if v is None or str(v).strip() == "":
+            continue
+        label = k.replace("_", " ").strip()
+        label = " ".join(w.capitalize() for w in label.split())
+        out[label] = str(v).strip()
+    return out
 
 
 def _parse_blocked_by(body: str) -> list:
@@ -126,9 +140,12 @@ def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
     tasks_dir = sess_dir / "tasks"
     if tasks_dir.exists():
         for task_path in sorted(tasks_dir.glob("*.md")):
-            body = task_path.read_text(encoding="utf-8")
+            raw = task_path.read_text(encoding="utf-8")
+            task_meta, body = _split_frontmatter(raw)
             t_slug = task_path.stem
             inline = _parse_inline_fields(body)
+            for k, v in _frontmatter_to_display(task_meta).items():
+                inline[k] = v  # frontmatter wins over bold-pair
             status = status_map.get(t_slug)
             if status is None:
                 status = _fallback_status_from_inline(inline.get("Status", ""))

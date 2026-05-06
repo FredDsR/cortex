@@ -1,10 +1,14 @@
-# <Task Title>
+---
+status: Open
+started: YYYY-MM-DD
+ticket: XXX-123
+ticket_url:
+pr:
+pr_url:
+branch:
+---
 
-**Ticket:** [XXX-123](url)
-**PR:** [#456](url)
-**Branch:** <branch>
-**Status:** Open
-**Started:** YYYY-MM-DD
+# <Task Title>
 
 ## Description
 

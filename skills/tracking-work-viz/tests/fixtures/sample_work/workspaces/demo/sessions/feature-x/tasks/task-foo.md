@@ -1,7 +1,9 @@
-# Foo
+---
+status: In Progress
+started: 2026-04-20
+---
 
-**Status:** In Progress
-**Started:** 2026-04-20
+# Foo
 
 ## Description
 
