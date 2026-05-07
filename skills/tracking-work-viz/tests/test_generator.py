@@ -1,7 +1,85 @@
 import json
+import re
 from pathlib import Path
 from work_viz.generator import generate_one_shot
 from work_viz.generator import generate_dashboard
+from work_viz.generator import build_workspace_html, build_dashboard_html
+from work_viz.parser import parse_world
+
+
+def _extract_cy_data(html: str) -> dict:
+    """Extract and parse the __CY_DATA__ JSON payload from an HTML string."""
+    # Find the line containing window.__CY_DATA__ = ...;
+    for line in html.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("window.__CY_DATA__"):
+            # Strip the variable assignment prefix and trailing semicolon
+            after_eq = stripped.split("=", 1)[1].strip()
+            json_str = after_eq.rstrip(";")
+            # Unescape the <\/ back to </ for JSON parsing
+            json_str = json_str.replace("<\\/", "</")
+            return json.loads(json_str)
+    raise ValueError("window.__CY_DATA__ not found in HTML")
+
+
+def test_workspace_html_carries_cy_data(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    assert "window.__CY_DATA__ = " in html
+    assert "@@CY_DATA@@" not in html
+    payload = _extract_cy_data(html)
+    assert "modes" in payload
+    assert "ghosts" in payload
+    assert "default_mode" in payload
+
+
+def test_workspace_local_mode_excludes_other_ws_tasks(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    payload = _extract_cy_data(html)
+    local = payload["modes"]["local"]
+    node_ids = [n["id"] for n in local["nodes"]]
+    # All real (non-ghost) nodes should belong to demo workspace
+    real_nodes = [n for n in local["nodes"] if not n["ghost"]]
+    assert all(n["id"].startswith("demo/") for n in real_nodes)
+    # The cross-WS reference to other/sister/task-pinned appears as a ghost node
+    ghost_nodes = [n for n in local["nodes"] if n["ghost"]]
+    ghost_ids = [n["id"] for n in ghost_nodes]
+    assert any("other/sister/task-pinned" in gid for gid in ghost_ids)
+
+
+def test_workspace_global_mode_includes_cross_ws_neighbor(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    payload = _extract_cy_data(html)
+    global_mode = payload["modes"]["global"]
+    node_ids = [n["id"] for n in global_mode["nodes"]]
+    # other/sister/task-pinned must appear as a real node (ghost: False)
+    cross_ws = [n for n in global_mode["nodes"] if n["id"] == "other/sister/task-pinned"]
+    assert cross_ws, f"other/sister/task-pinned not in global mode nodes: {node_ids}"
+    assert cross_ws[0]["ghost"] is False
+
+
+def test_workspace_edges_carry_kind_and_resolved(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    payload = _extract_cy_data(html)
+    for mode_name, mode_data in payload["modes"].items():
+        for edge in mode_data["edges"]:
+            assert "kind" in edge, f"edge missing 'kind' in {mode_name}: {edge}"
+            assert "resolved" in edge, f"edge missing 'resolved' in {mode_name}: {edge}"
+
+
+def test_dashboard_global_contains_all_workspaces(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_dashboard_html(world)
+    payload = _extract_cy_data(html)
+    global_mode = payload["modes"]["global"]
+    node_ids = [n["id"] for n in global_mode["nodes"]]
+    has_demo = any(nid.startswith("demo/") for nid in node_ids)
+    has_other = any(nid.startswith("other/") for nid in node_ids)
+    assert has_demo, f"No demo nodes in dashboard global: {node_ids}"
+    assert has_other, f"No other nodes in dashboard global: {node_ids}"
 
 
 def test_one_shot_writes_self_contained_html(workspaces_root: Path, tmp_path: Path):
