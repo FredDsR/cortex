@@ -330,7 +330,7 @@ def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
                 slug=t_slug,
                 body=body,
                 inline_fields=inline,
-                blocked_by=_parse_blocked_by(body),
+                blocked_by=[tgt for kind, tgt in typed_rels if kind == "blocked"],
                 status=status,
                 edges_out=edges,
             ))
