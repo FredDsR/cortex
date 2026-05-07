@@ -57,6 +57,9 @@ def _list_workspace_slugs(workspaces_root: Path) -> list:
 # Per-edge-class data builders (Step 6)
 # ---------------------------------------------------------------------------
 
+# Transitional: generate_one_shot / generate_dashboard will be rewired in Step 7
+# to call build_workspace_html / build_dashboard_html. Until then they emit an
+# empty graph payload so the @@CY_DATA@@ placeholder is satisfied.
 _EMPTY_CY_DATA: dict = {
     "modes": {
         "local": {"nodes": [], "edges": []},
@@ -67,34 +70,32 @@ _EMPTY_CY_DATA: dict = {
 }
 
 
-def _serialize_edge(canonical_source: str, edge) -> dict:
-    """Convert a parsed Edge to a JSON-friendly dict with canonical source id.
+def _serialize_edge(edge) -> dict:
+    """Convert a parsed Edge to a JSON-friendly dict.
 
-    `canonical_source` must be the fully-qualified `<ws>/<sess>/<task>` string
-    computed by the caller from the iteration context (ws, sess, task). The
-    edge's `target` field is already canonicalized by `parse_world`.
+    Both edge.source and edge.target are already canonicalized by parse_world.
     """
     return {
-        "source": canonical_source,
+        "source": edge.source,
         "target": edge.target,
         "kind": edge.kind,
         "resolved": edge.resolved,
     }
 
 
-def _collect_workspace_nodes(world: World, slug: str) -> list:
-    """Produce the node list for a single workspace slug (non-archived sessions only)."""
+def _collect_nodes(world: World, slug: str | None = None) -> list:
+    """Collect node dicts. If slug is provided, restrict to that workspace.
+    Otherwise return nodes for all workspaces. Skips archived sessions."""
     nodes: list = []
     for ws in world.workspaces:
-        if ws.slug != slug:
+        if slug is not None and ws.slug != slug:
             continue
         for sess in ws.sessions:
             if sess.archived:
                 continue
             for task in sess.tasks:
-                node_id = f"{ws.slug}/{sess.slug}/{task.slug}"
                 nodes.append({
-                    "id": node_id,
+                    "id": f"{ws.slug}/{sess.slug}/{task.slug}",
                     "label": task.slug,
                     "ws": ws.slug,
                     "session": sess.slug,
@@ -102,43 +103,6 @@ def _collect_workspace_nodes(world: World, slug: str) -> list:
                     "ghost": False,
                 })
     return nodes
-
-
-def _collect_world_nodes(world: World) -> list:
-    """Produce the node list for the entire world (all workspaces, non-archived)."""
-    nodes: list = []
-    for ws in world.workspaces:
-        for sess in ws.sessions:
-            if sess.archived:
-                continue
-            for task in sess.tasks:
-                node_id = f"{ws.slug}/{sess.slug}/{task.slug}"
-                nodes.append({
-                    "id": node_id,
-                    "label": task.slug,
-                    "ws": ws.slug,
-                    "session": sess.slug,
-                    "status": task.status,
-                    "ghost": False,
-                })
-    return nodes
-
-
-def _iter_canonical_edges(world: World):
-    """Yield (canonical_source, edge) tuples for all non-archived tasks in world.
-
-    `parse_world` canonicalizes edge.target but leaves edge.source as the raw
-    task slug. This generator recomputes the canonical source from iteration
-    context so callers always have a fully-qualified `<ws>/<sess>/<task>` source.
-    """
-    for ws in world.workspaces:
-        for sess in ws.sessions:
-            if sess.archived:
-                continue
-            for task in sess.tasks:
-                canonical_src = f"{ws.slug}/{sess.slug}/{task.slug}"
-                for edge in task.edges_out:
-                    yield canonical_src, edge
 
 
 def _build_local_mode(world: World, slug: str) -> dict:
@@ -148,7 +112,7 @@ def _build_local_mode(world: World, slug: str) -> dict:
     Edges: all edges whose source is in this WS.
     """
     ws_prefix = slug + "/"
-    real_nodes = _collect_workspace_nodes(world, slug)
+    real_nodes = _collect_nodes(world, slug)
     real_ids = {n["id"] for n in real_nodes}
 
     # Collect cross-WS edge targets that are not in this WS
@@ -156,10 +120,10 @@ def _build_local_mode(world: World, slug: str) -> dict:
     ghost_nodes: list = []
     local_edges: list = []
 
-    for canonical_src, edge in _iter_canonical_edges(world):
-        if not canonical_src.startswith(ws_prefix):
+    for edge in world.edges:
+        if not edge.source.startswith(ws_prefix):
             continue
-        local_edges.append(_serialize_edge(canonical_src, edge))
+        local_edges.append(_serialize_edge(edge))
         # If the target is outside this WS and not already a real node, add ghost
         if not edge.target.startswith(ws_prefix) and edge.target not in real_ids:
             if edge.target not in ghost_ids_seen:
@@ -187,24 +151,24 @@ def _build_global_mode_for_workspace(world: World, slug: str) -> dict:
     Edges: all edges where source or target is in this WS.
     """
     ws_prefix = slug + "/"
-    ws_nodes = _collect_workspace_nodes(world, slug)
+    ws_nodes = _collect_nodes(world, slug)
     ws_node_ids = {n["id"] for n in ws_nodes}
 
     # Collect edges touching this WS (source or target in WS)
     touching_edges: list = []
     neighbor_ids: set = set()
-    for canonical_src, edge in _iter_canonical_edges(world):
-        src_in = canonical_src.startswith(ws_prefix)
+    for edge in world.edges:
+        src_in = edge.source.startswith(ws_prefix)
         tgt_in = edge.target.startswith(ws_prefix)
         if src_in or tgt_in:
-            touching_edges.append(_serialize_edge(canonical_src, edge))
+            touching_edges.append(_serialize_edge(edge))
             if src_in and not tgt_in:
                 neighbor_ids.add(edge.target)
             if tgt_in and not src_in:
-                neighbor_ids.add(canonical_src)
+                neighbor_ids.add(edge.source)
 
     # Build a lookup of all world nodes by id
-    world_node_lookup: dict = {n["id"]: n for n in _collect_world_nodes(world)}
+    world_node_lookup: dict = {n["id"]: n for n in _collect_nodes(world)}
 
     # Add neighbor nodes that are real (exist in world) and not already in WS
     extra_nodes: list = []
@@ -221,11 +185,8 @@ def _build_global_mode_for_workspace(world: World, slug: str) -> dict:
 def _build_dashboard_global(world: World) -> dict:
     """Return all nodes and all edges in the world."""
     return {
-        "nodes": _collect_world_nodes(world),
-        "edges": [
-            _serialize_edge(src, edge)
-            for src, edge in _iter_canonical_edges(world)
-        ],
+        "nodes": _collect_nodes(world),
+        "edges": [_serialize_edge(edge) for edge in world.edges],
     }
 
 
@@ -259,6 +220,7 @@ def build_workspace_html(world: World, slug: str) -> str:
 
 def build_dashboard_html(world: World) -> str:
     """Return the full HTML string for the dashboard page (pure, no I/O)."""
+    # Dashboard has no per-workspace local view; local is intentionally empty.
     cy_data = {
         "modes": {
             "local": {"nodes": [], "edges": []},

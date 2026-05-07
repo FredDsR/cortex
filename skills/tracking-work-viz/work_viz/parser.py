@@ -436,6 +436,8 @@ def parse_world(workspaces_root: Path) -> World:
                     canonical, found = _resolve_target(
                         edge.target, ws.slug, sess.slug, index
                     )
+                    # Source is always canonical post-parse_world.
+                    edge.source = f"{ws.slug}/{sess.slug}/{task.slug}"
                     # Mutate edge in place: rewrite raw target to canonical form.
                     edge.target = canonical
                     edge.resolved = found
