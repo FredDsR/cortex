@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 from .model import (
-    Workspace, Session, Task,
+    Workspace, Session, Task, Edge,
     STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED, STATUS_UNKNOWN,
 )
 
@@ -313,6 +313,13 @@ def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
             raw = task_path.read_text(encoding="utf-8")
             task_meta, body = _split_frontmatter(raw)
             t_slug = task_path.stem
+            typed_rels = _parse_typed_relations(body, task_meta)
+            typed_targets = [target for _, target in typed_rels]
+            mentions = _parse_mentions(body, typed_targets, t_slug)
+            edges = [Edge(source=t_slug, target=tgt, kind=kind, resolved=False)
+                     for kind, tgt in typed_rels]
+            edges += [Edge(source=t_slug, target=tgt, kind="mentions", resolved=False)
+                      for tgt in mentions]
             inline = _parse_inline_fields(body)
             for k, v in _frontmatter_to_display(task_meta).items():
                 inline[k] = v  # frontmatter wins over bold-pair
@@ -325,6 +332,7 @@ def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
                 inline_fields=inline,
                 blocked_by=_parse_blocked_by(body),
                 status=status,
+                edges_out=edges,
             ))
     return sess
 

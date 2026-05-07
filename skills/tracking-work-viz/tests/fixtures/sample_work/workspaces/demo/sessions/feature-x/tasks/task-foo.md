@@ -8,3 +8,7 @@ started: 2026-04-20
 ## Description
 
 The foo task.
+
+Blocked by: [task-baz]
+Related to: [task-bar]
+Follows: [task-bar]

@@ -2,6 +2,7 @@ from pathlib import Path
 from work_viz.parser import parse_workspace, _parse_typed_relations, _parse_mentions
 from work_viz.model import (
     STATUS_IN_PROGRESS, STATUS_OPEN, STATUS_BLOCKED, STATUS_RESOLVED,
+    Edge,
 )
 
 
@@ -94,6 +95,21 @@ def test_archived_sessions_present(workspaces_root: Path):
     s = archived[0]
     assert s.slug == "old-feature"
     assert s.archived is True
+
+
+def test_session_parse_populates_edges_out(workspaces_root: Path):
+    """task-foo.md declares blocked/related/follows relations; edges_out must reflect them."""
+    ws = parse_workspace(workspaces_root, "demo")
+    sess = next(s for s in ws.sessions if s.slug == "feature-x")
+    foo = next(t for t in sess.tasks if t.slug == "task-foo")
+
+    blocked_edge = Edge(source="task-foo", target="task-baz", kind="blocked", resolved=False)
+    related_edge = Edge(source="task-foo", target="task-bar", kind="related", resolved=False)
+    follows_edge = Edge(source="task-foo", target="task-bar", kind="follows", resolved=False)
+
+    assert blocked_edge in foo.edges_out, f"blocked edge missing; got {foo.edges_out}"
+    assert related_edge in foo.edges_out, f"related edge missing; got {foo.edges_out}"
+    assert follows_edge in foo.edges_out, f"follows edge missing; got {foo.edges_out}"
 
 
 # ---------------------------------------------------------------------------
