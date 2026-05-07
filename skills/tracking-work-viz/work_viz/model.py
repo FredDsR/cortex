@@ -9,6 +9,16 @@ STATUS_UNKNOWN = "unknown"
 
 ALL_STATUSES = (STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED, STATUS_UNKNOWN)
 
+EDGE_KINDS = ("blocked", "related", "follows", "mentions")
+
+
+@dataclass
+class Edge:
+    source: str
+    target: str
+    kind: str
+    resolved: bool = True
+
 
 @dataclass
 class Task:
@@ -17,6 +27,7 @@ class Task:
     inline_fields: dict = field(default_factory=dict)
     blocked_by: list = field(default_factory=list)
     status: str = STATUS_UNKNOWN
+    edges_out: list = field(default_factory=list)
 
 
 @dataclass
@@ -35,3 +46,10 @@ class Workspace:
     has_meta: bool = False
     active_session_slugs: list = field(default_factory=list)
     sessions: list = field(default_factory=list)
+
+
+@dataclass
+class World:
+    workspaces: list = field(default_factory=list)
+    edges: list = field(default_factory=list)
+    ghosts: list = field(default_factory=list)
