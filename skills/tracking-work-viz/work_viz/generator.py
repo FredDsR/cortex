@@ -106,22 +106,25 @@ def _build_local_mode(world: World, slug: str) -> dict:
         if not edge.source.startswith(ws_prefix):
             continue
         local_edges.append(_serialize_edge(edge))
-        # If the target is outside this WS and not already a real node, add ghost
-        if not edge.target.startswith(ws_prefix) and edge.target not in real_ids:
-            if edge.target not in ghost_ids_seen:
-                ghost_ids_seen.add(edge.target)
-                parts = edge.target.split("/")
-                ghost_ws = parts[0] if len(parts) >= 1 else ""
-                ghost_sess = parts[1] if len(parts) >= 2 else ""
-                ghost_task = parts[2] if len(parts) >= 3 else edge.target
-                ghost_nodes.append({
-                    "id": edge.target,
-                    "label": ghost_task,
-                    "ws": ghost_ws,
-                    "session": ghost_sess,
-                    "status": "unknown",
-                    "ghost": True,
-                })
+        # Add a ghost for any target that isn't a real node in this WS.
+        # Covers both cross-WS targets and same-WS targets that didn't
+        # resolve (e.g., a typo or a stale slug). Cytoscape rejects edges
+        # whose endpoints aren't in the elements list, so dangling targets
+        # MUST be represented somehow.
+        if edge.target not in real_ids and edge.target not in ghost_ids_seen:
+            ghost_ids_seen.add(edge.target)
+            parts = edge.target.split("/")
+            ghost_ws = parts[0] if len(parts) >= 1 else ""
+            ghost_sess = parts[1] if len(parts) >= 2 else ""
+            ghost_task = parts[2] if len(parts) >= 3 else edge.target
+            ghost_nodes.append({
+                "id": edge.target,
+                "label": ghost_task,
+                "ws": ghost_ws,
+                "session": ghost_sess,
+                "status": "unknown",
+                "ghost": True,
+            })
 
     return {"nodes": real_nodes + ghost_nodes, "edges": local_edges}
 
@@ -136,30 +139,39 @@ def _build_global_mode_for_workspace(world: World, slug: str) -> dict:
     ws_nodes = _collect_nodes(world, slug)
     ws_node_ids = {n["id"] for n in ws_nodes}
 
-    # Collect edges touching this WS (source or target in WS)
+    # Collect edges touching this WS and every endpoint they reference.
     touching_edges: list = []
-    neighbor_ids: set = set()
+    referenced_ids: set = set()
     for edge in world.edges:
         src_in = edge.source.startswith(ws_prefix)
         tgt_in = edge.target.startswith(ws_prefix)
         if src_in or tgt_in:
             touching_edges.append(_serialize_edge(edge))
-            if src_in and not tgt_in:
-                neighbor_ids.add(edge.target)
-            if tgt_in and not src_in:
-                neighbor_ids.add(edge.source)
+            referenced_ids.add(edge.source)
+            referenced_ids.add(edge.target)
 
-    # Build a lookup of all world nodes by id
     world_node_lookup: dict = {n["id"]: n for n in _collect_nodes(world)}
 
-    # Add neighbor nodes that are real (exist in world) and not already in WS
+    # For every endpoint not already in this WS's real nodes, add either
+    # a real (cross-WS resolved) node or a ghost node. Cytoscape rejects
+    # edges whose endpoints aren't in the elements list, so we must
+    # represent every endpoint somehow.
     extra_nodes: list = []
-    for nid in neighbor_ids:
+    for nid in referenced_ids:
         if nid in ws_node_ids:
             continue
         if nid in world_node_lookup:
             extra_nodes.append(world_node_lookup[nid])
-        # Unresolvable (ghost) neighbors are not added as real nodes in global mode
+        else:
+            parts = nid.split("/")
+            extra_nodes.append({
+                "id": nid,
+                "label": parts[2] if len(parts) >= 3 else nid,
+                "ws": parts[0] if len(parts) >= 1 else "",
+                "session": parts[1] if len(parts) >= 2 else "",
+                "status": "unknown",
+                "ghost": True,
+            })
 
     return {"nodes": ws_nodes + extra_nodes, "edges": touching_edges}
 

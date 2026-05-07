@@ -145,6 +145,21 @@ def test_chip_default_classes(workspaces_root: Path):
     assert chip_classes("chip-global") == "chip"
 
 
+def test_no_dangling_edges_in_either_mode(workspaces_root: Path):
+    """Every edge endpoint in both modes must be present in that mode's nodes
+    list. Cytoscape rejects edges referencing missing nodes; a regression here
+    would visibly break the graph render."""
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    payload = _extract_cy_data(html)
+    for mode_name in ("local", "global"):
+        mode = payload["modes"][mode_name]
+        ids = {n["id"] for n in mode["nodes"]}
+        for edge in mode["edges"]:
+            assert edge["source"] in ids, f"{mode_name}: dangling source {edge['source']}"
+            assert edge["target"] in ids, f"{mode_name}: dangling target {edge['target']}"
+
+
 def test_script_tag_injection_neutralized(workspaces_root: Path, tmp_path: Path):
     """A task body containing </script> must not break out of the inline <script> block."""
     # Inject a malicious task body into a writable copy of the fixture

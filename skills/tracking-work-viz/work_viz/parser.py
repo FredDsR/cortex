@@ -239,6 +239,14 @@ def _parse_mentions(body: str, typed_targets, source_slug: str) -> list[str]:
                 local_seen.add(tok)
 
         for tok in candidates:
+            # Mentions fire only on task- prefixed leaf slugs. The bracket
+            # form accepts any kebab string (so typed relations can name
+            # sessions and workspaces), but for inferred mentions that
+            # rule pulls in things like `[i]` from regex character classes
+            # in code-fence-adjacent prose. Restrict to genuine task refs.
+            leaf = tok.rsplit("/", 1)[-1]
+            if not leaf.startswith("task-"):
+                continue
             if tok == source_slug:
                 continue
             if tok in typed_set:

@@ -259,6 +259,25 @@ def test_mentions_dedup_typed_target_in_plain_prose():
     assert mentions == []
 
 
+def test_mentions_require_task_prefix_on_leaf():
+    """Bracketed forms whose leaf segment isn't task- prefixed are not mentions.
+    Without this, regex character classes like `[i]` in code-fence-adjacent prose
+    pollute the graph with phantom mentions to non-existent tasks."""
+    body = "Pattern matches `[i]` in regex; see [a-z0-9-]+ for the syntax."
+    mentions = _parse_mentions(body, [], "task-other")
+    assert mentions == []
+
+
+def test_mentions_bracket_with_session_prefix_still_requires_task():
+    """`[session/foo]` (no task- prefix on leaf) is also not a mention."""
+    body = "Refer to [other-session/foo] for context."
+    mentions = _parse_mentions(body, [], "task-other")
+    assert mentions == []
+    body2 = "Refer to [other-session/task-foo] for context."
+    mentions2 = _parse_mentions(body2, [], "task-other")
+    assert "other-session/task-foo" in mentions2
+
+
 # ---------------------------------------------------------------------------
 # parse_world tests
 # ---------------------------------------------------------------------------
