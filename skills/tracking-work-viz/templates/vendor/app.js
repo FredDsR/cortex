@@ -13,6 +13,13 @@ const state = {
   treeCollapsed: false,
   graphCollapsed: false,
   search: "",             // free-text filter against session/task slugs
+  chips: {
+    blocked: true,
+    related: true,
+    follows: true,
+    mentions: false,
+    global: false,
+  },
 };
 
 async function loadData() {
@@ -60,7 +67,8 @@ function _toggleBtn(label, isActive, onClick) {
 
 function renderTopbar() {
   const ws = state.data;
-  const bar = document.getElementById("topbar");
+  // Target #topbar-controls, not #topbar, so the chip markup stays intact.
+  const bar = document.getElementById("topbar-controls");
   bar.innerHTML = "";
 
   const titleGroup = document.createElement("div");
@@ -402,43 +410,32 @@ function _shortTaskLabel(slug) {
   return slug.startsWith("task-") ? slug.slice(5) : slug;
 }
 
-function buildGraphElements(ws) {
+// Build Cytoscape elements from a cy_data mode object.
+function buildCyElements(modeData) {
   const elements = [];
-  elements.push({ data: { id: `ws:${ws.slug}`, label: ws.slug, kind: "workspace" } });
-  for (const sess of visibleSessions(ws)) {
-    const sessId = `sess:${sess.slug}`;
-    const sessLabel = sess.slug + (sess.active_agent_count > 1 ? ` (${sess.active_agent_count})` : "");
+  for (const node of (modeData.nodes || [])) {
     elements.push({
       data: {
-        id: sessId,
-        label: sessLabel,
-        kind: "session",
-        status: aggregateSessionStatus(sess),
-        archived: sess.archived ? "true" : "false",
+        id: node.id,
+        label: _shortTaskLabel(node.label || node.id.split("/").pop()),
+        kind: "task",
+        status: node.status || "unknown",
+        ws: node.ws || "",
+        session: node.session || "",
+        ghost: node.ghost ? "true" : "false",
       },
     });
-    elements.push({ data: { id: `e:ws:${sess.slug}`, source: `ws:${ws.slug}`, target: sessId, kind: "contains" } });
-    const tasks = visibleTasks(sess);
-    for (const t of tasks) {
-      const tId = `task:${sess.slug}:${t.slug}`;
-      elements.push({
-        data: {
-          id: tId,
-          label: _shortTaskLabel(t.slug),
-          kind: "task",
-          status: t.status,
-          sessionSlug: sess.slug,
-          taskSlug: t.slug,
-        },
-      });
-      elements.push({ data: { id: `e:c:${sess.slug}:${t.slug}`, source: sessId, target: tId, kind: "contains" } });
-      for (const upstream of (t.blocked_by || [])) {
-        const upstreamId = `task:${sess.slug}:${upstream}`;
-        elements.push({
-          data: { id: `e:b:${sess.slug}:${t.slug}:${upstream}`, source: upstreamId, target: tId, kind: "blocks" },
-        });
-      }
-    }
+  }
+  for (const edge of (modeData.edges || [])) {
+    elements.push({
+      data: {
+        id: edge.id || `e:${edge.source}:${edge.target}:${edge.kind}`,
+        source: edge.source,
+        target: edge.target,
+        kind: edge.kind,
+        resolved: edge.resolved ? "true" : "false",
+      },
+    });
   }
   return elements;
 }
@@ -453,6 +450,59 @@ const _DAGRE_LAYOUT = {
   fit: true,
 };
 
+// Replace current graph elements with the provided mode data and re-run layout.
+function renderMode(cyInst, modeData) {
+  if (!cyInst) return;
+  cyInst.elements().remove();
+  cyInst.add(buildCyElements(modeData));
+  cyInst.layout(_DAGRE_LAYOUT).run();
+}
+
+// Toggle edge display based on state.chips.
+function syncEdgeVisibility(cyInst) {
+  if (!cyInst) return;
+  const kindMap = {
+    blocked: "blocked",
+    related: "related",
+    follows: "follows",
+    mentions: "mentions",
+  };
+  for (const [chipKey, edgeKind] of Object.entries(kindMap)) {
+    const show = state.chips[chipKey];
+    cyInst.edges(`[kind = "${edgeKind}"]`).style("display", show ? "element" : "none");
+  }
+}
+
+// Wire click handlers for the five chip buttons.
+function bindChips(cyInst, cyData) {
+  const kindChips = [
+    { id: "chip-blocked", key: "blocked" },
+    { id: "chip-related", key: "related" },
+    { id: "chip-follows", key: "follows" },
+    { id: "chip-mentions", key: "mentions" },
+  ];
+  for (const { id, key } of kindChips) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener("click", () => {
+      state.chips[key] = !state.chips[key];
+      el.classList.toggle("on", state.chips[key]);
+      syncEdgeVisibility(cyInst);
+    });
+  }
+  const globalEl = document.getElementById("chip-global");
+  if (globalEl) {
+    globalEl.addEventListener("click", () => {
+      state.chips.global = !state.chips.global;
+      globalEl.classList.toggle("on", state.chips.global);
+      const modeName = state.chips.global ? "global" : "local";
+      const modeData = (cyData.modes && cyData.modes[modeName]) || { nodes: [], edges: [] };
+      renderMode(cyInst, modeData);
+      syncEdgeVisibility(cyInst);
+    });
+  }
+}
+
 function renderGraph() {
   const pane = document.getElementById("graph-pane");
   pane.classList.toggle("hidden", state.graphCollapsed);
@@ -465,11 +515,17 @@ function renderGraph() {
       window._cyDagreRegistered = true;
     }
     pane.innerHTML = '<div id="cy-host"></div>';
+
+    // Read the cy_data that was set during init.
+    const cyData = window.__CY_DATA__ || { modes: { local: { nodes: [], edges: [] }, global: { nodes: [], edges: [] } }, default_mode: "local" };
+    const defaultModeName = state.chips.global ? "global" : (cyData.default_mode || "local");
+    const defaultModeData = (cyData.modes && cyData.modes[defaultModeName]) || { nodes: [], edges: [] };
+
     cy = window.cytoscape({
       container: document.getElementById("cy-host"),
       wheelSensitivity: 0.25,
       style: [
-        // Workspace and session: rounded rectangles with the label inside the shape.
+        // All nodes: label, font, color.
         { selector: "node", style: {
             "label": "data(label)",
             "font-size": 11,
@@ -479,29 +535,7 @@ function renderGraph() {
             "color": "#ffffff",
             "text-outline-width": 0,
         }},
-        { selector: 'node[kind = "workspace"]', style: {
-            "shape": "round-rectangle",
-            "background-color": "#37404a",
-            "width": "label",
-            "height": "label",
-            "padding": 10,
-            "font-weight": "bold",
-            "font-size": 12,
-        }},
-        { selector: 'node[kind = "session"]', style: {
-            "shape": "round-rectangle",
-            "background-color": "#1f7ae0",
-            "width": "label",
-            "height": "label",
-            "padding": 10,
-            "font-weight": "bold",
-            "font-size": 12,
-        }},
-        { selector: 'node[kind = "session"][status = "blocked"]', style: { "background-color": "#e53935" } },
-        { selector: 'node[kind = "session"][status = "resolved"]', style: { "background-color": "#2e9358" } },
-        { selector: 'node[kind = "session"][status = "open"]', style: { "background-color": "#8a929c" } },
-        { selector: 'node[archived = "true"]', style: { "opacity": 0.55 } },
-        // Task: small dot with label to the right (LR orientation puts each task on its own row).
+        // Task nodes: small dot with label to the right.
         { selector: 'node[kind = "task"]', style: {
             "shape": "ellipse",
             "background-color": "#8a929c",
@@ -521,7 +555,16 @@ function renderGraph() {
         { selector: 'node[kind = "task"][status = "blocked"]', style: { "background-color": "#e53935" } },
         { selector: 'node[kind = "task"][status = "resolved"]', style: { "background-color": "#2e9358", "opacity": 0.7 } },
         { selector: 'node[kind = "task"][status = "open"]', style: { "background-color": "#9aa3ad" } },
+        // Ghost (cross-WS) nodes: dashed border, faded.
+        { selector: 'node[ghost = "true"]', style: {
+            "border-style": "dashed",
+            "border-color": "#9aa3ad",
+            "border-width": 2,
+            "opacity": 0.6,
+            "color": "#8a929c",
+        }},
         { selector: ":selected", style: { "border-width": 3, "border-color": "#f1c40f" } },
+        // Base edge style.
         { selector: "edge", style: {
             "width": 1.4,
             "line-color": "#cdd2da",
@@ -530,16 +573,36 @@ function renderGraph() {
             "arrow-scale": 0.8,
             "curve-style": "bezier",
         }},
-        { selector: 'edge[kind = "blocks"]', style: {
+        // Per-kind edge styles.
+        { selector: 'edge[kind = "blocked"]', style: {
             "line-color": "#e53935",
             "target-arrow-color": "#e53935",
-            "line-style": "dashed",
+            "line-style": "solid",
             "width": 1.8,
+        }},
+        { selector: 'edge[kind = "related"]', style: {
+            "line-color": "#9aa3ad",
+            "target-arrow-color": "#9aa3ad",
+            "line-style": "solid",
+            "width": 1.4,
+        }},
+        { selector: 'edge[kind = "follows"]', style: {
+            "line-color": "#9aa3ad",
+            "target-arrow-color": "#9aa3ad",
+            "line-style": "dashed",
+            "width": 1.4,
+        }},
+        { selector: 'edge[kind = "mentions"]', style: {
+            "line-color": "#cdd2da",
+            "target-arrow-color": "#cdd2da",
+            "line-style": "dotted",
+            "width": 1.4,
         }},
       ],
       layout: _DAGRE_LAYOUT,
-      elements: buildGraphElements(state.data),
+      elements: buildCyElements(defaultModeData),
     });
+
     // Fit on initial render so the workspace uses the full pane (clamped so a single-node
     // workspace doesn't blow up to fill the whole viewport).
     const _fitClamped = () => {
@@ -560,34 +623,41 @@ function renderGraph() {
       window.addEventListener("resize", refit);
       window._cyRefit = refit;
     }
+
     cy.on("tap", "node", (ev) => {
       const d = ev.target.data();
+      // Ghost (cross-WS) nodes: ignore taps to avoid crashes on missing session data.
+      if (d.ghost === "true") return;
       if (d.kind === "task") {
-        state.selection = { kind: "task", sessionSlug: d.sessionSlug, taskSlug: d.taskSlug };
-      } else if (d.kind === "session") {
-        const slug = d.id.slice(5);
-        state.selection = { kind: "session", sessionSlug: slug };
+        // id is "ws/session/task-slug" — extract session and task slugs.
+        const sessionSlug = d.session || (d.id.split("/").slice(0, -1).pop());
+        const taskSlug = d.id.split("/").pop();
+        state.selection = { kind: "task", sessionSlug, taskSlug };
+        render();
       }
-      render();
     });
+
+    // Wire chips and apply initial visibility.
+    bindChips(cy, cyData);
+    syncEdgeVisibility(cy);
   } else {
-    // Save viewport before relayout (cy.layout.run() resets zoom/pan).
-    const _zoom = cy.zoom();
-    const _pan = cy.pan();
-    cy.json({ elements: buildGraphElements(state.data) });
-    cy.layout(_DAGRE_LAYOUT).run();
-    cy.zoom(_zoom);
-    cy.pan(_pan);
+    // Graph already initialised: just sync chip visibility (mode changes go through renderMode).
+    syncEdgeVisibility(cy);
   }
 
   // Sync selection ring to graph.
   cy.nodes().unselect();
-  if (state.selection) {
-    const id = state.selection.kind === "task"
-      ? `task:${state.selection.sessionSlug}:${state.selection.taskSlug}`
-      : `sess:${state.selection.sessionSlug}`;
-    const node = cy.getElementById(id);
-    if (node && node.length) node.select();
+  if (state.selection && state.selection.kind === "task") {
+    // The new task-centric id format is "ws/session/taskSlug".
+    // Try to find the node by searching for one whose id ends with the task slug in the right session.
+    const candidates = cy.nodes().filter(n => {
+      const d = n.data();
+      if (d.ghost === "true") return false;
+      const parts = d.id.split("/");
+      return parts[parts.length - 1] === state.selection.taskSlug &&
+             (d.session === state.selection.sessionSlug || parts[parts.length - 2] === state.selection.sessionSlug);
+    });
+    if (candidates.length) candidates.first().select();
   }
 }
 

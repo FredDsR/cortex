@@ -117,6 +117,36 @@ def test_one_shot_emits_cy_data_with_global_mode(workspaces_root: Path, tmp_path
     assert has_other, f"No 'other/' nodes in global mode: {[n['id'] for n in global_nodes]}"
 
 
+def test_workspace_html_emits_chip_markup(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    assert 'id="chip-blocked"' in html
+    assert 'id="chip-related"' in html
+    assert 'id="chip-follows"' in html
+    assert 'id="chip-mentions"' in html
+    assert 'id="chip-global"' in html
+
+
+def test_chip_default_classes(workspaces_root: Path):
+    world = parse_world(workspaces_root)
+    html = build_workspace_html(world, "demo")
+    # First three chips should be 'chip on'; last two just 'chip'
+    assert 'id="chip-blocked" class="chip on"' in html or 'class="chip on"' in html.split('id="chip-blocked"')[0].split('<')[-1] + 'id="chip-blocked"' in html
+    # Use a more robust check: find the button tag for each chip
+    import re
+    def chip_classes(chip_id):
+        m = re.search(r'<button[^>]*id="' + chip_id + r'"[^>]*class="([^"]*)"', html)
+        if not m:
+            m = re.search(r'<button[^>]*class="([^"]*)"[^>]*id="' + chip_id + r'"', html)
+        return m.group(1) if m else None
+
+    assert chip_classes("chip-blocked") == "chip on"
+    assert chip_classes("chip-related") == "chip on"
+    assert chip_classes("chip-follows") == "chip on"
+    assert chip_classes("chip-mentions") == "chip"
+    assert chip_classes("chip-global") == "chip"
+
+
 def test_script_tag_injection_neutralized(workspaces_root: Path, tmp_path: Path):
     """A task body containing </script> must not break out of the inline <script> block."""
     # Inject a malicious task body into a writable copy of the fixture

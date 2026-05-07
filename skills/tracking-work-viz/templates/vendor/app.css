@@ -34,6 +34,13 @@ html, body {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
+#topbar-controls {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
 #topbar h1,
 #topbar .ws-title {
   margin: 0;
@@ -328,3 +335,37 @@ html, body {
 
 #graph-pane { padding: 0; background: #fbfcfd; }
 #cy-host { width: 100%; height: 100%; }
+
+/* Chip toggle buttons in the topbar */
+.topbar-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-left: 1px solid var(--pane-border);
+  margin-left: auto;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--font-stack);
+  border: 1px solid transparent;
+  background: #9aa3ad;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.12s, opacity 0.12s;
+  opacity: 0.55;
+}
+
+.chip.on {
+  opacity: 1;
+}
+
+#chip-blocked.on { background: #e53935; }
+#chip-related.on { background: #5d6b7a; }
+#chip-follows.on { background: #3a7ab5; }
+#chip-mentions.on { background: #7d6db5; }
+#chip-global.on { background: #2e9358; }

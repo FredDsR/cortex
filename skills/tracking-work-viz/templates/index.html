@@ -6,7 +6,16 @@
   <link rel="stylesheet" href="vendor/app.css">
 </head>
 <body>
-  <header id="topbar"></header>
+  <header id="topbar">
+    <div id="topbar-controls"></div>
+    <div class="topbar-chips">
+      <button id="chip-blocked" class="chip on" type="button">Blocked by</button>
+      <button id="chip-related" class="chip on" type="button">Related to</button>
+      <button id="chip-follows" class="chip on" type="button">Follows</button>
+      <button id="chip-mentions" class="chip" type="button">Mentions</button>
+      <button id="chip-global" class="chip" type="button">Global</button>
+    </div>
+  </header>
   <main id="layout">
     <aside id="tree-pane" class="pane"></aside>
     <section id="graph-pane" class="pane"></section>
