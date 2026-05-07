@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 from .model import (
-    Workspace, Session, Task, Edge,
+    Workspace, Session, Task, Edge, World,
     STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED, STATUS_UNKNOWN,
 )
 
@@ -356,3 +356,89 @@ def parse_workspace(workspaces_root: Path, slug: str) -> Workspace:
             sess.archived = True
             ws.sessions.append(sess)
     return ws
+
+
+# ---------------------------------------------------------------------------
+# parse_world: multi-workspace cross-WS edge resolution
+# ---------------------------------------------------------------------------
+
+def _list_workspace_slugs(workspaces_root: Path) -> list[str]:
+    """Return sorted list of immediate subdirectory names under workspaces_root."""
+    if not workspaces_root.is_dir():
+        return []
+    return sorted(p.name for p in workspaces_root.iterdir() if p.is_dir())
+
+
+def _build_task_index(workspaces: list) -> dict:
+    """Return a dict {canonical_id: Task} keyed by <ws>/<sess>/<task>.
+
+    Only non-archived sessions are indexed for resolution purposes.
+    """
+    index: dict = {}
+    for ws in workspaces:
+        for sess in ws.sessions:
+            if sess.archived:
+                continue
+            for task in sess.tasks:
+                canonical = f"{ws.slug}/{sess.slug}/{task.slug}"
+                index[canonical] = task
+    return index
+
+
+def _resolve_target(raw: str, src_ws: str, src_sess: str, index: dict) -> tuple[str, bool]:
+    """Resolve a raw edge target to a canonical id.
+
+    Returns (canonical_id, found) where found indicates membership in index.
+
+    Resolution rules based on slash count in raw:
+      0 slashes -> <src_ws>/<src_sess>/<raw>
+      1 slash   -> <src_ws>/<raw>
+      2 slashes -> <raw>  (already fully qualified)
+      3+ slashes -> unresolvable; return (raw, False)
+    """
+    slash_count = raw.count("/")
+    if slash_count == 0:
+        canonical = f"{src_ws}/{src_sess}/{raw}"
+    elif slash_count == 1:
+        canonical = f"{src_ws}/{raw}"
+    elif slash_count == 2:
+        canonical = raw
+    else:
+        return raw, False
+    return canonical, canonical in index
+
+
+def parse_world(workspaces_root: Path) -> World:
+    """Parse all workspaces under workspaces_root and resolve cross-WS edges.
+
+    Returns a World with:
+      - workspaces: all parsed Workspace objects
+      - edges: flat list of all Edge objects (resolved and unresolved)
+      - ghosts: deduplicated list of canonical IDs that could not be resolved
+    """
+    workspaces_root = Path(workspaces_root).resolve()
+    slugs = _list_workspace_slugs(workspaces_root)
+    workspaces = [parse_workspace(workspaces_root, slug) for slug in slugs]
+    index = _build_task_index(workspaces)
+
+    all_edges: list = []
+    ghosts_seen: set = set()
+    ghosts: list = []
+
+    for ws in workspaces:
+        for sess in ws.sessions:
+            if sess.archived:
+                continue
+            for task in sess.tasks:
+                for edge in task.edges_out:
+                    canonical, found = _resolve_target(
+                        edge.target, ws.slug, sess.slug, index
+                    )
+                    edge.target = canonical
+                    edge.resolved = found
+                    if not found and canonical not in ghosts_seen:
+                        ghosts_seen.add(canonical)
+                        ghosts.append(canonical)
+                    all_edges.append(edge)
+
+    return World(workspaces=workspaces, edges=all_edges, ghosts=ghosts)

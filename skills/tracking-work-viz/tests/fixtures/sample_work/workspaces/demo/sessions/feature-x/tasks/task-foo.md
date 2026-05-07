@@ -12,3 +12,4 @@ The foo task.
 Blocked by: [task-baz]
 Related to: [task-bar]
 Follows: [task-bar]
+Related to: [other/sister/task-pinned]

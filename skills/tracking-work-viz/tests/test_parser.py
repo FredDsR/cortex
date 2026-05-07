@@ -1,5 +1,5 @@
 from pathlib import Path
-from work_viz.parser import parse_workspace, _parse_typed_relations, _parse_mentions
+from work_viz.parser import parse_workspace, parse_world, _parse_typed_relations, _parse_mentions
 from work_viz.model import (
     STATUS_IN_PROGRESS, STATUS_OPEN, STATUS_BLOCKED, STATUS_RESOLVED,
     Edge,
@@ -257,3 +257,76 @@ def test_mentions_dedup_typed_target_in_plain_prose():
     body = "We discussed task-foo in a previous meeting."
     mentions = _parse_mentions(body, ["task-foo"], "task-other")
     assert mentions == []
+
+
+# ---------------------------------------------------------------------------
+# parse_world tests
+# ---------------------------------------------------------------------------
+
+def test_world_local_edge_resolution(workspaces_root: Path):
+    """Local edge: task-foo's blocked edge resolves to demo/feature-x/task-baz."""
+    world = parse_world(workspaces_root)
+    demo_ws = next(ws for ws in world.workspaces if ws.slug == "demo")
+    sess = next(s for s in demo_ws.sessions if s.slug == "feature-x")
+    foo = next(t for t in sess.tasks if t.slug == "task-foo")
+    blocked_edges = [e for e in foo.edges_out if e.kind == "blocked"]
+    assert len(blocked_edges) == 1
+    e = blocked_edges[0]
+    assert e.target == "demo/feature-x/task-baz"
+    assert e.resolved is True
+
+
+def test_world_cross_ws_demo_to_other(workspaces_root: Path):
+    """task-foo has a resolved related edge pointing to other/sister/task-pinned."""
+    world = parse_world(workspaces_root)
+    demo_ws = next(ws for ws in world.workspaces if ws.slug == "demo")
+    sess = next(s for s in demo_ws.sessions if s.slug == "feature-x")
+    foo = next(t for t in sess.tasks if t.slug == "task-foo")
+    cross_edges = [
+        e for e in foo.edges_out
+        if e.kind == "related" and e.target == "other/sister/task-pinned"
+    ]
+    assert len(cross_edges) == 1
+    assert cross_edges[0].resolved is True
+
+
+def test_world_cross_ws_other_to_demo(workspaces_root: Path):
+    """task-pinned has a resolved related edge pointing to demo/feature-x/task-foo."""
+    world = parse_world(workspaces_root)
+    other_ws = next(ws for ws in world.workspaces if ws.slug == "other")
+    sess = next(s for s in other_ws.sessions if s.slug == "sister")
+    pinned = next(t for t in sess.tasks if t.slug == "task-pinned")
+    cross_edges = [
+        e for e in pinned.edges_out
+        if e.kind == "related" and e.target == "demo/feature-x/task-foo"
+    ]
+    assert len(cross_edges) == 1
+    assert cross_edges[0].resolved is True
+
+
+def test_world_ghost_target(tmp_path: Path):
+    """An edge pointing at a nonexistent task produces a ghost entry."""
+    # Build a minimal workspace fixture in tmp_path
+    ws_dir = tmp_path / "workspaces" / "tmpws" / "sessions" / "s1" / "tasks"
+    ws_dir.mkdir(parents=True)
+    # SUMMARY.md for session s1
+    summary = tmp_path / "workspaces" / "tmpws" / "sessions" / "s1" / "SUMMARY.md"
+    summary.write_text(
+        "---\nslug: s1\nstatus: Active\n---\n\n# Session\n\n## Tasks\n\n### Open\n\n- task-ghost\n",
+        encoding="utf-8",
+    )
+    # task that references a nonexistent target
+    task_file = ws_dir / "task-ghost.md"
+    task_file.write_text(
+        "---\nstatus: Open\n---\n\n# Ghost\n\nBlocked by: [task-missing]\n",
+        encoding="utf-8",
+    )
+    world = parse_world(tmp_path / "workspaces")
+    assert len(world.workspaces) == 1
+    assert "tmpws/s1/task-missing" in world.ghosts
+    ghost_ws = world.workspaces[0]
+    ghost_sess = next(s for s in ghost_ws.sessions if s.slug == "s1")
+    ghost_task = next(t for t in ghost_sess.tasks if t.slug == "task-ghost")
+    unresolved = [e for e in ghost_task.edges_out if e.kind == "blocked"]
+    assert len(unresolved) == 1
+    assert unresolved[0].resolved is False
