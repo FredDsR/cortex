@@ -6,7 +6,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from .parser import parse_workspace
+from .parser import parse_world
 
 
 DEFAULT_WORKSPACES_ROOT = Path.home() / ".work" / "workspaces"
@@ -77,8 +77,8 @@ def main(argv: list | None = None) -> int:
         parser.error("workspace slug is required (or use --workspace=all, or `serve`)")
 
     if args.emit_json:
-        ws = parse_workspace(args.workspaces_root, args.workspace)
-        json.dump(asdict(ws), sys.stdout, ensure_ascii=False, indent=2)
+        world = parse_world(args.workspaces_root)
+        json.dump(asdict(world), sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         return 0
 

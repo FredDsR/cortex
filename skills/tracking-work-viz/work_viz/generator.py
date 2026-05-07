@@ -13,7 +13,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from .parser import parse_workspace, parse_world
+from .parser import parse_world
 from .model import World
 
 
@@ -56,18 +56,6 @@ def _list_workspace_slugs(workspaces_root: Path) -> list:
 # ---------------------------------------------------------------------------
 # Per-edge-class data builders (Step 6)
 # ---------------------------------------------------------------------------
-
-# Transitional: generate_one_shot / generate_dashboard will be rewired in Step 7
-# to call build_workspace_html / build_dashboard_html. Until then they emit an
-# empty graph payload so the @@CY_DATA@@ placeholder is satisfied.
-_EMPTY_CY_DATA: dict = {
-    "modes": {
-        "local": {"nodes": [], "edges": []},
-        "global": {"nodes": [], "edges": []},
-    },
-    "ghosts": [],
-    "default_mode": "local",
-}
 
 
 def _serialize_edge(edge) -> dict:
@@ -245,27 +233,23 @@ def build_dashboard_html(world: World) -> str:
 
 
 def generate_one_shot(workspaces_root: Path, slug: str, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
-    ws = parse_workspace(workspaces_root, slug)
-    data = asdict(ws)
-    # Embed sibling workspace slugs so the UI can render a switcher.
-    data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
-    payload = _safe_json_for_script_tag(data)
-    cy_payload = _safe_json_for_script_tag(_EMPTY_CY_DATA)
-    html = _render("index.html", {
-        '"@@MODE@@"': '"static"',
-        "@@DATA@@": payload,
-        "@@CY_DATA@@": cy_payload,
-    })
+    world = parse_world(workspaces_root)
+    if not any(ws.slug == slug for ws in world.workspaces):
+        raise FileNotFoundError(f"workspace not found: {slug}")
+    html = build_workspace_html(world, slug)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{slug}.html"
     out_path.write_text(html, encoding="utf-8")
     return out_path
 
 
-def _summarize_one(workspaces_root: Path, ws_dir: Path) -> dict:
-    """Build the dashboard row for a single workspace. Raises on parse failure."""
-    slug = ws_dir.name
-    ws = parse_workspace(workspaces_root, slug)
+def _summarize_one(workspaces_root: Path, ws) -> dict:
+    """Build the dashboard row for a single workspace from a parsed Workspace object.
+
+    The last_mtime is still computed from the filesystem because it reflects
+    file modification times that are not captured in the parsed model.
+    """
+    ws_dir = workspaces_root / ws.slug
     active_sessions = [s for s in ws.sessions if not s.archived]
     session_count = len(active_sessions)
     all_tasks = [t for s in active_sessions for t in s.tasks]
@@ -287,7 +271,7 @@ def _summarize_one(workspaces_root: Path, ws_dir: Path) -> dict:
         if last_mtime else ""
     )
     return {
-        "slug": slug,
+        "slug": ws.slug,
         "session_count": session_count,
         "task_count": task_count,
         "last_updated": last_iso,
@@ -297,19 +281,22 @@ def _summarize_one(workspaces_root: Path, ws_dir: Path) -> dict:
     }
 
 
-def _summarize(workspaces_root: Path) -> dict:
+def _summarize(workspaces_root: Path, world: World) -> dict:
+    """Build the dashboard summary from an already-parsed World.
+
+    Falls back to a placeholder row for any workspace that cannot be summarized
+    (e.g., filesystem disappeared between parse and summary).
+    """
     out: dict = {"workspaces": []}
-    if not workspaces_root.is_dir():
-        return out
-    for ws_dir in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
+    for ws in world.workspaces:
         try:
-            out["workspaces"].append(_summarize_one(workspaces_root, ws_dir))
+            out["workspaces"].append(_summarize_one(workspaces_root, ws))
         except Exception as exc:
             # Don't let one corrupt workspace blow up the whole dashboard;
             # surface it as a placeholder row so the user notices.
-            print(f"warning: failed to summarize {ws_dir.name}: {exc}", file=sys.stderr)
+            print(f"warning: failed to summarize {ws.slug}: {exc}", file=sys.stderr)
             out["workspaces"].append({
-                "slug": ws_dir.name,
+                "slug": ws.slug,
                 "session_count": 0,
                 "task_count": 0,
                 "last_updated": "",
@@ -322,19 +309,30 @@ def _summarize(workspaces_root: Path) -> dict:
 
 
 def generate_dashboard(workspaces_root: Path, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
-    summary = _summarize(workspaces_root)
+    world = parse_world(workspaces_root)
     out_dir.mkdir(parents=True, exist_ok=True)
-    # Also generate per-workspace pages so dashboard links resolve.
-    for entry in summary["workspaces"]:
-        if entry.get("error"):
-            continue  # parse already failed; don't try to render the per-workspace page
+    # Generate per-workspace pages so dashboard links resolve.
+    for ws in world.workspaces:
         try:
-            generate_one_shot(workspaces_root, entry["slug"], out_dir=out_dir)
+            html = build_workspace_html(world, ws.slug)
+            (out_dir / f"{ws.slug}.html").write_text(html, encoding="utf-8")
         except Exception as exc:
-            print(f"warning: failed to generate {entry['slug']}.html: {exc}", file=sys.stderr)
+            print(f"warning: failed to generate {ws.slug}.html: {exc}", file=sys.stderr)
+    # Build the filesystem-based summary (status counts, last_mtime, etc.)
+    summary = _summarize(workspaces_root, world)
+    # Build the CY data via the pure builder then re-render with the full summary.
+    # build_dashboard_html uses a minimal summary; here we override @@DATA@@ with
+    # the richer filesystem summary while keeping the CY graph payload from the builder.
+    cy_data = {
+        "modes": {
+            "local": {"nodes": [], "edges": []},
+            "global": _build_dashboard_global(world),
+        },
+        "ghosts": list(world.ghosts),
+        "default_mode": "global",
+    }
     payload = _safe_json_for_script_tag(summary)
-    empty_cy = dict(_EMPTY_CY_DATA)
-    cy_payload = _safe_json_for_script_tag(empty_cy)
+    cy_payload = _safe_json_for_script_tag(cy_data)
     html = _render("dashboard.html", {
         "@@DATA@@": payload,
         "@@CY_DATA@@": cy_payload,

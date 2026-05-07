@@ -104,6 +104,19 @@ def test_dashboard_lists_workspaces(workspaces_root: Path, tmp_path: Path):
     assert '"slug": "demo"' in text or '"slug":"demo"' in text
 
 
+def test_one_shot_emits_cy_data_with_global_mode(workspaces_root: Path, tmp_path: Path):
+    """generate_one_shot uses parse_world, so the global mode includes cross-WS nodes."""
+    out = generate_one_shot(workspaces_root, "demo", out_dir=tmp_path)
+    text = out.read_text(encoding="utf-8")
+    assert "window.__CY_DATA__" in text
+    assert "@@CY_DATA@@" not in text
+    payload = _extract_cy_data(text)
+    # Global mode should contain nodes from the 'other' workspace (cross-WS neighbor)
+    global_nodes = payload["modes"]["global"]["nodes"]
+    has_other = any(n["id"].startswith("other/") for n in global_nodes)
+    assert has_other, f"No 'other/' nodes in global mode: {[n['id'] for n in global_nodes]}"
+
+
 def test_script_tag_injection_neutralized(workspaces_root: Path, tmp_path: Path):
     """A task body containing </script> must not break out of the inline <script> block."""
     # Inject a malicious task body into a writable copy of the fixture

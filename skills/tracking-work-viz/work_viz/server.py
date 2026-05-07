@@ -12,7 +12,7 @@ from pathlib import Path
 from queue import Queue, Empty
 from typing import Optional
 
-from .parser import parse_workspace
+from .parser import parse_world
 from .generator import _TEMPLATES_DIR
 
 
@@ -100,16 +100,21 @@ class VizServer:
             def do_GET(self):
                 if self.path == "/" or self.path == "/index.html":
                     raw = (templates_dir / "index.html").read_text(encoding="utf-8")
-                    html = raw.replace('"@@MODE@@"', '"dynamic"').replace("@@DATA@@", "null")
+                    html = (raw
+                            .replace('"@@MODE@@"', '"dynamic"')
+                            .replace("@@DATA@@", "null")
+                            .replace("@@CY_DATA@@", "null"))
                     self._send_text(html, "text/html; charset=utf-8")
                     return
                 if self.path == "/data.json":
                     try:
-                        from .generator import _list_workspace_slugs
-                        ws = parse_workspace(workspaces_root, slug)
-                        data = asdict(ws)
-                        data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
-                        body = json.dumps(data, ensure_ascii=False)
+                        world = parse_world(workspaces_root)
+                        ws_obj = next(
+                            (ws for ws in world.workspaces if ws.slug == slug), None
+                        )
+                        if ws_obj is None:
+                            raise FileNotFoundError(f"workspace not found: {slug}")
+                        body = json.dumps(asdict(world), ensure_ascii=False)
                     except FileNotFoundError as exc:
                         body = json.dumps({"error": "workspace_not_found", "detail": str(exc)})
                         self.send_response(HTTPStatus.NOT_FOUND)

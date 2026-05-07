@@ -25,12 +25,19 @@ def _start_server(workspaces_root: Path, slug: str) -> VizServer:
 
 
 def test_server_serves_data_json(writable_workspaces: Path):
+    """/data.json now emits the full World shape (workspaces/edges/ghosts)."""
     srv = _start_server(writable_workspaces, "demo")
     try:
         url = f"http://127.0.0.1:{srv.port}/data.json"
         with urllib.request.urlopen(url, timeout=5) as r:
             payload = json.loads(r.read())
-        assert payload["slug"] == "demo"
+        # World shape
+        assert "workspaces" in payload
+        assert "edges" in payload
+        assert "ghosts" in payload
+        # The demo workspace must be present
+        demo_ws = next((w for w in payload["workspaces"] if w["slug"] == "demo"), None)
+        assert demo_ws is not None
     finally:
         srv.stop()
 
