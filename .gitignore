@@ -10,3 +10,6 @@ __pycache__/
 
 # Superpowers brainstorm session dirs
 .superpowers/
+
+# WIP brainstorming/spec scratchpad — never committed
+docs/superpowers/
