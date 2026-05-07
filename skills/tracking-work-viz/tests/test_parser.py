@@ -234,3 +234,10 @@ def test_mentions_repeat_dedup():
     body = "See task-bar and also task-bar again."
     mentions = _parse_mentions(body, [], "task-other")
     assert mentions.count("task-bar") == 1
+
+
+def test_mentions_dedup_typed_target_in_plain_prose():
+    """Slug already in typed_targets is excluded even when it appears in plain prose, not on a typed-relation line."""
+    body = "We discussed task-foo in a previous meeting."
+    mentions = _parse_mentions(body, ["task-foo"], "task-other")
+    assert mentions == []
