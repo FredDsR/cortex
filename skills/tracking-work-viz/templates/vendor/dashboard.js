@@ -127,4 +127,113 @@
       idleToggle.classList.toggle("open", open);
     });
   }
+
+  // Cross-workspace graph (uses window.__CY_DATA__.modes.global).
+  const cyData = window.__CY_DATA__;
+  const graphSection = document.getElementById("dash-graph-section");
+  if (!graphSection) return;
+  const globalMode = cyData && cyData.modes && cyData.modes.global;
+  if (!globalMode || !globalMode.nodes || globalMode.nodes.length === 0) {
+    graphSection.style.display = "none";
+    return;
+  }
+
+  function _shortTaskLabel(slug) {
+    return slug.startsWith("task-") ? slug.slice(5) : slug;
+  }
+
+  function buildElements(mode) {
+    const elements = [];
+    for (const node of mode.nodes) {
+      elements.push({ data: {
+        id: node.id,
+        label: _shortTaskLabel(node.label || node.id.split("/").pop()),
+        ws: node.ws || "",
+        session: node.session || "",
+        status: node.status || "unknown",
+        ghost: node.ghost ? "true" : "false",
+      }});
+    }
+    for (const edge of mode.edges) {
+      elements.push({ data: {
+        id: edge.id || `e:${edge.source}:${edge.target}:${edge.kind}`,
+        source: edge.source, target: edge.target,
+        kind: edge.kind, resolved: edge.resolved ? "true" : "false",
+      }});
+    }
+    return elements;
+  }
+
+  if (window.cytoscape && window.cytoscapeDagre && !window._dashCyDagre) {
+    window.cytoscape.use(window.cytoscapeDagre);
+    window._dashCyDagre = true;
+  }
+
+  const dashCy = window.cytoscape({
+    container: document.getElementById("dash-cy-host"),
+    wheelSensitivity: 0.25,
+    elements: buildElements(globalMode),
+    layout: { name: "dagre", rankDir: "LR", nodeSep: 14, rankSep: 110, edgeSep: 8, padding: 28, fit: true },
+    style: [
+      { selector: "node", style: {
+          "label": "data(label)", "font-size": 10, "text-valign": "center",
+          "text-halign": "right", "text-margin-x": 6, "color": "#1f2933",
+          "shape": "ellipse", "width": 14, "height": 14,
+          "background-color": "#9aa3ad", "border-width": 2, "border-color": "#ffffff",
+      }},
+      { selector: 'node[status = "in_progress"]', style: { "background-color": "#1f7ae0" } },
+      { selector: 'node[status = "blocked"]', style: { "background-color": "#e53935" } },
+      { selector: 'node[status = "resolved"]', style: { "background-color": "#2e9358", "opacity": 0.7 } },
+      { selector: 'node[status = "open"]', style: { "background-color": "#9aa3ad" } },
+      { selector: 'node[ghost = "true"]', style: {
+          "border-style": "dashed", "border-color": "#9aa3ad",
+          "background-color": "#cdd2da", "opacity": 0.6, "color": "#7a828c",
+      }},
+      { selector: "edge", style: {
+          "width": 1.4, "line-color": "#cdd2da",
+          "target-arrow-shape": "triangle", "target-arrow-color": "#cdd2da",
+          "arrow-scale": 0.8, "curve-style": "bezier",
+      }},
+      { selector: 'edge[kind = "blocked"]', style: {
+          "line-color": "#e53935", "target-arrow-color": "#e53935", "width": 1.8,
+      }},
+      { selector: 'edge[kind = "related"]', style: {
+          "line-color": "#9aa3ad", "target-arrow-color": "#9aa3ad",
+      }},
+      { selector: 'edge[kind = "follows"]', style: {
+          "line-color": "#9aa3ad", "target-arrow-color": "#9aa3ad", "line-style": "dashed",
+      }},
+      { selector: 'edge[kind = "mentions"]', style: {
+          "line-color": "#cdd2da", "target-arrow-color": "#cdd2da", "line-style": "dotted",
+      }},
+    ],
+  });
+
+  // Initial chip state matches workspace page defaults: mentions OFF.
+  const chipState = { blocked: true, related: true, follows: true, mentions: false };
+
+  function syncEdgeVisibility() {
+    for (const kind of ["blocked", "related", "follows", "mentions"]) {
+      dashCy.edges(`[kind = "${kind}"]`).style("display", chipState[kind] ? "element" : "none");
+    }
+  }
+  syncEdgeVisibility();
+
+  for (const kind of ["blocked", "related", "follows", "mentions"]) {
+    const btn = document.getElementById("chip-" + kind);
+    if (!btn) continue;
+    btn.addEventListener("click", () => {
+      chipState[kind] = !chipState[kind];
+      btn.classList.toggle("on", chipState[kind]);
+      btn.setAttribute("aria-pressed", chipState[kind] ? "true" : "false");
+      syncEdgeVisibility();
+    });
+  }
+
+  // Tap-to-open: clicking a real (non-ghost) node opens that workspace's page.
+  dashCy.on("tap", "node", (ev) => {
+    const d = ev.target.data();
+    if (d.ghost === "true" || !d.ws) return;
+    window.location.href = d.ws + ".html";
+  });
 })();

@@ -177,11 +177,31 @@ def _build_global_mode_for_workspace(world: World, slug: str) -> dict:
 
 
 def _build_dashboard_global(world: World) -> dict:
-    """Return all nodes and all edges in the world."""
-    return {
-        "nodes": _collect_nodes(world),
-        "edges": [_serialize_edge(edge) for edge in world.edges],
-    }
+    """Return all nodes and all edges in the world.
+
+    Includes ghost nodes for any edge endpoint that didn't resolve to a
+    real task, so consumers can render every edge without filtering.
+    """
+    real_nodes = _collect_nodes(world)
+    real_ids = {n["id"] for n in real_nodes}
+    edges = [_serialize_edge(edge) for edge in world.edges]
+    ghost_seen: set = set()
+    ghost_nodes: list = []
+    for edge in world.edges:
+        for endpoint in (edge.source, edge.target):
+            if endpoint in real_ids or endpoint in ghost_seen:
+                continue
+            ghost_seen.add(endpoint)
+            parts = endpoint.split("/")
+            ghost_nodes.append({
+                "id": endpoint,
+                "label": parts[2] if len(parts) >= 3 else endpoint,
+                "ws": parts[0] if len(parts) >= 1 else "",
+                "session": parts[1] if len(parts) >= 2 else "",
+                "status": "unknown",
+                "ghost": True,
+            })
+    return {"nodes": real_nodes + ghost_nodes, "edges": edges}
 
 
 def build_workspace_html(world: World, slug: str) -> str:
