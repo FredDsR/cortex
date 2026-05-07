@@ -130,8 +130,6 @@ def test_workspace_html_emits_chip_markup(workspaces_root: Path):
 def test_chip_default_classes(workspaces_root: Path):
     world = parse_world(workspaces_root)
     html = build_workspace_html(world, "demo")
-    # First three chips should be 'chip on'; last two just 'chip'
-    assert 'id="chip-blocked" class="chip on"' in html or 'class="chip on"' in html.split('id="chip-blocked"')[0].split('<')[-1] + 'id="chip-blocked"' in html
     # Use a more robust check: find the button tag for each chip
     import re
     def chip_classes(chip_id):

@@ -453,9 +453,13 @@ const _DAGRE_LAYOUT = {
 // Replace current graph elements with the provided mode data and re-run layout.
 function renderMode(cyInst, modeData) {
   if (!cyInst) return;
+  const _z = cyInst.zoom();
+  const _p = cyInst.pan();
   cyInst.elements().remove();
   cyInst.add(buildCyElements(modeData));
   cyInst.layout(_DAGRE_LAYOUT).run();
+  cyInst.zoom(_z);
+  cyInst.pan(_p);
 }
 
 // Toggle edge display based on state.chips.
@@ -487,6 +491,7 @@ function bindChips(cyInst, cyData) {
     el.addEventListener("click", () => {
       state.chips[key] = !state.chips[key];
       el.classList.toggle("on", state.chips[key]);
+      el.setAttribute("aria-pressed", state.chips[key] ? "true" : "false");
       syncEdgeVisibility(cyInst);
     });
   }
@@ -495,6 +500,7 @@ function bindChips(cyInst, cyData) {
     globalEl.addEventListener("click", () => {
       state.chips.global = !state.chips.global;
       globalEl.classList.toggle("on", state.chips.global);
+      globalEl.setAttribute("aria-pressed", state.chips.global ? "true" : "false");
       const modeName = state.chips.global ? "global" : "local";
       const modeData = (cyData.modes && cyData.modes[modeName]) || { nodes: [], edges: [] };
       renderMode(cyInst, modeData);

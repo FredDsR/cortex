@@ -346,7 +346,7 @@ html, body {
   margin-left: auto;
 }
 
-.chip {
+#topbar .chip {
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 11.5px;
@@ -360,7 +360,7 @@ html, body {
   opacity: 0.55;
 }
 
-.chip.on {
+#topbar .chip.on {
   opacity: 1;
 }
 
