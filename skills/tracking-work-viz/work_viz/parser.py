@@ -34,6 +34,13 @@ _TYPED_REL_FM_KEYS: dict[str, str] = {
 _REF_BRACKET_RE = re.compile(r"\[((?:[a-z0-9-]+/){0,2}[a-z0-9-]+)\]")
 _REF_BARE_RE = re.compile(r"\b((?:[a-z0-9-]+/){0,2}task-[a-z0-9-]+)\b")
 
+# Matches a complete line that begins a typed-relation declaration.
+# Used by _parse_mentions to skip lines already handled by _parse_typed_relations.
+_TYPED_REL_LINE_RE = re.compile(
+    r"^\s*\*?\*?\s*(?:Blocked by|Related to|Follows)\b",
+    re.IGNORECASE,
+)
+
 _HEADING_TO_STATUS = {
     "in progress": STATUS_IN_PROGRESS,
     "open": STATUS_OPEN,
@@ -178,6 +185,69 @@ def _parse_typed_relations(body: str, frontmatter: dict) -> list[tuple[str, str]
 def _parse_blocked_by(body: str) -> list:
     """Back-compat shim: return a plain list of blocked-by slugs from body."""
     return [target for kind, target in _parse_typed_relations(body, {}) if kind == "blocked"]
+
+
+def _strip_code_fences(body: str) -> str:
+    """Return body with lines inside triple-backtick fences removed.
+
+    Both the fence-delimiter lines and the content between them are dropped.
+    Unbalanced fences cause everything from the unmatched opener to the end
+    of the body to be treated as inside a fence (excluded).
+    """
+    out: list[str] = []
+    in_fence = False
+    for line in body.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue  # drop fence delimiter itself
+        if in_fence:
+            continue
+        out.append(line)
+    return "".join(out)
+
+
+def _parse_mentions(body: str, typed_targets, source_slug: str) -> list[str]:
+    """Return raw target strings mentioned in prose that are not typed relations.
+
+    Arguments:
+        body: raw task body text.
+        typed_targets: iterable of raw target strings already captured by
+            _parse_typed_relations; these are excluded from the output.
+        source_slug: the task's own slug; self-references are excluded.
+
+    Returns a deduped, first-seen-order list of raw target strings.
+    """
+    typed_set = set(typed_targets)
+    seen: set[str] = set()
+    result: list[str] = []
+
+    stripped = _strip_code_fences(body)
+    for line in stripped.splitlines():
+        if _TYPED_REL_LINE_RE.match(line):
+            continue
+        # Collect bracketed refs then bare task-* refs (same strategy as _extract_targets).
+        candidates: list[str] = []
+        local_seen: set[str] = set()
+        for tok in _REF_BRACKET_RE.findall(line):
+            if tok not in local_seen:
+                candidates.append(tok)
+                local_seen.add(tok)
+        bare_line = _MARKDOWN_LINK_RE.sub("", line)
+        for tok in _REF_BARE_RE.findall(bare_line):
+            if tok not in local_seen:
+                candidates.append(tok)
+                local_seen.add(tok)
+
+        for tok in candidates:
+            if tok == source_slug:
+                continue
+            if tok in typed_set:
+                continue
+            if tok not in seen:
+                result.append(tok)
+                seen.add(tok)
+
+    return result
 
 
 def _parse_summary_status_map(summary_text: str) -> dict:

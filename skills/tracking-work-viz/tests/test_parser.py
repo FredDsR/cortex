@@ -1,5 +1,5 @@
 from pathlib import Path
-from work_viz.parser import parse_workspace, _parse_typed_relations
+from work_viz.parser import parse_workspace, _parse_typed_relations, _parse_mentions
 from work_viz.model import (
     STATUS_IN_PROGRESS, STATUS_OPEN, STATUS_BLOCKED, STATUS_RESOLVED,
 )
@@ -185,3 +185,52 @@ def test_typed_relations_order_frontmatter_first():
     kinds = [r for r in rels if r[0] == "related"]
     assert kinds[0] == ("related", "task-fm")
     assert kinds[1] == ("related", "task-body")
+
+
+# ---------------------------------------------------------------------------
+# _parse_mentions unit tests
+# ---------------------------------------------------------------------------
+
+def test_mentions_bare_slug_in_prose():
+    """Bare task-* reference in prose is picked up as a mention."""
+    body = "We tracked this in task-bar earlier."
+    mentions = _parse_mentions(body, [], "task-other")
+    assert "task-bar" in mentions
+
+
+def test_mentions_link_form():
+    """Bracketed [task-slug] form in prose is picked up as a mention."""
+    body = "See [task-foo] for context."
+    mentions = _parse_mentions(body, [], "task-other")
+    assert "task-foo" in mentions
+
+
+def test_mentions_dedup_with_typed_relations():
+    """A slug already captured as a typed relation is excluded from mentions."""
+    body = "Blocked by: [task-foo]\nSee task-foo for background."
+    typed_targets = ["task-foo"]
+    mentions = _parse_mentions(body, typed_targets, "task-other")
+    assert "task-foo" not in mentions
+    assert mentions == []
+
+
+def test_mentions_self_reference_skipped():
+    """Self-references (source_slug matches target) are excluded from mentions."""
+    body = "This task (task-foo) is self-referential."
+    mentions = _parse_mentions(body, [], "task-foo")
+    assert "task-foo" not in mentions
+    assert mentions == []
+
+
+def test_mentions_code_fence_excluded():
+    """References inside triple-backtick fences are not picked up as mentions."""
+    body = "Some prose.\n```\ntask-bar is inside a fence\n```\nEnd."
+    mentions = _parse_mentions(body, [], "task-other")
+    assert "task-bar" not in mentions
+
+
+def test_mentions_repeat_dedup():
+    """The same slug appearing multiple times in prose appears only once in output."""
+    body = "See task-bar and also task-bar again."
+    mentions = _parse_mentions(body, [], "task-other")
+    assert mentions.count("task-bar") == 1
