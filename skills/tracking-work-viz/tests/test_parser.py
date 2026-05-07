@@ -1,5 +1,5 @@
 from pathlib import Path
-from work_viz.parser import parse_workspace
+from work_viz.parser import parse_workspace, _parse_typed_relations
 from work_viz.model import (
     STATUS_IN_PROGRESS, STATUS_OPEN, STATUS_BLOCKED, STATUS_RESOLVED,
 )
@@ -94,3 +94,94 @@ def test_archived_sessions_present(workspaces_root: Path):
     s = archived[0]
     assert s.slug == "old-feature"
     assert s.archived is True
+
+
+# ---------------------------------------------------------------------------
+# _parse_typed_relations unit tests
+# ---------------------------------------------------------------------------
+
+def test_typed_relations_body_blocked_by():
+    body = "Some prose.\nBlocked by: [task-foo], [task-bar]\nMore prose."
+    rels = _parse_typed_relations(body, {})
+    assert ("blocked", "task-foo") in rels
+    assert ("blocked", "task-bar") in rels
+
+
+def test_typed_relations_body_related_to():
+    body = "Related to: [task-foo]"
+    rels = _parse_typed_relations(body, {})
+    assert rels == [("related", "task-foo")]
+
+
+def test_typed_relations_body_follows():
+    body = "Follows: task-bar"
+    rels = _parse_typed_relations(body, {})
+    assert rels == [("follows", "task-bar")]
+
+
+def test_typed_relations_multiple_targets_per_line():
+    body = "Related to: [task-a], [task-b], task-c"
+    rels = _parse_typed_relations(body, {})
+    assert ("related", "task-a") in rels
+    assert ("related", "task-b") in rels
+    assert ("related", "task-c") in rels
+
+
+def test_typed_relations_frontmatter_list():
+    fm = {"blocked_by": "[task-foo, task-bar]", "related_to": "[task-baz]"}
+    rels = _parse_typed_relations("", fm)
+    assert ("blocked", "task-foo") in rels
+    assert ("blocked", "task-bar") in rels
+    assert ("related", "task-baz") in rels
+
+
+def test_typed_relations_dedup_body_and_frontmatter():
+    body = "Blocked by: [task-foo]"
+    fm = {"blocked_by": "[task-foo]"}
+    rels = _parse_typed_relations(body, fm)
+    assert rels.count(("blocked", "task-foo")) == 1
+
+
+def test_typed_relations_bare_slug_form():
+    body = "Related to: task-bar"
+    rels = _parse_typed_relations(body, {})
+    assert ("related", "task-bar") == rels[0]
+
+
+def test_typed_relations_bold_label_variant():
+    """Bold markdown around the label should still match."""
+    body = "**Blocked by:** [task-x]"
+    rels = _parse_typed_relations(body, {})
+    assert ("blocked", "task-x") in rels
+
+
+def test_typed_relations_case_insensitive():
+    """Labels should match regardless of case."""
+    body = "RELATED TO: task-z"
+    rels = _parse_typed_relations(body, {})
+    assert ("related", "task-z") in rels
+
+
+def test_typed_relations_cross_ws_path():
+    """Slash-separated references up to two slashes are accepted."""
+    body = "Follows: feature-x/task-foo\nRelated to: demo/feature-x/task-bar"
+    rels = _parse_typed_relations(body, {})
+    assert ("follows", "feature-x/task-foo") in rels
+    assert ("related", "demo/feature-x/task-bar") in rels
+
+
+def test_typed_relations_frontmatter_single_string():
+    """A single bare value (not in brackets) treated as one-element list."""
+    fm = {"follows": "task-alpha"}
+    rels = _parse_typed_relations("", fm)
+    assert ("follows", "task-alpha") in rels
+
+
+def test_typed_relations_order_frontmatter_first():
+    """Frontmatter entries come before body entries in the result list."""
+    body = "Related to: task-body"
+    fm = {"related_to": "[task-fm]"}
+    rels = _parse_typed_relations(body, fm)
+    kinds = [r for r in rels if r[0] == "related"]
+    assert kinds[0] == ("related", "task-fm")
+    assert kinds[1] == ("related", "task-body")

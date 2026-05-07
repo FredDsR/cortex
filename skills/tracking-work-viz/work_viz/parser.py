@@ -16,6 +16,25 @@ _BARE_TASK_RE = re.compile(r"\b(task-[a-z0-9-]+)\b")
 _BLOCKED_BY_RE = re.compile(r"^\s*\*?\*?\s*Blocked by:?\s*\*?\*?\s*(.+)$", re.IGNORECASE)
 _ARCHIVE_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 
+# Typed relations: one regex per kind, maps label -> kind tag.
+# Pattern: optional leading whitespace, optional ** bold markers, label, optional colon, optional ** close bold.
+_TYPED_REL_LABELS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"^\s*\*?\*?\s*Blocked by:?\s*\*?\*?\s*(.+)$", re.IGNORECASE), "blocked"),
+    (re.compile(r"^\s*\*?\*?\s*Related to:?\s*\*?\*?\s*(.+)$", re.IGNORECASE), "related"),
+    (re.compile(r"^\s*\*?\*?\s*Follows:?\s*\*?\*?\s*(.+)$", re.IGNORECASE), "follows"),
+]
+
+# Frontmatter snake_case keys -> internal kind tag.
+_TYPED_REL_FM_KEYS: dict[str, str] = {
+    "blocked_by": "blocked",
+    "related_to": "related",
+    "follows": "follows",
+}
+
+# Reference forms: bracketed slug (up to 2 slashes) and bare task-* slug (up to 2 slashes).
+_REF_BRACKET_RE = re.compile(r"\[((?:[a-z0-9-]+/){0,2}[a-z0-9-]+)\]")
+_REF_BARE_RE = re.compile(r"\b((?:[a-z0-9-]+/){0,2}task-[a-z0-9-]+)\b")
+
 _HEADING_TO_STATUS = {
     "in progress": STATUS_IN_PROGRESS,
     "open": STATUS_OPEN,
@@ -65,20 +84,100 @@ def _frontmatter_to_display(meta: dict) -> dict:
     return out
 
 
-def _parse_blocked_by(body: str) -> list:
-    out: list = []
-    for line in body.splitlines():
-        m = _BLOCKED_BY_RE.match(line.strip())
-        if not m:
+_MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\([^)]*\)")
+
+
+def _extract_targets(rest: str) -> list[str]:
+    """Extract all reference tokens from a relation line remainder.
+
+    Strategy:
+    1. Collect bracketed slug refs first (e.g. [task-foo], [feature-x/task-foo]).
+       For full markdown links like [task-foo](tasks/task-foo.md) the bracket
+       part is captured and the link is then erased so the URL is not re-matched.
+    2. Erase full markdown links from a copy of rest before applying bare-slug
+       matching, preventing the ``tasks/task-foo`` path segment from matching.
+    3. Collect bare task-* refs not already captured.
+
+    Tokens with three or more slashes are rejected by the regexes (max two
+    slashes via {0,2}).
+    """
+    targets: list[str] = []
+    seen: set[str] = set()
+    for tok in _REF_BRACKET_RE.findall(rest):
+        if tok not in seen:
+            targets.append(tok)
+            seen.add(tok)
+    # Remove full markdown links before bare matching so the ``(url)`` part
+    # is not picked up by _REF_BARE_RE.
+    bare_rest = _MARKDOWN_LINK_RE.sub("", rest)
+    for tok in _REF_BARE_RE.findall(bare_rest):
+        if tok not in seen:
+            targets.append(tok)
+            seen.add(tok)
+    return targets
+
+
+def _parse_fm_list(value: str) -> list[str]:
+    """Parse a frontmatter string value as a list.
+
+    Accepts three forms:
+    - Inline flow: ``[task-foo, task-bar]`` - strip brackets, split on commas.
+    - Single string: ``task-foo`` - return as one-element list.
+    - Empty string - return empty list.
+
+    Block-form YAML lists are not handled here (``_split_frontmatter`` treats
+    each ``- item`` as a separate key-less line which is skipped). Inline flow
+    and single-string cover the documented usage.
+    """
+    v = value.strip()
+    if not v:
+        return []
+    if v.startswith("[") and v.endswith("]"):
+        inner = v[1:-1]
+        return [t.strip() for t in inner.split(",") if t.strip()]
+    return [v]
+
+
+def _parse_typed_relations(body: str, frontmatter: dict) -> list[tuple[str, str]]:
+    """Return ``[(kind, raw_target), ...]`` for Blocked by / Related to / Follows.
+
+    Sources are unioned with frontmatter first (in YAML dict order), then body
+    lines top-to-bottom. Duplicates on (kind, target) are suppressed.
+    """
+    out: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def _add(kind: str, target: str) -> None:
+        pair = (kind, target)
+        if pair not in seen:
+            out.append(pair)
+            seen.add(pair)
+
+    # Frontmatter keys first.
+    for fm_key, kind in _TYPED_REL_FM_KEYS.items():
+        raw = frontmatter.get(fm_key, "")
+        if not raw:
             continue
-        rest = m.group(1)
-        for slug in _LINK_TASK_RE.findall(rest):
-            if slug not in out:
-                out.append(slug)
-        for slug in _BARE_TASK_RE.findall(rest):
-            if slug not in out:
-                out.append(slug)
+        for target in _parse_fm_list(str(raw)):
+            if target:
+                _add(kind, target)
+
+    # Body lines.
+    for line in body.splitlines():
+        stripped = line.strip()
+        for pattern, kind in _TYPED_REL_LABELS:
+            m = pattern.match(stripped)
+            if m:
+                for target in _extract_targets(m.group(1)):
+                    _add(kind, target)
+                break  # one label per line
+
     return out
+
+
+def _parse_blocked_by(body: str) -> list:
+    """Back-compat shim: return a plain list of blocked-by slugs from body."""
+    return [target for kind, target in _parse_typed_relations(body, {}) if kind == "blocked"]
 
 
 def _parse_summary_status_map(summary_text: str) -> dict:
