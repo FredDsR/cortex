@@ -13,7 +13,6 @@ _INLINE_FIELD_RE = re.compile(r"^\*\*([^*:]+?)(?::\*\*|\*\*:)\s*(.*)$")
 _HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
 _LINK_TASK_RE = re.compile(r"\[[^\]]+\]\(tasks/([a-z0-9-]+)\.md\)")
 _BARE_TASK_RE = re.compile(r"\b(task-[a-z0-9-]+)\b")
-_BLOCKED_BY_RE = re.compile(r"^\s*\*?\*?\s*Blocked by:?\s*\*?\*?\s*(.+)$", re.IGNORECASE)
 _ARCHIVE_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 
 # Typed relations: one regex per kind, maps label -> kind tag.
@@ -141,8 +140,9 @@ def _parse_fm_list(value: str) -> list[str]:
 def _parse_typed_relations(body: str, frontmatter: dict) -> list[tuple[str, str]]:
     """Return ``[(kind, raw_target), ...]`` for Blocked by / Related to / Follows.
 
-    Sources are unioned with frontmatter first (in YAML dict order), then body
-    lines top-to-bottom. Duplicates on (kind, target) are suppressed.
+    Sources are unioned with frontmatter first (in _TYPED_REL_FM_KEYS declaration
+    order: blocked_by, related_to, follows), then body lines top-to-bottom.
+    Duplicates on (kind, target) are suppressed.
     """
     out: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
