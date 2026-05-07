@@ -28,7 +28,7 @@ Both side panes are individually collapsible via the topbar. The topbar also has
 ## UI panes
 
 - **Tree** pane: workspace > session > task, with status pills, per-session agent badges, and ellipsis-truncated long names.
-- **Graph** pane: Cytoscape with dagre LR layout. Status-colored nodes, dashed red blocker edges. Auto-fits on resize and pane toggle.
+- **Graph** pane: Cytoscape with dagre LR layout. Status-colored nodes. Five topbar chips control which edge kinds are visible: `Blocked by` (red solid), `Related to` (gray solid), `Follows` (dashed), `Mentions` (dotted), and `Global`. The first three are on by default; `Mentions` and `Global` are off. Ghost nodes (targets that did not resolve to a known task) render with a dashed border and faded label. In local mode the graph shows only nodes inside the current workspace, plus ghost nodes for cross-workspace targets. Click `Global` to include 1-hop neighbors from other workspaces (or, on the dashboard, every workspace). Auto-fits on resize and pane toggle.
 - **Content** pane: kicker + title + status pill header, key/value field grid, rendered markdown body. Intra-task links navigate inside the UI.
 - **Search**: substring filter against session and task slugs; tree and graph both update live.
 - **Idle workspaces** on the dashboard: workspaces with no in-progress / blocked / open work, no active agents, and >7 days since last edit fold under an "N idle workspaces" expander.
@@ -63,7 +63,7 @@ cd skills/tracking-work-viz
 uv run --with pytest python -m pytest -v
 ```
 
-23 tests covering the parser, generator, CLI, watch-mode SSE, dashboard server, hot-reload script injection, path-traversal protection, and the script-tag JSON injection escape.
+61 tests covering the parser (typed-relations parsing, mentions detection, cross-workspace resolution), generator, edge-kind chips, Local/Global mode, CLI, watch-mode SSE, dashboard server, hot-reload script injection, path-traversal protection, and the script-tag JSON injection escape.
 
 ## Security
 
