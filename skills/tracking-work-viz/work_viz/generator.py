@@ -47,12 +47,6 @@ def _render(template_name: str, replacements: dict) -> str:
     return out
 
 
-def _list_workspace_slugs(workspaces_root: Path) -> list:
-    if not workspaces_root.is_dir():
-        return []
-    return sorted(p.name for p in workspaces_root.iterdir() if p.is_dir())
-
-
 # ---------------------------------------------------------------------------
 # Per-edge-class data builders (Step 6)
 # ---------------------------------------------------------------------------
@@ -191,7 +185,7 @@ def build_workspace_html(world: World, slug: str) -> str:
 
     ws_obj = next((ws for ws in world.workspaces if ws.slug == slug), None)
     if ws_obj is None:
-        raise ValueError(f"Workspace '{slug}' not found in world")
+        raise FileNotFoundError(f"workspace not found: {slug}")
 
     data = asdict(ws_obj)
     data["available_workspaces"] = [ws.slug for ws in world.workspaces]
@@ -206,10 +200,9 @@ def build_workspace_html(world: World, slug: str) -> str:
     })
 
 
-def build_dashboard_html(world: World) -> str:
-    """Return the full HTML string for the dashboard page (pure, no I/O)."""
-    # Dashboard has no per-workspace local view; local is intentionally empty.
-    cy_data = {
+def _dashboard_cy_data(world: World) -> dict:
+    """Return the cy_data dict shared by the dashboard page builders."""
+    return {
         "modes": {
             "local": {"nodes": [], "edges": []},
             "global": _build_dashboard_global(world),
@@ -218,13 +211,14 @@ def build_dashboard_html(world: World) -> str:
         "default_mode": "global",
     }
 
-    # Build the existing summary data dict from the world workspaces
-    # (replicated logic from _summarize_one but without filesystem I/O)
-    # For dashboard HTML built from World, we emit a minimal summary.
+
+def build_dashboard_html(world: World) -> str:
+    """Return the full HTML string for the dashboard page (pure, no I/O)."""
+    # For dashboard HTML built from World alone, emit a minimal summary.
     # The full filesystem-based summary is only needed for generate_dashboard.
     summary = {"workspaces": [ws.slug for ws in world.workspaces]}
     payload = _safe_json_for_script_tag(summary)
-    cy_payload = _safe_json_for_script_tag(cy_data)
+    cy_payload = _safe_json_for_script_tag(_dashboard_cy_data(world))
 
     return _render("dashboard.html", {
         "@@DATA@@": payload,
@@ -234,8 +228,6 @@ def build_dashboard_html(world: World) -> str:
 
 def generate_one_shot(workspaces_root: Path, slug: str, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
     world = parse_world(workspaces_root)
-    if not any(ws.slug == slug for ws in world.workspaces):
-        raise FileNotFoundError(f"workspace not found: {slug}")
     html = build_workspace_html(world, slug)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{slug}.html"
@@ -320,19 +312,9 @@ def generate_dashboard(workspaces_root: Path, out_dir: Path = DEFAULT_OUT_DIR) -
             print(f"warning: failed to generate {ws.slug}.html: {exc}", file=sys.stderr)
     # Build the filesystem-based summary (status counts, last_mtime, etc.)
     summary = _summarize(workspaces_root, world)
-    # Build the CY data via the pure builder then re-render with the full summary.
-    # build_dashboard_html uses a minimal summary; here we override @@DATA@@ with
-    # the richer filesystem summary while keeping the CY graph payload from the builder.
-    cy_data = {
-        "modes": {
-            "local": {"nodes": [], "edges": []},
-            "global": _build_dashboard_global(world),
-        },
-        "ghosts": list(world.ghosts),
-        "default_mode": "global",
-    }
+    # Re-render with the richer filesystem summary and the shared cy_data helper.
     payload = _safe_json_for_script_tag(summary)
-    cy_payload = _safe_json_for_script_tag(cy_data)
+    cy_payload = _safe_json_for_script_tag(_dashboard_cy_data(world))
     html = _render("dashboard.html", {
         "@@DATA@@": payload,
         "@@CY_DATA@@": cy_payload,

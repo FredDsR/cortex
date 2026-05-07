@@ -21,7 +21,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--serve", action="store_true",
                    help="Start a local HTTP server fronting ~/.work/viz/ (dashboard + per-workspace pages). "
                         "Bypasses snap-Firefox file:// restrictions.")
-    p.add_argument("--json", dest="emit_json", action="store_true", help="Print parsed model JSON to stdout.")
+    p.add_argument("--json", dest="emit_json", action="store_true", help="Print the full World model (workspaces/edges/ghosts) as JSON to stdout.")
     p.add_argument("--workspaces-root", type=Path, default=DEFAULT_WORKSPACES_ROOT,
                    help="Override the workspaces root (defaults to ~/.work/workspaces).")
     p.add_argument("--out-dir", type=Path, default=None,

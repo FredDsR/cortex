@@ -110,20 +110,20 @@ class VizServer:
                     try:
                         world = parse_world(workspaces_root)
                         ws_obj = next(
-                            (ws for ws in world.workspaces if ws.slug == slug), None
+                            (w for w in world.workspaces if w.slug == slug), None
                         )
                         if ws_obj is None:
-                            raise FileNotFoundError(f"workspace not found: {slug}")
-                        body = json.dumps(asdict(world), ensure_ascii=False)
-                    except FileNotFoundError as exc:
-                        body = json.dumps({"error": "workspace_not_found", "detail": str(exc)})
-                        self.send_response(HTTPStatus.NOT_FOUND)
-                        self.send_header("Content-Type", "application/json; charset=utf-8")
-                        data = body.encode("utf-8")
-                        self.send_header("Content-Length", str(len(data)))
-                        self.end_headers()
-                        self.wfile.write(data)
-                        return
+                            body = json.dumps({"error": "workspace_not_found", "detail": f"workspace not found: {slug}"})
+                            self.send_response(HTTPStatus.NOT_FOUND)
+                            self.send_header("Content-Type", "application/json; charset=utf-8")
+                            data = body.encode("utf-8")
+                            self.send_header("Content-Length", str(len(data)))
+                            self.end_headers()
+                            self.wfile.write(data)
+                            return
+                        data = asdict(ws_obj)
+                        data["available_workspaces"] = [ws.slug for ws in world.workspaces]
+                        body = json.dumps(data, ensure_ascii=False)
                     except Exception as exc:
                         body = json.dumps({"error": "parse_failed", "detail": str(exc)})
                         self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
