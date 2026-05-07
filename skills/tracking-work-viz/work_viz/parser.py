@@ -427,6 +427,8 @@ def parse_world(workspaces_root: Path) -> World:
 
     for ws in workspaces:
         for sess in ws.sessions:
+            # Archived tasks are excluded from resolution and from World.edges aggregation.
+            # Their edges_out stays in the raw, unresolved form left by _parse_session.
             if sess.archived:
                 continue
             for task in sess.tasks:
@@ -434,6 +436,7 @@ def parse_world(workspaces_root: Path) -> World:
                     canonical, found = _resolve_target(
                         edge.target, ws.slug, sess.slug, index
                     )
+                    # Mutate edge in place: rewrite raw target to canonical form.
                     edge.target = canonical
                     edge.resolved = found
                     if not found and canonical not in ghosts_seen:

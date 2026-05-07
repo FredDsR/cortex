@@ -330,3 +330,4 @@ def test_world_ghost_target(tmp_path: Path):
     unresolved = [e for e in ghost_task.edges_out if e.kind == "blocked"]
     assert len(unresolved) == 1
     assert unresolved[0].resolved is False
+    assert unresolved[0].target == "tmpws/s1/task-missing"
