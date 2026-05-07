@@ -76,5 +76,7 @@ uv run --with pytest python -m pytest -v
 ## Limitations
 
 - Watch mode hot-swaps data without a full page reload (preserves zoom/pan/selection); serve mode does `location.reload()` (simpler, drops UI state).
+- Watch mode (`--watch`) inlines the graph data at page load. Edits to the workspace during the session refresh the tree and content panes via SSE, but the graph stays at the snapshot it was loaded with; reload the page to see new edges. Use `serve` mode if you want the graph to update on changes.
+- The dashboard does not yet render a cross-workspace graph, even though the data is available; the topbar chips and graph pane are workspace-page features only.
 - The workspace-level "focused session" marker (which session a given agent currently has selected) is not surfaced in the UI; only per-session agent counts appear.
 - Polling-based watcher does an `os.walk()` per second; fine for thousands of files, may be worth replacing with a fingerprint or `inotify` for tens-of-thousands.

@@ -132,6 +132,19 @@ def test_dashboard_server_injects_hot_reload_script(writable_workspaces: Path, t
         srv.stop()
 
 
+def test_viz_server_inlines_cy_data(workspaces_root: Path, tmp_path: Path):
+    """/  response must embed a non-null __CY_DATA__ so the watch-mode graph is populated at page load."""
+    srv = VizServer(workspaces_root=workspaces_root, slug="demo", port=0, runtime_dir=tmp_path)
+    srv.start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.port}/", timeout=5) as r:
+            html = r.read().decode("utf-8")
+        assert "window.__CY_DATA__ = null" not in html
+        assert '"modes"' in html  # cy_data was inlined as JSON
+    finally:
+        srv.stop()
+
+
 def test_dashboard_server_emits_sse_change_on_workspace_modification(writable_workspaces: Path, tmp_path: Path):
     viz_out = tmp_path / "viz"
     srv = DashboardServer(workspaces_root=writable_workspaces, port=0, viz_dir=viz_out)

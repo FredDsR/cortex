@@ -13,7 +13,12 @@ from queue import Queue, Empty
 from typing import Optional
 
 from .parser import parse_world
-from .generator import _TEMPLATES_DIR
+from .generator import (
+    _TEMPLATES_DIR,
+    _build_local_mode,
+    _build_global_mode_for_workspace,
+    _safe_json_for_script_tag,
+)
 
 
 def _scan_mtimes(root: Path) -> dict:
@@ -99,11 +104,25 @@ class VizServer:
 
             def do_GET(self):
                 if self.path == "/" or self.path == "/index.html":
+                    try:
+                        world = parse_world(workspaces_root)
+                        cy_data = {
+                            "modes": {
+                                "local": _build_local_mode(world, slug),
+                                "global": _build_global_mode_for_workspace(world, slug),
+                            },
+                            "ghosts": list(world.ghosts),
+                            "default_mode": "local",
+                        }
+                        cy_data_json = _safe_json_for_script_tag(cy_data)
+                    except Exception as exc:
+                        print(f"warning: cy_data build failed: {exc}")
+                        cy_data_json = "null"
                     raw = (templates_dir / "index.html").read_text(encoding="utf-8")
                     html = (raw
                             .replace('"@@MODE@@"', '"dynamic"')
                             .replace("@@DATA@@", "null")
-                            .replace("@@CY_DATA@@", "null"))
+                            .replace("@@CY_DATA@@", cy_data_json))
                     self._send_text(html, "text/html; charset=utf-8")
                     return
                 if self.path == "/data.json":
