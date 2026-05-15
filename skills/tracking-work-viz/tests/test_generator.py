@@ -37,3 +37,41 @@ def test_build_skips_ghosts(workspaces_root, tmp_path):
     build(world, out)
     # The ghost memory/architecture reference must not produce a file.
     assert not (out / "workspaces/demo-ws/memory/architecture.md").exists()
+
+
+def test_build_emits_root_index(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    build(world, out)
+    root_idx = (out / "index.md").read_text()
+    assert "# Fred's Work Tracking" in root_idx
+    assert "demo-ws" in root_idx
+    assert "other-ws" in root_idx
+
+
+def test_build_emits_workspace_index(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    build(world, out)
+    idx = (out / "workspaces" / "demo-ws" / "index.md").read_text()
+    assert "# demo-ws" in idx
+    assert "alpha" in idx
+    assert "beta" in idx
+
+
+def test_build_emits_session_index(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    build(world, out)
+    idx = (out / "workspaces" / "demo-ws" / "sessions" / "alpha" / "index.md").read_text()
+    assert "alpha" in idx
+    assert "task-a" in idx
+    assert "Open" in idx
+
+
+def test_build_emits_memory_index(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    build(world, out)
+    idx = (out / "workspaces" / "demo-ws" / "memory" / "index.md").read_text()
+    assert "memory" in idx.lower()
