@@ -1,27 +1,37 @@
+"""CLI smoke tests."""
 import json
 import subprocess
 import sys
+import threading
+import urllib.request
+import socket
 from pathlib import Path
+import pytest
 
 
-def test_cli_json_output(workspaces_root: Path, tmp_path: Path):
-    """--json now emits the full World (top-level workspaces/edges/ghosts keys)."""
-    repo_root = Path(__file__).resolve().parents[1]
-    cmd = [
-        sys.executable, "-c",
-        "import sys; sys.path.insert(0, %r); "
-        "from work_viz.cli import main; "
-        "sys.exit(main(['--workspaces-root', %r, 'demo', '--json']))" % (
-            str(repo_root), str(workspaces_root),
-        ),
-    ]
-    r = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    payload = json.loads(r.stdout)
-    # World shape: top-level keys are workspaces, edges, ghosts
-    assert "workspaces" in payload
-    assert "edges" in payload
-    assert "ghosts" in payload
-    # The demo workspace must be present
-    demo_ws = next((w for w in payload["workspaces"] if w["slug"] == "demo"), None)
-    assert demo_ws is not None, f"demo not found in workspaces: {[w['slug'] for w in payload['workspaces']]}"
-    assert any(s["slug"] == "feature-x" for s in demo_ws["sessions"])
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def test_cli_build(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    from work_viz.cli import main
+    rc = main(["build", str(workspaces_root), "--out", str(out)])
+    assert rc == 0
+    assert (out / "index.html").is_file()
+    assert (out / "workspaces" / "demo-ws" / "index.html").is_file()
+
+
+def test_cli_serve_runs(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    from work_viz.cli import main, _start_server_for_test
+    main(["build", str(workspaces_root), "--out", str(out)])
+    port = _free_port()
+    httpd, thread = _start_server_for_test(out, port)
+    try:
+        resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/index.html", timeout=2)
+        assert resp.status == 200
+    finally:
+        httpd.shutdown()

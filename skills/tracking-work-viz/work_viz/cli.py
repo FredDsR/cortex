@@ -1,111 +1,67 @@
 """Command-line entry point for work-viz."""
 from __future__ import annotations
 import argparse
-import json
+import socketserver
 import sys
-from dataclasses import asdict
+import threading
 from pathlib import Path
 
 from .parser import parse_world
+from .generator import build as build_world
+from .serve import serve, _make_server
 
 
 DEFAULT_WORKSPACES_ROOT = Path.home() / ".work" / "workspaces"
+DEFAULT_OUT_DIR = Path.home() / ".cache" / "work-viz" / "out"
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="work-viz", description="Browser-based viewer for ~/.work/.")
-    p.add_argument("workspace", nargs="?",
-                   help="Workspace slug to render. Use 'serve' for the dashboard server, 'all' for one-shot dashboard.")
-    p.add_argument("--workspace", dest="workspace_flag", help="Set to 'all' for the cross-workspace dashboard.")
-    p.add_argument("--watch", action="store_true", help="Per-workspace watch mode (local server + SSE).")
-    p.add_argument("--serve", action="store_true",
-                   help="Start a local HTTP server fronting ~/.work/viz/ (dashboard + per-workspace pages). "
-                        "Bypasses snap-Firefox file:// restrictions.")
-    p.add_argument("--json", dest="emit_json", action="store_true", help="Print the full World model (workspaces/edges/ghosts) as JSON to stdout.")
-    p.add_argument("--workspaces-root", type=Path, default=DEFAULT_WORKSPACES_ROOT,
-                   help="Override the workspaces root (defaults to ~/.work/workspaces).")
-    p.add_argument("--out-dir", type=Path, default=None,
-                   help="Override the output directory for generated HTML (defaults to ~/.work/viz). "
-                        "Vendor JS/CSS must already be present in <out-dir>/vendor/ for the page to render.")
-    p.add_argument("--port", type=int, default=0, help="Server port (0 picks 8765..8775 for watch, 8800..8810 for serve).")
-    p.add_argument("--no-open", action="store_true", help="Server modes: don't auto-open the browser.")
+def _build_argparser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="work-viz",
+                                 description="Static browser-based viewer for ~/.work/.")
+    sub = p.add_subparsers(dest="cmd")
+
+    b = sub.add_parser("build", help="Build the static site.")
+    b.add_argument("workspaces_root", nargs="?", default=str(DEFAULT_WORKSPACES_ROOT))
+    b.add_argument("--out", type=Path, default=DEFAULT_OUT_DIR)
+
+    s = sub.add_parser("serve", help="Serve a built out/ directory.")
+    s.add_argument("out_dir", nargs="?", type=Path, default=DEFAULT_OUT_DIR)
+    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--port", type=int, default=0)
+    s.add_argument("--no-open", action="store_true")
+
     return p
 
 
-def main(argv: list | None = None) -> int:
-    parser = _build_parser()
+def _start_server_for_test(out_dir: Path, port: int) -> tuple[socketserver.TCPServer, threading.Thread]:
+    """Helper used by tests; not part of the public CLI."""
+    httpd = _make_server(Path(out_dir), "127.0.0.1", port)
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+    return httpd, t
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_argparser()
     args = parser.parse_args(argv)
-
-    # Resolve output dir: explicit --out-dir wins, otherwise fall back to the generator default.
-    from .generator import DEFAULT_OUT_DIR as _DEFAULT_OUT
-    out_dir = args.out_dir if args.out_dir is not None else _DEFAULT_OUT
-
-    # `serve` either via positional `serve` or via --serve flag
-    if args.serve or args.workspace == "serve":
-        from .server import DashboardServer
-        from .generator import generate_dashboard
-        # Generate fresh content before serving so the dashboard reflects current state.
-        generate_dashboard(args.workspaces_root, out_dir=out_dir)
-        srv = DashboardServer(workspaces_root=args.workspaces_root, port=args.port, viz_dir=out_dir)
-        srv.start()
-        url = f"http://127.0.0.1:{srv.port}/dashboard.html"
-        print(f"work-viz serve: dashboard at {url}")
-        print("(regenerates on every page request; Ctrl-C to stop)")
-        if not args.no_open:
-            try:
-                import webbrowser
-                webbrowser.open(url)
-            except Exception:
-                pass
-        try:
-            while True:
-                import time as _t
-                _t.sleep(60)
-        except KeyboardInterrupt:
-            print("stopping")
-        finally:
-            srv.stop()
+    if args.cmd is None:
+        # default: build into the cache dir, then serve
+        world = parse_world(DEFAULT_WORKSPACES_ROOT)
+        build_world(world, DEFAULT_OUT_DIR)
+        serve(DEFAULT_OUT_DIR)
         return 0
-
-    if args.workspace_flag == "all" or args.workspace == "all":
-        from .generator import generate_dashboard
-        out = generate_dashboard(args.workspaces_root, out_dir=out_dir)
-        print(out)
+    if args.cmd == "build":
+        world = parse_world(Path(args.workspaces_root))
+        build_world(world, args.out)
+        print(f"work-viz build: wrote {args.out}")
         return 0
-
-    if not args.workspace:
-        parser.error("workspace slug is required (or use --workspace=all, or `serve`)")
-
-    if args.emit_json:
-        world = parse_world(args.workspaces_root)
-        json.dump(asdict(world), sys.stdout, ensure_ascii=False, indent=2)
-        sys.stdout.write("\n")
+    if args.cmd == "serve":
+        serve(args.out_dir, host=args.host, port=args.port,
+              open_browser=not args.no_open)
         return 0
+    parser.error(f"unknown subcommand: {args.cmd}")
+    return 2
 
-    if args.watch:
-        from .server import VizServer
-        srv = VizServer(workspaces_root=args.workspaces_root, slug=args.workspace,
-                         port=args.port, runtime_dir=out_dir)
-        srv.start()
-        url = f"http://127.0.0.1:{srv.port}/"
-        print(f"work-viz watch: serving {url}")
-        if not args.no_open:
-            try:
-                import webbrowser
-                webbrowser.open(url)
-            except Exception:
-                pass
-        try:
-            while True:
-                import time as _t
-                _t.sleep(60)
-        except KeyboardInterrupt:
-            print("stopping")
-        finally:
-            srv.stop()
-        return 0
 
-    from .generator import generate_one_shot
-    out = generate_one_shot(args.workspaces_root, args.workspace, out_dir=out_dir)
-    print(out)
-    return 0
+if __name__ == "__main__":
+    sys.exit(main())
