@@ -1,55 +1,59 @@
-from work_viz.model import (
-    Task, Session, Workspace, Edge, World,
-    STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED, STATUS_UNKNOWN,
-    ALL_STATUSES, EDGE_KINDS,
-)
+"""Tests for the multi-typed graph model."""
+from work_viz.model import Doc, DocId, Edge, RawEdge, World, STATUS_OPEN
 
 
-def test_task_defaults():
-    t = Task(slug="task-foo")
-    assert t.slug == "task-foo"
-    assert t.body == ""
-    assert t.inline_fields == {}
-    assert t.blocked_by == []
-    assert t.status == STATUS_UNKNOWN
+def test_docid_root_canonical():
+    assert DocId(kind="root").canonical() == "/"
 
 
-def test_session_defaults():
-    s = Session(slug="feature-x")
-    assert s.tasks == []
-    assert s.active_agent_count == 0
-    assert s.archived is False
+def test_docid_workspace_canonical():
+    assert DocId(kind="workspace", workspace="foo").canonical() == "foo/"
 
 
-def test_workspace_defaults():
-    w = Workspace(slug="demo")
-    assert w.sessions == []
-    assert w.has_meta is False
+def test_docid_session_canonical():
+    assert DocId(kind="session", workspace="foo", session="bar").canonical() == "foo/bar/"
 
 
-def test_status_constants_unique():
-    assert len(set(ALL_STATUSES)) == 5
+def test_docid_task_canonical():
+    cid = DocId(kind="task", workspace="foo", session="bar", slug="task-baz").canonical()
+    assert cid == "foo/bar/task/task-baz"
 
 
-def test_edge_kinds_constant():
-    assert EDGE_KINDS == ("blocked", "related", "follows", "mentions")
+def test_docid_memory_canonical():
+    cid = DocId(kind="memory", workspace="foo", slug="note").canonical()
+    assert cid == "foo/memory/note"
 
 
-def test_edge_defaults():
-    e = Edge(source="a", target="b", kind="related")
-    assert e.source == "a"
-    assert e.target == "b"
-    assert e.kind == "related"
+def test_docid_workbench_canonical():
+    cid = DocId(kind="workbench", workspace="foo", session="bar", slug="draft").canonical()
+    assert cid == "foo/bar/workbench/draft"
+
+
+def test_docid_equality_hashable():
+    a = DocId(kind="task", workspace="w", session="s", slug="x")
+    b = DocId(kind="task", workspace="w", session="s", slug="x")
+    assert a == b
+    assert hash(a) == hash(b)
+
+
+def test_doc_defaults():
+    doc = Doc(id=DocId(kind="root"), title="root", body="", frontmatter={}, rel_path=None,
+              edges_out=[])
+    assert doc.ghost is False
+    assert doc.edges_out == []
+
+
+def test_edge_basic():
+    src = DocId(kind="task", workspace="w", session="s", slug="a")
+    tgt = DocId(kind="task", workspace="w", session="s", slug="b")
+    e = Edge(source=src, target=tgt, raw_target="task-b", kind="blocked", resolved=True)
+    assert e.kind == "blocked"
     assert e.resolved is True
 
 
-def test_world_defaults():
-    w = World()
-    assert w.workspaces == []
+def test_world_empty():
+    root = Doc(id=DocId(kind="root"), title="root", body="", frontmatter={}, rel_path=None,
+               edges_out=[])
+    w = World(root=root, docs={"/": root}, edges=[], ghosts=set())
+    assert w.docs["/"] is root
     assert w.edges == []
-    assert w.ghosts == []
-
-
-def test_task_has_edges_out_default():
-    t = Task(slug="x")
-    assert t.edges_out == []
