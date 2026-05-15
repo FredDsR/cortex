@@ -1,13 +1,17 @@
-"""pytest fixtures for work-viz tests."""
+"""Shared fixtures for work_viz tests."""
 from pathlib import Path
 import pytest
 
 
-@pytest.fixture
-def fixtures_root() -> Path:
-    return Path(__file__).parent / "fixtures" / "sample_work"
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
-def workspaces_root(fixtures_root: Path) -> Path:
-    return fixtures_root / "workspaces"
+def workspaces_root(tmp_path):
+    """Copy the canonical fixture tree into a tmp dir and yield the path."""
+    import shutil
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    for sub in ("demo-ws", "other-ws", "kb-ghosts-ws"):
+        shutil.copytree(FIXTURES / sub, root / sub)
+    return root
