@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>__TITLE__</title>
+  <link rel="stylesheet" href="__VENDOR__/app.css">
+</head>
+<body>
+  <main id="layout">
+    <aside id="tree"></aside>
+    <section id="graph"></section>
+    <article id="content"></article>
+  </main>
+  <footer id="chips">
+    <button class="chip on" data-kind="blocked">Blocked</button>
+    <button class="chip on" data-kind="related">Related</button>
+    <button class="chip on" data-kind="follows">Follows</button>
+    <button class="chip" data-kind="mentions">Mentions</button>
+  </footer>
+  <script id="__SCOPE__" type="application/json">__SCOPE_JSON__</script>
+  <script src="__VENDOR__/cytoscape.min.js"></script>
+  <script src="__VENDOR__/dagre.min.js"></script>
+  <script src="__VENDOR__/cytoscape-dagre.min.js"></script>
+  <script src="__VENDOR__/marked.min.js"></script>
+  <script src="__VENDOR__/app.js"></script>
+</body>
+</html>
