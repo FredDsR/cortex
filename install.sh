@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install / update tracking-work skills.
-# Default: global install — symlinks each skill into $HOME/.<harness>/skills/.
-# --project [path]: project-local install — symlinks into <path>/.<harness>/skills/.
-# Idempotent — safe to re-run after `git pull`.
+# Default: global install (symlinks each skill into $HOME/.<harness>/skills/).
+# --project [path]: project-local install (symlinks into <path>/.<harness>/skills/).
+# Idempotent. Safe to re-run after `git pull`.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -103,15 +103,17 @@ echo ""
 echo "tracking-work skills installed. Restart your agent session to pick up changes."
 
 # --- tracking-work-viz install ---
-VIZ_DIR="$HOME/.work/bin"
-VIZ_VENDOR="$REPO_DIR/skills/tracking-work-viz/vendor"
+VIZ_BIN_DIR="$HOME/.work/bin"
+VIZ_VENDOR="$REPO_DIR/skills/tracking-work-viz/templates/vendor"
 
-mkdir -p "$VIZ_DIR" "$VIZ_VENDOR"
+mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
 
 # Symlink work-viz onto ~/.work/bin
-ln -sf "$REPO_DIR/skills/tracking-work-viz/bin/work-viz" "$VIZ_DIR/work-viz"
+ln -sf "$REPO_DIR/skills/tracking-work-viz/bin/work-viz" "$VIZ_BIN_DIR/work-viz"
 
-# Vendored JS (only fetched if missing)
+# Vendored JS (only fetched if missing). The generator stages templates/vendor/
+# into out/vendor/ at build time, so populating templates/vendor/ is the only
+# install-time requirement.
 fetch_if_missing() {
   local dest="$1"
   local url="$2"
@@ -144,23 +146,11 @@ for entry in "${REQUIRED_VENDOR[@]}"; do
   fi
 done
 
-# Copy vendor + templates to a stable runtime location used by the generator and server
-RUNTIME_DIR="$HOME/.work/viz"
-mkdir -p "$RUNTIME_DIR/vendor"
-cp "$VIZ_VENDOR/"*.js "$RUNTIME_DIR/vendor/" 2>/dev/null || true
-
-# Copy first-party JS/CSS (committed in templates/vendor/) to the runtime vendor dir
-SRC_VENDOR="$REPO_DIR/skills/tracking-work-viz/templates/vendor"
-if [ -d "$SRC_VENDOR" ]; then
-  cp "$SRC_VENDOR/"*.js "$RUNTIME_DIR/vendor/" 2>/dev/null || true
-  cp "$SRC_VENDOR/"*.css "$RUNTIME_DIR/vendor/" 2>/dev/null || true
-fi
-
-# Verify required vendor files actually landed in the runtime dir.
+# Verify every required third-party file landed in templates/vendor/.
 VIZ_MISSING=()
 for entry in "${REQUIRED_VENDOR[@]}"; do
   name="${entry%%|*}"
-  if [ ! -s "$RUNTIME_DIR/vendor/$name" ]; then
+  if [ ! -s "$VIZ_VENDOR/$name" ]; then
     VIZ_MISSING+=("$name")
   fi
 done
@@ -168,7 +158,7 @@ done
 if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
   echo "" >&2
   echo "ERROR: tracking-work-viz install incomplete." >&2
-  echo "  Missing vendor file(s) in $RUNTIME_DIR/vendor/:" >&2
+  echo "  Missing vendor file(s) in $VIZ_VENDOR/:" >&2
   for m in "${VIZ_MISSING[@]}"; do
     echo "    - $m" >&2
   done
@@ -180,5 +170,5 @@ if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "tracking-work-viz: installed. Add $VIZ_DIR to PATH if not already, then run: work-viz <workspace>"
+echo "tracking-work-viz: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: work-viz"
 # --- end tracking-work-viz install ---
