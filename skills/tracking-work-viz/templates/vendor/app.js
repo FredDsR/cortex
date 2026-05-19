@@ -3,9 +3,10 @@
 
   var STORE = { cy: null, payload: null, layout: 'concentric-hier',
                 rootPrefix: '', contentBase: '', wikilinkIndex: new Map() };
-  var KIND_RADIUS = { root: 0, workspace: 260, session: 470, task: 820,
-                      memory: 470, workbench: 470 };
-  var SIBLING_GAP_FRAC = 0.22;
+  var KIND_RADIUS = { root: 0, workspace: 320, session: 600, task: 1050,
+                      memory: 600, workbench: 600 };
+  var SIBLING_GAP_FRAC = 0.28;
+  var MAX_LABEL_CHARS = 22;
 
   function parsePayload() {
     var node = document.getElementById('__SCOPE__');
@@ -200,11 +201,10 @@
   }
 
   function nodeStyleByKind(kind) {
-    // Task / memory / workbench labels are hidden by default (text-opacity 0)
-    // and revealed on hover (.hovered class added in mouseover bindings),
-    // because at dense clusters there is no pixel budget to show every name.
-    // Container labels (root, workspace, session) are always visible because
-    // there are few of them and they orient the user.
+    // Labels are always visible. Task labels truncate with ellipsis at the
+    // node's text-max-width and the underlying label string is shortened to
+    // MAX_LABEL_CHARS before reaching the renderer, so dense clusters still
+    // get readable per-node text without smearing across neighbors.
     var s = {
       'label': 'data(label)',
       'font-size': 10,
@@ -212,53 +212,82 @@
       'text-halign': 'center',
       'text-margin-y': 4,
       'text-wrap': 'ellipsis',
-      'text-max-width': '90px',
+      'text-max-width': '110px',
       'text-background-color': '#ffffff',
-      'text-background-opacity': 0.95,
+      'text-background-opacity': 0.92,
       'text-background-padding': 3,
       'text-background-shape': 'roundrectangle',
       'text-border-opacity': 0,
-      'text-opacity': 0,           // tasks: hidden until hovered
-      'background-color': '#ffffff',
+      'background-color': 'data(tint)',
       'border-width': 1,
       'border-color': '#5a6573',
       'shape': 'ellipse',
-      'width': 18, 'height': 18,
+      'width': 26, 'height': 26,
       'color': '#1f2933',
     };
     if (kind === 'workspace') {
-      s['background-color'] = '#eef4fb'; s['width'] = 34; s['height'] = 34;
-      s['font-size'] = 11; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
+      s['width'] = 48; s['height'] = 48;
+      s['font-size'] = 12; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
-      s['text-opacity'] = 1;
       s['font-weight'] = 600;
+      s['border-width'] = 2;
     }
     if (kind === 'session') {
-      s['background-color'] = '#f3f5fa'; s['width'] = 28; s['height'] = 28;
-      s['font-size'] = 10; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
+      s['width'] = 38; s['height'] = 38;
+      s['font-size'] = 11; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
-      s['text-opacity'] = 1;
+      s['border-width'] = 1.5;
     }
-    if (kind === 'task')      { s['background-color'] = '#ffffff'; }
-    if (kind === 'memory')    { s['background-color'] = '#fff5d6'; }
-    if (kind === 'workbench') { s['background-color'] = '#e8f7e0'; }
-    if (kind === 'root')      {
+    if (kind === 'task') {
+      s['width'] = 24; s['height'] = 24;
+    }
+    if (kind === 'root') {
       s['background-color'] = '#1f2933'; s['color'] = '#fff';
-      s['width'] = 56; s['height'] = 56; s['font-size'] = 12;
+      s['width'] = 86; s['height'] = 86; s['font-size'] = 14;
       s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
-      s['text-opacity'] = 1;
       s['font-weight'] = 700;
+      s['border-width'] = 0;
     }
     return s;
+  }
+
+  function shortenLabel(label) {
+    if (!label || label.length <= MAX_LABEL_CHARS) return label;
+    // Drop the conventional task- prefix first so the meaningful tail survives.
+    var stripped = label.replace(/^task-/, '');
+    if (stripped.length <= MAX_LABEL_CHARS) return stripped;
+    return stripped.slice(0, MAX_LABEL_CHARS - 1) + '…';
+  }
+
+  function hashString(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+
+  function tintForNode(node) {
+    // Hue derived from the (workspace, session) pair so all tasks in a session
+    // share a soft pastel, all sessions in a workspace are distinct hues, and
+    // tasks of different sessions in the same workspace are visually grouped.
+    if (node.kind === 'root') return '#1f2933';
+    var key;
+    if (node.kind === 'workspace') key = node.id.replace(/\/$/, '');
+    else key = (node.id.split('/').slice(0, 2).join('/'));  // workspace/session
+    var hue = hashString(key) % 360;
+    var sat = node.kind === 'task' ? 35 : 50;
+    var light = node.kind === 'task' ? 92 : 86;
+    return 'hsl(' + hue + ', ' + sat + '%, ' + light + '%)';
   }
 
   function buildCy(payload) {
     var elements = [];
     payload.nodes.forEach(function (n) {
       elements.push({ group: 'nodes',
-                      data: { id: n.id, label: n.label, kind: n.kind,
-                              contentPath: n.contentPath } });
+                      data: { id: n.id, label: shortenLabel(n.label),
+                              fullLabel: n.label, kind: n.kind,
+                              contentPath: n.contentPath,
+                              tint: tintForNode(n) } });
     });
     payload.edges.forEach(function (e) {
       elements.push({ group: 'edges',
@@ -271,10 +300,11 @@
     ['root','workspace','session','task','memory','workbench'].forEach(function (k) {
       styles.push({ selector: 'node[kind="' + k + '"]', style: nodeStyleByKind(k) });
     });
-    // Hovered task / memory / workbench reveals its label on top of others.
-    styles.push({ selector: 'node.hovered', style: { 'text-opacity': 1, 'z-index': 99,
+    // Hover highlight: lifted to top, accented border. Labels stay visible
+    // at all times so we don't toggle text-opacity here.
+    styles.push({ selector: 'node.hovered', style: { 'z-index': 99,
                                                       'border-color': '#1f7ae0',
-                                                      'border-width': 2 } });
+                                                      'border-width': 2.5 } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
     });
