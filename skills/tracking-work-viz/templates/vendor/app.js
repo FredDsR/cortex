@@ -27,7 +27,7 @@
   function writeFragment(params) {
     var parts = [];
     Object.keys(params).sort().forEach(function (k) {
-      if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
+      if (params[k] !== undefined && params[k] !== null) {
         parts.push(k + '=' + params[k]);
       }
     });
@@ -282,7 +282,8 @@
   function bindEdgeChips(cy) {
     var params = readFragment();
     var active;
-    if (params.chips) {
+    if (params.chips !== undefined) {
+      // Honor an explicit "all off" choice (chips=) as well as any subset.
       active = new Set(params.chips.split(',').filter(Boolean));
       document.querySelectorAll('#edge-chips .chip').forEach(function (el) {
         if (active.has(el.dataset.kind)) el.classList.add('on');
