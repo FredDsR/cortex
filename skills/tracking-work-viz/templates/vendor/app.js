@@ -245,7 +245,24 @@
       var cp = evt.target.data('contentPath');
       if (cp) loadContent(cp);
     });
+    cy.on('tap', function (evt) {
+      // Tap on the graph background (not a node/edge) -> reset to fit-all.
+      if (evt.target === cy) {
+        cy.animate({ fit: { eles: cy.elements(), padding: 30 } },
+                   { duration: 300, easing: 'ease-in-out' });
+      }
+    });
     return cy;
+  }
+
+  function bindFitAllButton() {
+    var btn = document.getElementById('fit-all');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (!STORE.cy) return;
+      STORE.cy.animate({ fit: { eles: STORE.cy.elements(), padding: 30 } },
+                       { duration: 300, easing: 'ease-in-out' });
+    });
   }
 
   function applyLayout(cy, payload, name) {
@@ -421,6 +438,7 @@
     STORE.cy = cy;
     bindEdgeChips(cy);
     bindLayoutToggle();
+    bindFitAllButton();
     bindContentPaneLinks();
     var params = readFragment();
     STORE.layout = params.layout === 'cose' ? 'cose' : 'concentric-hier';
