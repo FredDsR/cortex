@@ -2,7 +2,7 @@
   'use strict';
 
   var STORE = { cy: null, payload: null, layout: 'concentric-hier',
-                rootPrefix: '', contentBase: '' };
+                rootPrefix: '', contentBase: '', wikilinkIndex: new Map() };
   var KIND_RADIUS = { root: 0, workspace: 240, session: 420, task: 700,
                       memory: 420, workbench: 420 };
   var SIBLING_GAP_FRAC = 0.18;
@@ -326,6 +326,42 @@
     return STORE.rootPrefix + path;
   }
 
+  function stripFrontmatter(text) {
+    if (!text.startsWith('---\n')) return text;
+    var end = text.indexOf('\n---\n', 4);
+    if (end < 0) return text;
+    return text.slice(end + 5).replace(/^\n+/, '');
+  }
+
+  function buildWikilinkIndex(nodes) {
+    // Map slug -> contentPath. First-seen wins on ties. Slug is the trailing
+    // segment of the canonical id ("/task-foo" or "/session-name/" etc.).
+    var idx = new Map();
+    nodes.forEach(function (n) {
+      if (!n.contentPath || n.ghost) return;
+      var clean = n.id.replace(/\/$/, '');
+      var slug = clean.indexOf('/') < 0 ? clean : clean.split('/').pop();
+      if (slug && !idx.has(slug)) idx.set(slug, n.contentPath);
+    });
+    return idx;
+  }
+
+  function renderWikilinks(html) {
+    // Post-process the rendered HTML to convert [[target]] tokens to anchors.
+    // Done after marked because the bracket form is ambiguous with markdown's
+    // reference-style links; doing it on rendered output avoids fighting marked.
+    // Wikilink hrefs are absolute (leading slash) so the content-pane click
+    // handler resolves them correctly regardless of which doc is loaded.
+    return html.replace(/\[\[([^\]\n]+)\]\]/g, function (_, target) {
+      var t = target.trim();
+      var path = STORE.wikilinkIndex.get(t);
+      if (path) {
+        return '<a href="/' + path + '" class="wikilink">' + t + '</a>';
+      }
+      return '<span class="wikilink wikilink-broken" title="no doc for [[' + t + ']]">' + t + '</span>';
+    });
+  }
+
   function loadContent(path) {
     var pane = document.getElementById('content');
     var url = resolveContent(path);
@@ -334,7 +370,8 @@
       if (!r.ok) throw new Error('Could not load ' + url + ': ' + r.status);
       return r.text();
     }).then(function (txt) {
-      pane.innerHTML = marked.parse(txt);
+      var body = stripFrontmatter(txt);
+      pane.innerHTML = renderWikilinks(marked.parse(body));
     }).catch(function (err) {
       pane.innerHTML = '<p style="color:#a00">' + err.message + '</p>';
     });
@@ -376,6 +413,9 @@
     // filename) is the path back to the site root, which all contentPaths are
     // expressed relative to.
     STORE.rootPrefix = (payload.rootHref || '').replace(/index\.html$/, '');
+    STORE.wikilinkIndex = payload.wikilinks
+      ? new Map(Object.entries(payload.wikilinks))
+      : buildWikilinkIndex(payload.nodes);
     renderTree(payload.tree, payload.scopeId);
     var cy = buildCy(payload);
     STORE.cy = cy;

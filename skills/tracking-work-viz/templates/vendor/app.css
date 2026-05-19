@@ -163,3 +163,10 @@ body { display: flex; flex-direction: column; height: 100vh; }
 }
 #content a { color: var(--accent); text-decoration: none; }
 #content a:hover { text-decoration: underline; }
+#content a.wikilink { font-style: italic; }
+#content .wikilink-broken {
+  color: var(--text-muted);
+  font-style: italic;
+  text-decoration: line-through dotted;
+  cursor: help;
+}

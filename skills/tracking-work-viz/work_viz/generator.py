@@ -306,6 +306,24 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
     return nodes, edges
 
 
+def _global_wikilink_index(world: World) -> dict[str, str]:
+    """Map slug -> root-relative contentPath for every non-ghost doc with
+    content. First-seen wins; the world is iterated in dict order which is
+    insertion order from the parser pass-1."""
+    out: dict[str, str] = {}
+    for doc in world.docs.values():
+        if doc.ghost:
+            continue
+        path = _content_path(doc.id)
+        if not path:
+            continue
+        cid = doc.id
+        slug = cid.slug or cid.session or cid.workspace
+        if slug and slug not in out:
+            out[slug] = path
+    return out
+
+
 def _build_tree(world: World) -> list[dict]:
     root_doc = world.docs.get("/")
     root_node = {"id": "/", "label": "Fred's Work Tracking", "kind": "root",
@@ -368,12 +386,15 @@ def _default_content_path(scope: str) -> str:
 
 
 def _emit_html_pages(world: World, out_dir: Path) -> None:
+    wikilinks = _global_wikilink_index(world)
+    tree = _build_tree(world)
     nodes, edges = _scope_filter(world, "root", "/")
     payload = {
         "scope": "root", "scopeId": "/", "rootHref": "index.html",
-        "tree": _build_tree(world),
+        "tree": tree,
         "nodes": nodes, "edges": edges,
         "defaultContentPath": "index.md",
+        "wikilinks": wikilinks,
     }
     (out_dir / "index.html").write_text(
         _render_shell("root", "/", payload, _vendor_rel("root", "/"),
@@ -388,9 +409,10 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
         payload = {
             "scope": "workspace", "scopeId": ws_scope_id,
             "rootHref": "../../index.html",
-            "tree": _build_tree(world),
+            "tree": tree,
             "nodes": nodes, "edges": edges,
             "defaultContentPath": f"workspaces/{ws.id.workspace}/index.md",
+            "wikilinks": wikilinks,
         }
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
         ws_html.write_text(
@@ -406,11 +428,12 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
             payload = {
                 "scope": "session", "scopeId": sess_scope_id,
                 "rootHref": "../../../../index.html",
-                "tree": _build_tree(world),
+                "tree": tree,
                 "nodes": nodes, "edges": edges,
                 "defaultContentPath": (
                     f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/SUMMARY.md"
                 ),
+                "wikilinks": wikilinks,
             }
             sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
             sess_html.write_text(
