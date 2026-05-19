@@ -198,3 +198,10 @@ def test_tree_task_entries_have_contentpath_session_scope(workspaces_root, tmp_p
     sess = next(c for c in ws["children"] if c["id"] == "demo-ws/alpha/")
     task = next(c for c in sess["children"] if c["id"] == "demo-ws/alpha/task/task-a")
     assert task["contentPath"] == "tasks/task-a.md"
+
+
+def test_build_does_not_stage_dagre(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    assert not (out / "vendor" / "dagre.min.js").exists()
+    assert not (out / "vendor" / "cytoscape-dagre.min.js").exists()
