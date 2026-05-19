@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from typing import Optional
 
 from .model import World, Doc, DocId, Edge
 
@@ -179,8 +180,30 @@ def _emit_all_indices(world: World, out_dir: Path) -> None:
             _emit_tasks_index(world, sess, out_dir)
 
 
-def _node_dict(world: World, doc: Doc) -> dict:
-    parent = None
+def _content_path_for_scope(cid: DocId, scope: str, scope_id: str) -> Optional[str]:
+    """Return a path to the doc's markdown that resolves correctly when fetched
+    from a page at the given scope. Returns None for kinds without markdown
+    content (root, workspace, session)."""
+    if cid.kind == "task":
+        rel = f"workspaces/{cid.workspace}/sessions/{cid.session}/tasks/{cid.slug}.md"
+    elif cid.kind == "memory":
+        rel = f"workspaces/{cid.workspace}/memory/{cid.slug}.md"
+    elif cid.kind == "workbench":
+        rel = f"workspaces/{cid.workspace}/sessions/{cid.session}/workbench/{cid.slug}.md"
+    else:
+        return None
+    if scope == "root":
+        return rel
+    if scope == "workspace":
+        prefix = f"workspaces/{cid.workspace}/"
+        return rel[len(prefix):] if rel.startswith(prefix) else rel
+    if scope == "session":
+        prefix = f"workspaces/{cid.workspace}/sessions/{cid.session}/"
+        return rel[len(prefix):] if rel.startswith(prefix) else rel
+    return rel
+
+
+def _node_dict(world: World, doc: Doc, scope: str, scope_id: str) -> dict:
     cid = doc.id
     if cid.kind == "workspace":
         parent = "/"
@@ -190,14 +213,10 @@ def _node_dict(world: World, doc: Doc) -> dict:
         parent = f"{cid.workspace}/{cid.session}/"
     elif cid.kind == "memory":
         parent = f"{cid.workspace}/"
+    else:
+        parent = None
     label = cid.slug or cid.session or cid.workspace or "root"
-    content_path = None
-    if not doc.ghost and cid.kind == "task":
-        content_path = f"sessions/{cid.session}/tasks/{cid.slug}.md"
-    elif not doc.ghost and cid.kind == "memory":
-        content_path = f"memory/{cid.slug}.md"
-    elif not doc.ghost and cid.kind == "workbench":
-        content_path = f"sessions/{cid.session}/workbench/{cid.slug}.md"
+    content_path = None if doc.ghost else _content_path_for_scope(cid, scope, scope_id)
     return {
         "id": cid.canonical(),
         "label": label,
@@ -220,7 +239,7 @@ def _edge_dict(e: Edge) -> dict:
 
 def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], list[dict]]:
     if scope == "root":
-        nodes = [_node_dict(world, d) for d in world.docs.values()]
+        nodes = [_node_dict(world, d, scope, scope_id) for d in world.docs.values()]
         edges = [_edge_dict(e) for e in world.edges]
         return nodes, edges
     if scope == "workspace":
@@ -233,7 +252,6 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
                     if d.id.workspace == ws and d.id.session == sess}
         in_scope.add(f"{ws}/")
         in_scope.add("/")
-    # 1-hop expansion
     neighbours: set[str] = set()
     keep_edges = []
     for e in world.edges:
@@ -243,7 +261,8 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
             neighbours.add(s)
             neighbours.add(t)
     keep_ids = in_scope | neighbours
-    nodes = [_node_dict(world, world.docs[cid]) for cid in keep_ids if cid in world.docs]
+    nodes = [_node_dict(world, world.docs[cid], scope, scope_id)
+             for cid in keep_ids if cid in world.docs]
     edges = [_edge_dict(e) for e in keep_edges]
     return nodes, edges
 

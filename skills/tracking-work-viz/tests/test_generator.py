@@ -130,3 +130,48 @@ def test_session_payload_is_scoped(workspaces_root, tmp_path):
     assert "demo-ws/alpha/task/task-a" in ids
     # 1-hop neighbour (cross-session related-to)
     assert "demo-ws/beta/task/task-c" in ids
+
+
+def _payload(html_path):
+    import re, json
+    html = html_path.read_text()
+    blob = re.search(r'<script id="__SCOPE__"[^>]*>([\s\S]*?)</script>', html).group(1)
+    return json.loads(blob)
+
+
+def test_root_payload_task_contentpath(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    n = by_id["demo-ws/alpha/task/task-a"]
+    assert n["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
+
+
+def test_workspace_payload_task_contentpath(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "workspaces" / "demo-ws" / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    n = by_id["demo-ws/alpha/task/task-a"]
+    assert n["contentPath"] == "sessions/alpha/tasks/task-a.md"
+
+
+def test_session_payload_task_contentpath(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "workspaces" / "demo-ws" / "sessions" / "alpha" / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    n = by_id["demo-ws/alpha/task/task-a"]
+    assert n["contentPath"] == "tasks/task-a.md"
+
+
+def test_no_ghost_nodes_in_any_payload(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    for html in [out / "index.html",
+                 out / "workspaces" / "demo-ws" / "index.html",
+                 out / "workspaces" / "demo-ws" / "sessions" / "alpha" / "index.html"]:
+        payload = _payload(html)
+        for n in payload["nodes"]:
+            assert n.get("ghost") in (False, None), f"ghost node leaked: {n}"
