@@ -267,21 +267,36 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
     return nodes, edges
 
 
-def _build_tree(world: World) -> list[dict]:
+def _build_tree(world: World, scope: str, scope_id: str) -> list[dict]:
     root_node = {"id": "/", "label": "Fred's Work Tracking", "kind": "root",
-                 "href": "/index.html", "children": []}
+                 "scopeId": "/", "href": "index.html",
+                 "contentPath": None, "children": []}
     for ws in _children_of(world, "/", "workspace"):
-        ws_node = {"id": ws.id.canonical(), "label": ws.id.workspace, "kind": "workspace",
-                   "href": f"workspaces/{ws.id.workspace}/index.html", "children": []}
+        ws_node = {
+            "id": ws.id.canonical(),
+            "scopeId": ws.id.canonical(),
+            "label": ws.id.workspace, "kind": "workspace",
+            "href": f"workspaces/{ws.id.workspace}/index.html",
+            "contentPath": None,
+            "children": [],
+        }
         for sess in _children_of(world, ws.id.canonical(), "session"):
-            sess_node = {"id": sess.id.canonical(), "label": sess.id.session,
-                         "kind": "session",
-                         "href": f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/index.html",
-                         "children": []}
+            sess_node = {
+                "id": sess.id.canonical(),
+                "scopeId": sess.id.canonical(),
+                "label": sess.id.session, "kind": "session",
+                "href": f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/index.html",
+                "contentPath": None,
+                "children": [],
+            }
             for t in _children_of(world, sess.id.canonical(), "task"):
                 sess_node["children"].append({
-                    "id": t.id.canonical(), "label": t.id.slug,
-                    "kind": "task", "href": None, "children": []})
+                    "id": t.id.canonical(),
+                    "scopeId": t.id.canonical(),
+                    "label": t.id.slug, "kind": "task", "href": None,
+                    "contentPath": _content_path_for_scope(t.id, scope, scope_id),
+                    "children": [],
+                })
             ws_node["children"].append(sess_node)
         root_node["children"].append(ws_node)
     return [root_node]
@@ -309,12 +324,11 @@ def _default_content_path(scope: str) -> str:
 
 
 def _emit_html_pages(world: World, out_dir: Path) -> None:
-    tree = _build_tree(world)
-
     nodes, edges = _scope_filter(world, "root", "/")
     payload = {
         "scope": "root", "scopeId": "/", "rootHref": "index.html",
-        "tree": tree, "nodes": nodes, "edges": edges,
+        "tree": _build_tree(world, "root", "/"),
+        "nodes": nodes, "edges": edges,
         "defaultContentPath": "index.md",
     }
     (out_dir / "index.html").write_text(
@@ -322,30 +336,34 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
         encoding="utf-8")
 
     for ws in _children_of(world, "/", "workspace"):
-        nodes, edges = _scope_filter(world, "workspace", ws.id.canonical())
+        ws_scope_id = ws.id.canonical()
+        nodes, edges = _scope_filter(world, "workspace", ws_scope_id)
         payload = {
-            "scope": "workspace", "scopeId": ws.id.canonical(),
+            "scope": "workspace", "scopeId": ws_scope_id,
             "rootHref": "../../index.html",
-            "tree": tree, "nodes": nodes, "edges": edges,
+            "tree": _build_tree(world, "workspace", ws_scope_id),
+            "nodes": nodes, "edges": edges,
             "defaultContentPath": "index.md",
         }
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
         ws_html.write_text(
-            _render_shell("workspace", ws.id.canonical(), payload,
-                          _vendor_rel("workspace", ws.id.canonical()), ws.id.workspace),
+            _render_shell("workspace", ws_scope_id, payload,
+                          _vendor_rel("workspace", ws_scope_id), ws.id.workspace),
             encoding="utf-8")
-        for sess in _children_of(world, ws.id.canonical(), "session"):
-            nodes, edges = _scope_filter(world, "session", sess.id.canonical())
+        for sess in _children_of(world, ws_scope_id, "session"):
+            sess_scope_id = sess.id.canonical()
+            nodes, edges = _scope_filter(world, "session", sess_scope_id)
             payload = {
-                "scope": "session", "scopeId": sess.id.canonical(),
+                "scope": "session", "scopeId": sess_scope_id,
                 "rootHref": "../../../../index.html",
-                "tree": tree, "nodes": nodes, "edges": edges,
+                "tree": _build_tree(world, "session", sess_scope_id),
+                "nodes": nodes, "edges": edges,
                 "defaultContentPath": "index.md",
             }
             sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
             sess_html.write_text(
-                _render_shell("session", sess.id.canonical(), payload,
-                              _vendor_rel("session", sess.id.canonical()),
+                _render_shell("session", sess_scope_id, payload,
+                              _vendor_rel("session", sess_scope_id),
                               f"{sess.id.session} - {ws.id.workspace}"),
                 encoding="utf-8")
 

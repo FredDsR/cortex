@@ -175,3 +175,26 @@ def test_no_ghost_nodes_in_any_payload(workspaces_root, tmp_path):
         payload = _payload(html)
         for n in payload["nodes"]:
             assert n.get("ghost") in (False, None), f"ghost node leaked: {n}"
+
+
+def test_tree_task_entries_have_contentpath_root(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    root = payload["tree"][0]
+    ws = next(c for c in root["children"] if c["id"] == "demo-ws/")
+    sess = next(c for c in ws["children"] if c["id"] == "demo-ws/alpha/")
+    task = next(c for c in sess["children"] if c["id"] == "demo-ws/alpha/task/task-a")
+    assert task["scopeId"] == "demo-ws/alpha/task/task-a"
+    assert task["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
+
+
+def test_tree_task_entries_have_contentpath_session_scope(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "workspaces" / "demo-ws" / "sessions" / "alpha" / "index.html")
+    root = payload["tree"][0]
+    ws = next(c for c in root["children"] if c["id"] == "demo-ws/")
+    sess = next(c for c in ws["children"] if c["id"] == "demo-ws/alpha/")
+    task = next(c for c in sess["children"] if c["id"] == "demo-ws/alpha/task/task-a")
+    assert task["contentPath"] == "tasks/task-a.md"
