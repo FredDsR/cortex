@@ -76,7 +76,7 @@ def _emit_root_index(world: World, out_dir: Path) -> None:
     workspaces = _children_of(world, "/", "workspace")
     lines = ["# Fred's Work Tracking", "", "## Workspaces", ""]
     for ws in workspaces:
-        lines.append(f"- [{ws.id.workspace}](workspaces/{ws.id.workspace}/index.md)")
+        lines.append(f"- [{ws.id.workspace}](workspaces/{ws.id.workspace}/index.html)")
     lines.append("")
     (out_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -87,10 +87,10 @@ def _emit_workspace_index(world: World, ws: Doc, out_dir: Path) -> None:
     sessions = _children_of(world, ws.id.canonical(), "session")
     memories = _children_of(world, ws.id.canonical(), "memory")
     lines = [f"# {ws.id.workspace}", "",
-             "[<- Dashboard](../../index.md)", "",
+             "[<- Dashboard](../../index.html)", "",
              f"## Sessions ({len(sessions)})", ""]
     for s in sessions:
-        lines.append(f"- [{s.id.session}](sessions/{s.id.session}/index.md)")
+        lines.append(f"- [{s.id.session}](sessions/{s.id.session}/index.html)")
     lines.extend(["", f"## Memory ({len(memories)})", "",
                   "[Open memory folder](memory/index.md)", ""])
     (ws_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
@@ -101,7 +101,7 @@ def _emit_memory_index(world: World, ws: Doc, out_dir: Path) -> None:
     mem_dir.mkdir(parents=True, exist_ok=True)
     docs = _children_of(world, ws.id.canonical(), "memory")
     lines = [f"# {ws.id.workspace} / memory", "",
-             "[<- Workspace](../index.md)", "",
+             "[<- Workspace](../index.html)", "",
              f"## Memory docs ({len(docs)})", ""]
     if not docs:
         lines.append("_No memory docs yet._")
@@ -119,7 +119,7 @@ def _emit_session_index(world: World, sess: Doc, out_dir: Path) -> None:
     workbenches = _children_of(world, parent_canon, "workbench")
     lines = [f"# {sess.id.session}", "",
              f"_In workspace `{sess.id.workspace}`_", "",
-             "[<- Workspace](../../index.md)", "",
+             "[<- Workspace](../../index.html)", "",
              f"## Tasks ({len(tasks)})", ""]
     if not tasks:
         lines.append("_No tasks yet._")
@@ -144,7 +144,7 @@ def _emit_workbench_index(world: World, sess: Doc, out_dir: Path) -> None:
     wb_dir.mkdir(parents=True, exist_ok=True)
     docs = _children_of(world, sess.id.canonical(), "workbench")
     lines = [f"# {sess.id.session} / workbench", "",
-             "[<- Session](../index.md)", "",
+             "[<- Session](../index.html)", "",
              f"## Workbench docs ({len(docs)})", ""]
     if not docs:
         lines.append("_No workbench docs yet._")
@@ -159,7 +159,7 @@ def _emit_tasks_index(world: World, sess: Doc, out_dir: Path) -> None:
     tasks_dir.mkdir(parents=True, exist_ok=True)
     docs = _children_of(world, sess.id.canonical(), "task")
     lines = [f"# {sess.id.session} / tasks", "",
-             "[<- Session](../index.md)", "",
+             "[<- Session](../index.html)", "",
              f"## Tasks ({len(docs)})", ""]
     if not docs:
         lines.append("_No tasks yet._")

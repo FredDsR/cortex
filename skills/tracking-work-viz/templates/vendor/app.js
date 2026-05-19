@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  var STORE = { cy: null, payload: null, layout: 'concentric-hier', rootPrefix: '' };
+  var STORE = { cy: null, payload: null, layout: 'concentric-hier',
+                rootPrefix: '', contentBase: '' };
   var KIND_RADIUS = { root: 0, workspace: 240, session: 420, task: 700,
                       memory: 420, workbench: 420 };
   var SIBLING_GAP_FRAC = 0.18;
@@ -327,6 +328,7 @@
   function loadContent(path) {
     var pane = document.getElementById('content');
     var url = resolveContent(path);
+    STORE.contentBase = url.replace(/[^/]+$/, ''); // dirname + trailing slash
     fetch(url).then(function (r) {
       if (!r.ok) throw new Error('Could not load ' + url + ': ' + r.status);
       return r.text();
@@ -334,6 +336,33 @@
       pane.innerHTML = marked.parse(txt);
     }).catch(function (err) {
       pane.innerHTML = '<p style="color:#a00">' + err.message + '</p>';
+    });
+  }
+
+  function isExternalUrl(href) {
+    return /^https?:\/\//.test(href) || href.charAt(0) === '#';
+  }
+
+  function bindContentPaneLinks() {
+    var pane = document.getElementById('content');
+    pane.addEventListener('click', function (ev) {
+      var a = ev.target.closest('a[href]');
+      if (!a || !pane.contains(a)) return;
+      var href = a.getAttribute('href');
+      if (!href || isExternalUrl(href)) return;
+      // Resolve href against the document the pane currently shows.
+      var resolved;
+      try {
+        resolved = new URL(href, new URL(STORE.contentBase, window.location.href)).pathname;
+      } catch (e) { return; }
+      if (/\.md$/.test(resolved)) {
+        ev.preventDefault();
+        // Convert back to a path relative to the site root for loadContent.
+        var rootAbs = new URL(STORE.rootPrefix || './', window.location.href).pathname;
+        var relToRoot = resolved.indexOf(rootAbs) === 0 ? resolved.slice(rootAbs.length) : resolved;
+        loadContent(relToRoot);
+      }
+      // .html links navigate natively (full reload to that shell).
     });
   }
 
@@ -351,6 +380,7 @@
     STORE.cy = cy;
     bindEdgeChips(cy);
     bindLayoutToggle();
+    bindContentPaneLinks();
     var params = readFragment();
     STORE.layout = params.layout === 'cose' ? 'cose' : 'concentric-hier';
     applyLayout(cy, payload, STORE.layout);
