@@ -200,22 +200,23 @@
   }
 
   function nodeStyleByKind(kind) {
-    // Labels live outside the node (below) with a soft white background, so
-    // dense clusters keep their circles readable even when text would
-    // otherwise overlap. min-zoomed-font-size hides labels when the user is
-    // zoomed far out, so they only crowd the view when they're useful.
+    // At default fit-zoom there's no pixel budget for ~160 task labels at
+    // once, so task / memory / workbench labels are gated by zoom: invisible
+    // until the user zooms in past min-zoomed-font-size. Container labels
+    // (root, workspace, session) are always visible because there are few of
+    // them and they orient the user.
     var s = {
       'label': 'data(label)',
-      'font-size': 9,
+      'font-size': 10,
       'text-valign': 'bottom',
       'text-halign': 'center',
-      'text-margin-y': 3,
+      'text-margin-y': 4,
       'text-background-color': '#ffffff',
-      'text-background-opacity': 0.85,
-      'text-background-padding': 2,
+      'text-background-opacity': 0.9,
+      'text-background-padding': 3,
       'text-background-shape': 'roundrectangle',
       'text-border-opacity': 0,
-      'min-zoomed-font-size': 5,
+      'min-zoomed-font-size': 9,    // hide tasks etc. when zoomed out
       'background-color': '#ffffff',
       'border-width': 1,
       'border-color': '#5a6573',
@@ -227,11 +228,14 @@
       s['background-color'] = '#eef4fb'; s['width'] = 34; s['height'] = 34;
       s['font-size'] = 11; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
+      s['min-zoomed-font-size'] = 0;
+      s['font-weight'] = 600;
     }
     if (kind === 'session') {
-      s['background-color'] = '#f3f5fa'; s['width'] = 26; s['height'] = 26;
+      s['background-color'] = '#f3f5fa'; s['width'] = 28; s['height'] = 28;
       s['font-size'] = 10; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
+      s['min-zoomed-font-size'] = 0;
     }
     if (kind === 'task')      { s['background-color'] = '#ffffff'; }
     if (kind === 'memory')    { s['background-color'] = '#fff5d6'; }
@@ -241,6 +245,8 @@
       s['width'] = 56; s['height'] = 56; s['font-size'] = 12;
       s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
+      s['min-zoomed-font-size'] = 0;
+      s['font-weight'] = 700;
     }
     return s;
   }
