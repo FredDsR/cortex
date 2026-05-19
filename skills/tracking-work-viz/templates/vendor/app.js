@@ -2,8 +2,9 @@
   'use strict';
 
   var STORE = { cy: null, payload: null, layout: 'concentric-hier' };
-  var KIND_RADIUS = { root: 0, workspace: 240, session: 380, task: 520,
-                      memory: 380, workbench: 380 };
+  var KIND_RADIUS = { root: 0, workspace: 240, session: 420, task: 700,
+                      memory: 420, workbench: 420 };
+  var SIBLING_GAP_FRAC = 0.18;
 
   function parsePayload() {
     var node = document.getElementById('__SCOPE__');
@@ -153,11 +154,15 @@
       pos.set(id, { x: r * Math.cos(mid), y: r * Math.sin(mid) });
       var kids = children.get(id) || [];
       var total = kids.reduce(function (s, k) { return s + leafCount.get(k); }, 0);
+      var span = a1 - a0;
+      var gapAngle = kids.length > 1 ? span * SIBLING_GAP_FRAC : 0;
+      var perGap = kids.length > 1 ? gapAngle / (kids.length - 1) : 0;
+      var contentSpan = span - gapAngle;
       var cursor = a0;
-      kids.forEach(function (k) {
-        var share = (a1 - a0) * (leafCount.get(k) / (total || 1));
+      kids.forEach(function (k, i) {
+        var share = contentSpan * (leafCount.get(k) / (total || 1));
         place(k, cursor, cursor + share);
-        cursor += share;
+        cursor += share + (i < kids.length - 1 ? perGap : 0);
       });
     }
     place(root.id, -Math.PI, Math.PI);
