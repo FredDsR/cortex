@@ -51,6 +51,51 @@ def _copy_markdown(world: World, out_dir: Path) -> None:
         shutil.copy(doc.rel_path, dest)
 
 
+def _copy_supplementary_md(world: World, out_dir: Path) -> None:
+    """Mirror any unindexed .md files inside session and memory directories so
+    relative links in author-authored markdown resolve. Indexed docs (SUMMARY,
+    tasks/*.md, workbench/*.md, memory/*.md) are already copied by
+    _copy_markdown; this pass picks up siblings like research/notes.md and
+    dated audit files."""
+    for doc in world.docs.values():
+        if doc.id.kind != "session" or doc.rel_path is None:
+            continue
+        sess_dir = doc.rel_path if doc.rel_path.is_dir() else doc.rel_path.parent
+        if not sess_dir.is_dir():
+            continue
+        out_sess = (out_dir / "workspaces" / doc.id.workspace
+                    / "sessions" / doc.id.session)
+        for md in sess_dir.rglob("*.md"):
+            rel = md.relative_to(sess_dir)
+            # Skip already-indexed flat children (SUMMARY, tasks/*.md, workbench/*.md).
+            if rel.name == "SUMMARY.md" and len(rel.parts) == 1:
+                continue
+            if rel.parts[0] in ("tasks", "workbench") and len(rel.parts) == 2:
+                continue
+            if rel.name == "index.md":
+                continue
+            dest = out_sess / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(md, dest)
+
+    for doc in world.docs.values():
+        if doc.id.kind != "workspace" or doc.rel_path is None:
+            continue
+        mem_dir = doc.rel_path / "memory"
+        if not mem_dir.is_dir():
+            continue
+        out_mem = out_dir / "workspaces" / doc.id.workspace / "memory"
+        for md in mem_dir.rglob("*.md"):
+            rel = md.relative_to(mem_dir)
+            if rel.name == "index.md":
+                continue
+            if len(rel.parts) == 1:
+                continue  # already copied by _copy_markdown
+            dest = out_mem / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(md, dest)
+
+
 def _children_of(world: World, parent_canon: str, kind: str) -> list[Doc]:
     out = []
     for doc in world.docs.values():
@@ -382,5 +427,6 @@ def build(world: World, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     _stage_vendor(out_dir)
     _copy_markdown(world, out_dir)
+    _copy_supplementary_md(world, out_dir)
     _emit_all_indices(world, out_dir)
     _emit_html_pages(world, out_dir)

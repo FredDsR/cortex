@@ -230,6 +230,18 @@ def test_tree_session_entries_have_contentpath_to_summary(workspaces_root, tmp_p
     assert sess["contentPath"] == "workspaces/demo-ws/sessions/alpha/SUMMARY.md"
 
 
+def test_supplementary_md_copied_to_session_dir(workspaces_root, tmp_path):
+    """Author-authored .md files (research notes, dated audit logs, etc.) that
+    sit next to SUMMARY.md must be copied so that relative links in rendered
+    markdown resolve."""
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    # Nested supplementary file
+    assert (out / "workspaces/demo-ws/sessions/alpha/research/literature.md").is_file()
+    # Top-level supplementary file at session root
+    assert (out / "workspaces/demo-ws/sessions/alpha/audit-2026-04-29.md").is_file()
+
+
 def test_build_does_not_stage_dagre(workspaces_root, tmp_path):
     out = tmp_path / "out"
     build(parse_world(workspaces_root), out)
