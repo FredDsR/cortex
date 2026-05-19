@@ -200,23 +200,25 @@
   }
 
   function nodeStyleByKind(kind) {
-    // At default fit-zoom there's no pixel budget for ~160 task labels at
-    // once, so task / memory / workbench labels are gated by zoom: invisible
-    // until the user zooms in past min-zoomed-font-size. Container labels
-    // (root, workspace, session) are always visible because there are few of
-    // them and they orient the user.
+    // Task / memory / workbench labels are hidden by default (text-opacity 0)
+    // and revealed on hover (.hovered class added in mouseover bindings),
+    // because at dense clusters there is no pixel budget to show every name.
+    // Container labels (root, workspace, session) are always visible because
+    // there are few of them and they orient the user.
     var s = {
       'label': 'data(label)',
       'font-size': 10,
       'text-valign': 'bottom',
       'text-halign': 'center',
       'text-margin-y': 4,
+      'text-wrap': 'ellipsis',
+      'text-max-width': '90px',
       'text-background-color': '#ffffff',
-      'text-background-opacity': 0.9,
+      'text-background-opacity': 0.95,
       'text-background-padding': 3,
       'text-background-shape': 'roundrectangle',
       'text-border-opacity': 0,
-      'min-zoomed-font-size': 9,    // hide tasks etc. when zoomed out
+      'text-opacity': 0,           // tasks: hidden until hovered
       'background-color': '#ffffff',
       'border-width': 1,
       'border-color': '#5a6573',
@@ -228,14 +230,14 @@
       s['background-color'] = '#eef4fb'; s['width'] = 34; s['height'] = 34;
       s['font-size'] = 11; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
-      s['min-zoomed-font-size'] = 0;
+      s['text-opacity'] = 1;
       s['font-weight'] = 600;
     }
     if (kind === 'session') {
       s['background-color'] = '#f3f5fa'; s['width'] = 28; s['height'] = 28;
       s['font-size'] = 10; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
-      s['min-zoomed-font-size'] = 0;
+      s['text-opacity'] = 1;
     }
     if (kind === 'task')      { s['background-color'] = '#ffffff'; }
     if (kind === 'memory')    { s['background-color'] = '#fff5d6'; }
@@ -245,7 +247,7 @@
       s['width'] = 56; s['height'] = 56; s['font-size'] = 12;
       s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
-      s['min-zoomed-font-size'] = 0;
+      s['text-opacity'] = 1;
       s['font-weight'] = 700;
     }
     return s;
@@ -269,6 +271,10 @@
     ['root','workspace','session','task','memory','workbench'].forEach(function (k) {
       styles.push({ selector: 'node[kind="' + k + '"]', style: nodeStyleByKind(k) });
     });
+    // Hovered task / memory / workbench reveals its label on top of others.
+    styles.push({ selector: 'node.hovered', style: { 'text-opacity': 1, 'z-index': 99,
+                                                      'border-color': '#1f7ae0',
+                                                      'border-width': 2 } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
     });
@@ -292,6 +298,8 @@
                    { duration: 300, easing: 'ease-in-out' });
       }
     });
+    cy.on('mouseover', 'node', function (evt) { evt.target.addClass('hovered'); });
+    cy.on('mouseout', 'node', function (evt) { evt.target.removeClass('hovered'); });
     return cy;
   }
 
