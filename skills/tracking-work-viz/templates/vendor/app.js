@@ -343,6 +343,30 @@
     });
   }
 
+  function setGraphHidden(hidden) {
+    var layout = document.getElementById('layout');
+    var btn = document.getElementById('toggle-graph');
+    if (!layout) return;
+    if (hidden) {
+      layout.classList.add('graph-hidden');
+      if (btn) { btn.textContent = 'Show graph'; btn.classList.add('on'); }
+    } else {
+      layout.classList.remove('graph-hidden');
+      if (btn) { btn.textContent = 'Hide graph'; btn.classList.remove('on'); }
+      if (STORE.cy) STORE.cy.resize();  // recompute viewport after layout change
+    }
+    updateFragment({ graph: hidden ? 'hidden' : null });
+  }
+
+  function bindToggleGraphButton() {
+    var btn = document.getElementById('toggle-graph');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var layout = document.getElementById('layout');
+      setGraphHidden(!layout.classList.contains('graph-hidden'));
+    });
+  }
+
   function applyLayout(cy, payload, name) {
     if (name === 'cose') {
       cy.layout({
@@ -517,10 +541,12 @@
     bindEdgeChips(cy);
     bindLayoutToggle();
     bindFitAllButton();
+    bindToggleGraphButton();
     bindContentPaneLinks();
     var params = readFragment();
     STORE.layout = params.layout === 'cose' ? 'cose' : 'concentric-hier';
     applyLayout(cy, payload, STORE.layout);
+    if (params.graph === 'hidden') setGraphHidden(true);
     if (payload.defaultContentPath) loadContent(payload.defaultContentPath);
   }
 
