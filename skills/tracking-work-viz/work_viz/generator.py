@@ -180,30 +180,25 @@ def _emit_all_indices(world: World, out_dir: Path) -> None:
             _emit_tasks_index(world, sess, out_dir)
 
 
-def _content_path_for_scope(cid: DocId, scope: str, scope_id: str) -> Optional[str]:
-    """Return a path to the doc's markdown that resolves correctly when fetched
-    from a page at the given scope. Returns None for kinds without markdown
-    content (root, workspace, session)."""
+def _content_path(cid: DocId) -> Optional[str]:
+    """Root-relative path to a doc's markdown content. The frontend prepends a
+    page-scope prefix derived from payload.rootHref before fetching."""
+    if cid.kind == "root":
+        return "index.md"
+    if cid.kind == "workspace":
+        return f"workspaces/{cid.workspace}/index.md"
+    if cid.kind == "session":
+        return f"workspaces/{cid.workspace}/sessions/{cid.session}/SUMMARY.md"
     if cid.kind == "task":
-        rel = f"workspaces/{cid.workspace}/sessions/{cid.session}/tasks/{cid.slug}.md"
-    elif cid.kind == "memory":
-        rel = f"workspaces/{cid.workspace}/memory/{cid.slug}.md"
-    elif cid.kind == "workbench":
-        rel = f"workspaces/{cid.workspace}/sessions/{cid.session}/workbench/{cid.slug}.md"
-    else:
-        return None
-    if scope == "root":
-        return rel
-    if scope == "workspace":
-        prefix = f"workspaces/{cid.workspace}/"
-        return rel[len(prefix):] if rel.startswith(prefix) else rel
-    if scope == "session":
-        prefix = f"workspaces/{cid.workspace}/sessions/{cid.session}/"
-        return rel[len(prefix):] if rel.startswith(prefix) else rel
-    return rel
+        return f"workspaces/{cid.workspace}/sessions/{cid.session}/tasks/{cid.slug}.md"
+    if cid.kind == "memory":
+        return f"workspaces/{cid.workspace}/memory/{cid.slug}.md"
+    if cid.kind == "workbench":
+        return f"workspaces/{cid.workspace}/sessions/{cid.session}/workbench/{cid.slug}.md"
+    return None
 
 
-def _node_dict(world: World, doc: Doc, scope: str, scope_id: str) -> dict:
+def _node_dict(world: World, doc: Doc) -> dict:
     cid = doc.id
     if cid.kind == "workspace":
         parent = "/"
@@ -216,7 +211,7 @@ def _node_dict(world: World, doc: Doc, scope: str, scope_id: str) -> dict:
     else:
         parent = None
     label = cid.slug or cid.session or cid.workspace or "root"
-    content_path = None if doc.ghost else _content_path_for_scope(cid, scope, scope_id)
+    content_path = None if doc.ghost else _content_path(cid)
     return {
         "id": cid.canonical(),
         "label": label,
@@ -239,7 +234,7 @@ def _edge_dict(e: Edge) -> dict:
 
 def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], list[dict]]:
     if scope == "root":
-        nodes = [_node_dict(world, d, scope, scope_id) for d in world.docs.values()]
+        nodes = [_node_dict(world, d) for d in world.docs.values()]
         edges = [_edge_dict(e) for e in world.edges]
         return nodes, edges
     if scope == "workspace":
@@ -261,23 +256,24 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
             neighbours.add(s)
             neighbours.add(t)
     keep_ids = in_scope | neighbours
-    nodes = [_node_dict(world, world.docs[cid], scope, scope_id)
-             for cid in keep_ids if cid in world.docs]
+    nodes = [_node_dict(world, world.docs[cid]) for cid in keep_ids if cid in world.docs]
     edges = [_edge_dict(e) for e in keep_edges]
     return nodes, edges
 
 
-def _build_tree(world: World, scope: str, scope_id: str) -> list[dict]:
+def _build_tree(world: World) -> list[dict]:
+    root_doc = world.docs.get("/")
     root_node = {"id": "/", "label": "Fred's Work Tracking", "kind": "root",
                  "scopeId": "/", "href": "index.html",
-                 "contentPath": None, "children": []}
+                 "contentPath": _content_path(root_doc.id) if root_doc else "index.md",
+                 "children": []}
     for ws in _children_of(world, "/", "workspace"):
         ws_node = {
             "id": ws.id.canonical(),
             "scopeId": ws.id.canonical(),
             "label": ws.id.workspace, "kind": "workspace",
             "href": f"workspaces/{ws.id.workspace}/index.html",
-            "contentPath": None,
+            "contentPath": _content_path(ws.id),
             "children": [],
         }
         for sess in _children_of(world, ws.id.canonical(), "session"):
@@ -286,7 +282,7 @@ def _build_tree(world: World, scope: str, scope_id: str) -> list[dict]:
                 "scopeId": sess.id.canonical(),
                 "label": sess.id.session, "kind": "session",
                 "href": f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/index.html",
-                "contentPath": None,
+                "contentPath": _content_path(sess.id),
                 "children": [],
             }
             for t in _children_of(world, sess.id.canonical(), "task"):
@@ -294,7 +290,7 @@ def _build_tree(world: World, scope: str, scope_id: str) -> list[dict]:
                     "id": t.id.canonical(),
                     "scopeId": t.id.canonical(),
                     "label": t.id.slug, "kind": "task", "href": None,
-                    "contentPath": _content_path_for_scope(t.id, scope, scope_id),
+                    "contentPath": _content_path(t.id),
                     "children": [],
                 })
             ws_node["children"].append(sess_node)
@@ -330,7 +326,7 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
     nodes, edges = _scope_filter(world, "root", "/")
     payload = {
         "scope": "root", "scopeId": "/", "rootHref": "index.html",
-        "tree": _build_tree(world, "root", "/"),
+        "tree": _build_tree(world),
         "nodes": nodes, "edges": edges,
         "defaultContentPath": "index.md",
     }
@@ -347,9 +343,9 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
         payload = {
             "scope": "workspace", "scopeId": ws_scope_id,
             "rootHref": "../../index.html",
-            "tree": _build_tree(world, "workspace", ws_scope_id),
+            "tree": _build_tree(world),
             "nodes": nodes, "edges": edges,
-            "defaultContentPath": "index.md",
+            "defaultContentPath": f"workspaces/{ws.id.workspace}/index.md",
         }
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
         ws_html.write_text(
@@ -365,9 +361,11 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
             payload = {
                 "scope": "session", "scopeId": sess_scope_id,
                 "rootHref": "../../../../index.html",
-                "tree": _build_tree(world, "session", sess_scope_id),
+                "tree": _build_tree(world),
                 "nodes": nodes, "edges": edges,
-                "defaultContentPath": "index.md",
+                "defaultContentPath": (
+                    f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/SUMMARY.md"
+                ),
             }
             sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
             sess_html.write_text(

@@ -154,7 +154,8 @@ def test_workspace_payload_task_contentpath(workspaces_root, tmp_path):
     payload = _payload(out / "workspaces" / "demo-ws" / "index.html")
     by_id = {n["id"]: n for n in payload["nodes"]}
     n = by_id["demo-ws/alpha/task/task-a"]
-    assert n["contentPath"] == "sessions/alpha/tasks/task-a.md"
+    # Root-relative; frontend prefixes by rootHref dirname at fetch time.
+    assert n["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
 
 
 def test_session_payload_task_contentpath(workspaces_root, tmp_path):
@@ -163,7 +164,25 @@ def test_session_payload_task_contentpath(workspaces_root, tmp_path):
     payload = _payload(out / "workspaces" / "demo-ws" / "sessions" / "alpha" / "index.html")
     by_id = {n["id"]: n for n in payload["nodes"]}
     n = by_id["demo-ws/alpha/task/task-a"]
-    assert n["contentPath"] == "tasks/task-a.md"
+    assert n["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
+
+
+def test_payload_session_contentpath_points_to_summary(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    sess = by_id["demo-ws/alpha/"]
+    assert sess["contentPath"] == "workspaces/demo-ws/sessions/alpha/SUMMARY.md"
+
+
+def test_payload_workspace_contentpath_points_to_index(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    ws = by_id["demo-ws/"]
+    assert ws["contentPath"] == "workspaces/demo-ws/index.md"
 
 
 def test_no_ghost_nodes_in_any_payload(workspaces_root, tmp_path):
@@ -197,7 +216,18 @@ def test_tree_task_entries_have_contentpath_session_scope(workspaces_root, tmp_p
     ws = next(c for c in root["children"] if c["id"] == "demo-ws/")
     sess = next(c for c in ws["children"] if c["id"] == "demo-ws/alpha/")
     task = next(c for c in sess["children"] if c["id"] == "demo-ws/alpha/task/task-a")
-    assert task["contentPath"] == "tasks/task-a.md"
+    # Tree contentPaths are root-relative; the frontend prepends rootHref dirname.
+    assert task["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
+
+
+def test_tree_session_entries_have_contentpath_to_summary(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    root = payload["tree"][0]
+    ws = next(c for c in root["children"] if c["id"] == "demo-ws/")
+    sess = next(c for c in ws["children"] if c["id"] == "demo-ws/alpha/")
+    assert sess["contentPath"] == "workspaces/demo-ws/sessions/alpha/SUMMARY.md"
 
 
 def test_build_does_not_stage_dagre(workspaces_root, tmp_path):

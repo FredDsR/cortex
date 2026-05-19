@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var STORE = { cy: null, payload: null, layout: 'concentric-hier' };
+  var STORE = { cy: null, payload: null, layout: 'concentric-hier', rootPrefix: '' };
   var KIND_RADIUS = { root: 0, workspace: 240, session: 420, task: 700,
                       memory: 420, workbench: 420 };
   var SIBLING_GAP_FRAC = 0.18;
@@ -318,10 +318,17 @@
 
   // ---- Content pane --------------------------------------------------------
 
+  function resolveContent(path) {
+    if (!path) return path;
+    if (/^https?:\/\//.test(path) || path.charAt(0) === '/') return path;
+    return STORE.rootPrefix + path;
+  }
+
   function loadContent(path) {
     var pane = document.getElementById('content');
-    fetch(path).then(function (r) {
-      if (!r.ok) throw new Error('Could not load ' + path + ': ' + r.status);
+    var url = resolveContent(path);
+    fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('Could not load ' + url + ': ' + r.status);
       return r.text();
     }).then(function (txt) {
       pane.innerHTML = marked.parse(txt);
@@ -335,6 +342,10 @@
   function init() {
     var payload = parsePayload();
     STORE.payload = payload;
+    // rootHref is page-relative and ends in "index.html". The prefix (sans
+    // filename) is the path back to the site root, which all contentPaths are
+    // expressed relative to.
+    STORE.rootPrefix = (payload.rootHref || '').replace(/index\.html$/, '');
     renderTree(payload.tree, payload.scopeId);
     var cy = buildCy(payload);
     STORE.cy = cy;
