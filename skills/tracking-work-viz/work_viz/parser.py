@@ -114,15 +114,6 @@ def _read_doc(path: Path, id: DocId) -> tuple[Doc, list[RawEdge]]:
     return doc, raw
 
 
-def _ensure_ghost(docs: dict[str, Doc], ghosts: set[str], target_id: DocId) -> None:
-    canon = target_id.canonical()
-    if canon in docs:
-        return
-    docs[canon] = Doc(id=target_id, title=target_id.slug or canon, body="",
-                      frontmatter={}, rel_path=None, edges_out=[], ghost=True)
-    ghosts.add(canon)
-
-
 def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> World:
     workspaces_root = Path(workspaces_root)
     docs: dict[str, Doc] = {}
@@ -208,7 +199,8 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
                                           kind="contains", resolved=True))
                         raw_edges[wid.canonical()] = raw
 
-    # Pass 2: resolve raw edges
+    # Pass 2: resolve raw edges. Unresolved targets and dangling-after-resolution
+    # targets are dropped; no ghost docs are synthesized.
     edge_keys: set[tuple[str, str, str]] = {
         (e.source.canonical(), e.target.canonical(), e.kind) for e in edges
     }
@@ -217,14 +209,10 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
         for raw in raws:
             res = address.resolve(raw.raw_target, referencing=src_doc.id)
             if not res.resolved:
-                edge = Edge(source=src_doc.id, target=src_doc.id,
-                            raw_target=raw.raw_target, kind=raw.kind, resolved=False)
-                edges.append(edge)
-                src_doc.edges_out.append(edge)
                 continue
             tgt = res.doc_id
             if tgt.canonical() not in docs:
-                _ensure_ghost(docs, ghosts, tgt)
+                continue
             key = (src_doc.id.canonical(), tgt.canonical(), raw.kind)
             if key in edge_keys:
                 continue

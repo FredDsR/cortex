@@ -66,18 +66,28 @@ def test_follows_cross_workspace(workspaces_root):
     )
 
 
-def test_mention_to_memory_creates_ghost(workspaces_root):
+def test_mention_to_memory_does_not_create_ghost(workspaces_root):
     world = parse_world(workspaces_root)
-    ghost_id = "demo-ws/memory/architecture"
-    assert ghost_id in world.docs
-    assert world.docs[ghost_id].ghost is True
-    assert ghost_id in world.ghosts
+    # No ghost docs are synthesized for unresolved targets.
+    assert "demo-ws/memory/architecture" not in world.docs
+    assert world.ghosts == set()
 
 
-def test_kb_ghosts_workspace(workspaces_root):
+def test_kb_ghosts_workspace_emits_no_ghost_nodes(workspaces_root):
     world = parse_world(workspaces_root)
-    assert "kb-ghosts-ws/memory/missing-note" in world.docs
-    assert "kb-ghosts-ws/solo/workbench/draft-x" in world.docs
+    # The workspace and its session exist; the missing memory/workbench refs do not.
+    assert "kb-ghosts-ws/" in world.docs
+    assert "kb-ghosts-ws/solo/" in world.docs
+    assert "kb-ghosts-ws/memory/missing-note" not in world.docs
+    assert "kb-ghosts-ws/solo/workbench/draft-x" not in world.docs
+
+
+def test_unresolved_edges_are_dropped(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert all(e.resolved for e in world.edges)
+    doc_ids = set(world.docs.keys())
+    for e in world.edges:
+        assert e.target.canonical() in doc_ids
 
 
 def test_no_duplicate_edges(workspaces_root):
