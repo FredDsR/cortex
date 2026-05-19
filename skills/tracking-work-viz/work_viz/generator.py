@@ -302,10 +302,13 @@ def _build_tree(world: World, scope: str, scope_id: str) -> list[dict]:
     return [root_node]
 
 
-def _render_shell(scope: str, scope_id: str, payload: dict, vendor_rel: str, title: str) -> str:
+def _render_shell(scope: str, scope_id: str, payload: dict, vendor_rel: str,
+                  title: str, title_line: str, subtitle_line: str) -> str:
     blob = json.dumps(payload, ensure_ascii=False)
     html = _SHELL_TEMPLATE
     html = html.replace("__TITLE__", title)
+    html = html.replace("__TITLE_LINE__", title_line)
+    html = html.replace("__SUBTITLE_LINE__", subtitle_line)
     html = html.replace("__VENDOR__", vendor_rel)
     html = html.replace("__SCOPE_JSON__", blob)
     return html
@@ -332,7 +335,10 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
         "defaultContentPath": "index.md",
     }
     (out_dir / "index.html").write_text(
-        _render_shell("root", "/", payload, _vendor_rel("root", "/"), "Fred's Work Tracking"),
+        _render_shell("root", "/", payload, _vendor_rel("root", "/"),
+                      "Fred's Work Tracking",
+                      title_line="Fred's Work Tracking",
+                      subtitle_line="all workspaces"),
         encoding="utf-8")
 
     for ws in _children_of(world, "/", "workspace"):
@@ -348,7 +354,10 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
         ws_html.write_text(
             _render_shell("workspace", ws_scope_id, payload,
-                          _vendor_rel("workspace", ws_scope_id), ws.id.workspace),
+                          _vendor_rel("workspace", ws_scope_id),
+                          ws.id.workspace,
+                          title_line=ws.id.workspace,
+                          subtitle_line="workspace"),
             encoding="utf-8")
         for sess in _children_of(world, ws_scope_id, "session"):
             sess_scope_id = sess.id.canonical()
@@ -364,7 +373,9 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
             sess_html.write_text(
                 _render_shell("session", sess_scope_id, payload,
                               _vendor_rel("session", sess_scope_id),
-                              f"{sess.id.session} - {ws.id.workspace}"),
+                              f"{sess.id.session} - {ws.id.workspace}",
+                              title_line=sess.id.session,
+                              subtitle_line=f"session in workspace {ws.id.workspace}"),
                 encoding="utf-8")
 
 

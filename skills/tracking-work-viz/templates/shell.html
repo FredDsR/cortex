@@ -6,21 +6,30 @@
   <link rel="stylesheet" href="__VENDOR__/app.css">
 </head>
 <body>
+  <header id="appbar">
+    <h1>__TITLE_LINE__</h1>
+    <div class="subtitle">__SUBTITLE_LINE__</div>
+  </header>
   <main id="layout">
     <aside id="tree"></aside>
     <section id="graph"></section>
     <article id="content"></article>
   </main>
   <footer id="chips">
-    <button class="chip on" data-kind="blocked">Blocked</button>
-    <button class="chip on" data-kind="related">Related</button>
-    <button class="chip on" data-kind="follows">Follows</button>
-    <button class="chip" data-kind="mentions">Mentions</button>
+    <div class="chip-group" id="edge-chips">
+      <button class="chip on" data-kind="blocked">Blocked</button>
+      <button class="chip on" data-kind="related">Related</button>
+      <button class="chip on" data-kind="follows">Follows</button>
+      <button class="chip" data-kind="mentions">Mentions</button>
+    </div>
+    <div class="chip-divider"></div>
+    <div class="chip-group" id="layout-toggle">
+      <button class="chip" data-layout="concentric-hier">Hierarchical</button>
+      <button class="chip" data-layout="cose">Organic</button>
+    </div>
   </footer>
   <script id="__SCOPE__" type="application/json">__SCOPE_JSON__</script>
   <script src="__VENDOR__/cytoscape.min.js"></script>
-  <script src="__VENDOR__/dagre.min.js"></script>
-  <script src="__VENDOR__/cytoscape-dagre.min.js"></script>
   <script src="__VENDOR__/marked.min.js"></script>
   <script src="__VENDOR__/app.js"></script>
 </body>
