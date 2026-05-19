@@ -78,8 +78,19 @@
   function onTreeClick(n, ev) {
     ev.preventDefault();
     var cy = STORE.cy;
+    var scope = STORE.payload && STORE.payload.scope;
+    // Navigate when:
+    //  - target node is not in the current graph (need to load a wider scope), OR
+    //  - user clicked a higher-scope node than we're on (e.g. workspace from
+    //    a session page, or root from any deeper page) so the dashboard at
+    //    that scope shows the full subtree.
+    var widerScope = (
+      (n.kind === 'root' && scope !== 'root') ||
+      (n.kind === 'workspace' && scope === 'session' &&
+        STORE.payload.scopeId.indexOf(n.id) === 0)
+    );
     var inGraph = cy && cy.getElementById(n.id).length > 0;
-    if (!inGraph && n.href) {
+    if ((!inGraph || widerScope) && n.href) {
       window.location.href = relHref(n.href);
       return;
     }

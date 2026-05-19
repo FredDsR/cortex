@@ -369,6 +369,7 @@ def _render_shell(scope: str, scope_id: str, payload: dict, vendor_rel: str,
     html = html.replace("__TITLE_LINE__", title_line)
     html = html.replace("__SUBTITLE_LINE__", subtitle_line)
     html = html.replace("__VENDOR__", vendor_rel)
+    html = html.replace("__ROOT_HREF__", payload.get("rootHref", "index.html"))
     html = html.replace("__SCOPE_JSON__", blob)
     return html
 
