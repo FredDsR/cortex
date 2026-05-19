@@ -3,9 +3,9 @@
 
   var STORE = { cy: null, payload: null, layout: 'concentric-hier',
                 rootPrefix: '', contentBase: '', wikilinkIndex: new Map() };
-  var KIND_RADIUS = { root: 0, workspace: 240, session: 420, task: 700,
-                      memory: 420, workbench: 420 };
-  var SIBLING_GAP_FRAC = 0.18;
+  var KIND_RADIUS = { root: 0, workspace: 260, session: 470, task: 820,
+                      memory: 470, workbench: 470 };
+  var SIBLING_GAP_FRAC = 0.22;
 
   function parsePayload() {
     var node = document.getElementById('__SCOPE__');
@@ -200,25 +200,48 @@
   }
 
   function nodeStyleByKind(kind) {
+    // Labels live outside the node (below) with a soft white background, so
+    // dense clusters keep their circles readable even when text would
+    // otherwise overlap. min-zoomed-font-size hides labels when the user is
+    // zoomed far out, so they only crowd the view when they're useful.
     var s = {
       'label': 'data(label)',
-      'font-size': 10,
-      'text-valign': 'center',
+      'font-size': 9,
+      'text-valign': 'bottom',
       'text-halign': 'center',
+      'text-margin-y': 3,
+      'text-background-color': '#ffffff',
+      'text-background-opacity': 0.85,
+      'text-background-padding': 2,
+      'text-background-shape': 'roundrectangle',
+      'text-border-opacity': 0,
+      'min-zoomed-font-size': 5,
       'background-color': '#ffffff',
       'border-width': 1,
       'border-color': '#5a6573',
       'shape': 'ellipse',
-      'width': 24, 'height': 24,
+      'width': 18, 'height': 18,
       'color': '#1f2933',
     };
-    if (kind === 'workspace') { s['background-color'] = '#eef4fb'; s['width'] = 40; s['height'] = 40; s['font-size'] = 11; }
-    if (kind === 'session')   { s['background-color'] = '#f3f5fa'; s['width'] = 32; s['height'] = 32; }
+    if (kind === 'workspace') {
+      s['background-color'] = '#eef4fb'; s['width'] = 34; s['height'] = 34;
+      s['font-size'] = 11; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
+      s['text-background-opacity'] = 0;
+    }
+    if (kind === 'session') {
+      s['background-color'] = '#f3f5fa'; s['width'] = 26; s['height'] = 26;
+      s['font-size'] = 10; s['text-valign'] = 'center'; s['text-margin-y'] = 0;
+      s['text-background-opacity'] = 0;
+    }
     if (kind === 'task')      { s['background-color'] = '#ffffff'; }
     if (kind === 'memory')    { s['background-color'] = '#fff5d6'; }
     if (kind === 'workbench') { s['background-color'] = '#e8f7e0'; }
-    if (kind === 'root')      { s['background-color'] = '#1f2933'; s['color'] = '#fff';
-                                s['width'] = 56; s['height'] = 56; s['font-size'] = 12; }
+    if (kind === 'root')      {
+      s['background-color'] = '#1f2933'; s['color'] = '#fff';
+      s['width'] = 56; s['height'] = 56; s['font-size'] = 12;
+      s['text-valign'] = 'center'; s['text-margin-y'] = 0;
+      s['text-background-opacity'] = 0;
+    }
     return s;
   }
 
@@ -280,8 +303,8 @@
     if (name === 'cose') {
       cy.layout({
         name: 'cose', animate: false,
-        nodeRepulsion: 8000, idealEdgeLength: 60, edgeElasticity: 100,
-        gravity: 0.25, numIter: 1500, padding: 30,
+        nodeRepulsion: 14000, idealEdgeLength: 80, edgeElasticity: 100,
+        gravity: 0.2, numIter: 2000, padding: 30,
       }).run();
     } else {
       var pos = computeHierPositions(payload.nodes, payload.edges);
