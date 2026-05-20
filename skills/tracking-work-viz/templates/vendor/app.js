@@ -47,9 +47,29 @@
   function renderTree(rootNodes, scopeId) {
     var aside = document.getElementById('tree');
     aside.innerHTML = '';
+    var toolbar = document.createElement('div');
+    toolbar.id = 'tree-toolbar';
+    toolbar.innerHTML =
+      '<button class="tree-toolbtn" data-cmd="expand" title="Expand all">+ all</button>' +
+      '<button class="tree-toolbtn" data-cmd="collapse" title="Collapse all">- all</button>';
+    aside.appendChild(toolbar);
     var ul = document.createElement('ul');
     function rec(n, parent) {
       var li = document.createElement('li');
+      var hasChildren = n.children && n.children.length > 0;
+      if (hasChildren) li.classList.add('has-children');
+      var row = document.createElement('div');
+      row.className = 'tree-row';
+      var arrow = document.createElement('span');
+      arrow.className = hasChildren ? 'tree-arrow' : 'tree-arrow tree-arrow-empty';
+      arrow.textContent = hasChildren ? '▾' : ''; // ▾
+      if (hasChildren) {
+        arrow.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          li.classList.toggle('collapsed');
+        });
+      }
+      row.appendChild(arrow);
       var el = document.createElement('span');
       el.className = 'tree-node kind-' + n.kind;
       if (n.id === scopeId) el.classList.add('current');
@@ -59,8 +79,9 @@
       if (n.contentPath) el.dataset.contentPath = n.contentPath;
       if (n.href) el.dataset.href = n.href;
       el.addEventListener('click', function (ev) { onTreeClick(n, ev); });
-      li.appendChild(el);
-      if (n.children && n.children.length) {
+      row.appendChild(el);
+      li.appendChild(row);
+      if (hasChildren) {
         var sub = document.createElement('ul');
         n.children.forEach(function (c) { rec(c, sub); });
         li.appendChild(sub);
@@ -69,6 +90,15 @@
     }
     rootNodes.forEach(function (n) { rec(n, ul); });
     aside.appendChild(ul);
+    toolbar.querySelectorAll('.tree-toolbtn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var cmd = btn.dataset.cmd;
+        aside.querySelectorAll('li.has-children').forEach(function (li) {
+          if (cmd === 'collapse') li.classList.add('collapsed');
+          else li.classList.remove('collapsed');
+        });
+      });
+    });
   }
 
   function relHref(href) {
