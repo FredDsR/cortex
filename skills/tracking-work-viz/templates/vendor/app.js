@@ -386,9 +386,11 @@
     }
     if (kind === 'root') {
       s['background-color'] = '#1f2933'; s['color'] = '#fff';
-      s['width'] = 86; s['height'] = 86; s['font-size'] = 14;
+      s['width'] = 120; s['height'] = 120; s['font-size'] = 16;
       s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
+      s['text-wrap'] = 'wrap';
+      s['text-max-width'] = '100px';
       s['font-weight'] = 700;
       s['border-width'] = 0;
     }
@@ -416,7 +418,7 @@
     // share a soft pastel, all sessions in a workspace are distinct hues, and
     // tasks of different sessions in the same workspace are visually grouped.
     var dark = isDark();
-    if (node.kind === 'root') return dark ? '#0c1119' : '#1f2933';
+    if (node.kind === 'root') return dark ? '#5a6884' : '#1f2933';
     var key;
     if (node.kind === 'workspace') key = node.id.replace(/\/$/, '');
     else key = (node.id.split('/').slice(0, 2).join('/'));
@@ -447,14 +449,20 @@
       .selector('node[kind="root"]')
         .style({ 'color': '#ffffff', 'border-width': 0 })
       .selector('edge[kind="contains"]')
-        .style({ 'line-color': dark ? '#2c3548' : '#dde2e8',
-                 'opacity': dark ? 0.55 : 0.4 })
+        .style({ 'line-color': dark ? '#6b7790' : '#8a929c',
+                 'opacity': dark ? 0.75 : 0.7 })
       .selector('edge[kind="related"]')
-        .style({ 'line-color': dark ? '#9aa4b5' : '#5a6573',
-                 'target-arrow-color': dark ? '#9aa4b5' : '#5a6573' })
+        .style({ 'line-color': dark ? '#c8d0de' : '#3a4250',
+                 'target-arrow-color': dark ? '#c8d0de' : '#3a4250' })
       .selector('edge[kind="follows"]')
-        .style({ 'line-color': dark ? '#cad2dd' : '#1f2933',
-                 'target-arrow-color': dark ? '#cad2dd' : '#1f2933' })
+        .style({ 'line-color': dark ? '#e6ecf5' : '#1f2933',
+                 'target-arrow-color': dark ? '#e6ecf5' : '#1f2933' })
+      .selector('edge[kind="blocked"]')
+        .style({ 'line-color': dark ? '#ff6a5e' : '#c62828',
+                 'target-arrow-color': dark ? '#ff6a5e' : '#c62828' })
+      .selector('edge[kind="mentions"]')
+        .style({ 'line-color': dark ? '#5cb0ff' : '#0f5cb5',
+                 'target-arrow-color': dark ? '#5cb0ff' : '#0f5cb5' })
       .selector('node.selected')
         .style({
           'border-color': dark ? '#7bbfff' : '#1f7ae0',
