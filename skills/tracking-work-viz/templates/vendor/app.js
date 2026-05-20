@@ -571,13 +571,34 @@
 
   function applyLayout(cy, payload, name) {
     if (name === 'cose') {
-      // randomize:false → start from current positions (preset from
-      // hierarchical, or last cose result) so each run is reproducible.
-      cy.layout({
-        name: 'cose', animate: false, randomize: false,
-        nodeRepulsion: 14000, idealEdgeLength: 80, edgeElasticity: 100,
-        gravity: 0.2, numIter: 2000, padding: 30,
-      }).run();
+      // Seed every cose run from the deterministic hierarchical positions
+      // so the simulation starts in the same state each time.
+      var seedPos = computeHierPositions(payload.nodes, payload.edges);
+      cy.nodes().forEach(function (n) {
+        var p = seedPos.get(n.data('id'));
+        if (p) n.position(p);
+      });
+      // Cose's physics calls Math.random for perturbations even with
+      // randomize:false, so wrap the layout run in a seeded PRNG to make
+      // those calls reproducible.
+      var origRandom = Math.random;
+      var s = 0x1f7ae0; // any fixed seed
+      Math.random = function () {
+        s |= 0; s = (s + 0x6D2B79F5) | 0;
+        var t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      try {
+        cy.layout({
+          name: 'cose', animate: false, randomize: false,
+          nodeRepulsion: 14000, idealEdgeLength: 80, edgeElasticity: 100,
+          gravity: 0.2, numIter: 2000, padding: 30,
+        }).run();
+      } finally {
+        Math.random = origRandom;
+      }
+      cy.fit(undefined, 30);
     } else {
       var pos = computeHierPositions(payload.nodes, payload.edges);
       cy.nodes().forEach(function (n) {
