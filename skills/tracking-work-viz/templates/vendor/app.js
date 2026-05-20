@@ -128,7 +128,19 @@
       var coll = visibleHasChildren().filter(function (li) { return li.classList.contains('collapsed'); });
       if (coll.length === 0) return;
       var minD = Math.min.apply(null, coll.map(function (li) { return parseInt(li.dataset.depth, 10); }));
-      setUniformDepth(minD + 1);
+      var justUncollapsed = coll.filter(function (li) { return parseInt(li.dataset.depth, 10) === minD; });
+      justUncollapsed.forEach(function (li) { li.classList.remove('collapsed'); });
+      // For each just-uncollapsed li, mark any has-children descendant as
+      // .collapsed so the newly-revealed branch stops at the next level
+      // instead of cascading all the way down by default. Pre-existing
+      // open branches at deeper levels are untouched because we only walk
+      // descendants of the lis we just uncollapsed.
+      justUncollapsed.forEach(function (li) {
+        li.querySelectorAll('li.has-children').forEach(function (d) {
+          d.classList.add('collapsed');
+        });
+      });
+      updateDepthLabel();
     }
     function stepCollapse() {
       var open = visibleHasChildren().filter(function (li) { return !li.classList.contains('collapsed'); });
