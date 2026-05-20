@@ -506,7 +506,15 @@
       var clamped = Math.max(240, Math.min(window.innerWidth - 400, w));
       STORE.contentWidth = clamped;
       layout.style.gridTemplateColumns = '260px 1fr 6px ' + clamped + 'px';
-      if (STORE.cy) STORE.cy.resize();
+      if (STORE.cy) {
+        STORE.cy.resize();
+        // Re-center the selected node so it stays visible as the graph
+        // viewport reflows. Pan only; zoom is preserved.
+        if (STORE.selectedId) {
+          var n = STORE.cy.getElementById(STORE.selectedId);
+          if (n && n.length) STORE.cy.center(n);
+        }
+      }
     }
     resizer.addEventListener('mousedown', function (ev) {
       dragging = true;
