@@ -1,181 +1,225 @@
-"""Walk a `~/.work/workspaces/<slug>/` tree and produce a Workspace model."""
-from pathlib import Path
+"""Filesystem walker: emits a World from a workspaces root."""
+from __future__ import annotations
 import re
+from pathlib import Path
+from typing import Optional
+
+import yaml
 
 from .model import (
-    Workspace, Session, Task,
-    STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED, STATUS_UNKNOWN,
+    Doc, DocId, Edge, RawEdge, World,
+    AUTHORED_EDGE_KINDS,
 )
+from . import address
 
 
-_FRONTMATTER_DELIM = "---\n"
-_INLINE_FIELD_RE = re.compile(r"^\*\*([^*:]+?)(?::\*\*|\*\*:)\s*(.*)$")
-_HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
-_LINK_TASK_RE = re.compile(r"\[[^\]]+\]\(tasks/([a-z0-9-]+)\.md\)")
-_BARE_TASK_RE = re.compile(r"\b(task-[a-z0-9-]+)\b")
-_BLOCKED_BY_RE = re.compile(r"^\s*\*?\*?\s*Blocked by:?\s*\*?\*?\s*(.+)$", re.IGNORECASE)
-_ARCHIVE_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
-
-_HEADING_TO_STATUS = {
-    "in progress": STATUS_IN_PROGRESS,
-    "open": STATUS_OPEN,
-    "blocked": STATUS_BLOCKED,
-    "resolved": STATUS_RESOLVED,
-}
+_FENCE_RE = re.compile(r"^\s*```")
+_BODY_REL_RE = re.compile(r"^\s*(Blocked by|Related to|Follows):\s*(.+)$", re.IGNORECASE)
+_FM_KEY_TO_KIND = {"blocked_by": "blocked", "related_to": "related", "follows": "follows"}
+_LABEL_TO_KIND = {"blocked by": "blocked", "related to": "related", "follows": "follows"}
+_MENTION_BRACKET_RE = re.compile(r"\[([a-z0-9][a-z0-9/_\-]*)\]")
+_MENTION_BARE_RE = re.compile(r"\btask-[a-z0-9\-]+\b")
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
-    if not text.startswith(_FRONTMATTER_DELIM):
+    if not text.startswith("---\n"):
         return {}, text
-    end = text.find("\n" + _FRONTMATTER_DELIM, len(_FRONTMATTER_DELIM))
+    end = text.find("\n---\n", 4)
     if end == -1:
         return {}, text
-    fm_block = text[len(_FRONTMATTER_DELIM):end]
-    body = text[end + 1 + len(_FRONTMATTER_DELIM):].lstrip("\n")
-    meta: dict = {}
-    for line in fm_block.splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            meta[k.strip()] = v.strip()
-    return meta, body
+    fm_block = text[4:end]
+    body = text[end + 5:].lstrip("\n")
+    try:
+        fm = yaml.safe_load(fm_block) or {}
+    except yaml.YAMLError:
+        return {}, text
+    return fm if isinstance(fm, dict) else {}, body
 
 
-def _parse_inline_fields(body: str) -> dict:
-    fields: dict = {}
+def _title_from_body(body: str, fallback: str) -> str:
     for line in body.splitlines():
-        m = _INLINE_FIELD_RE.match(line)
+        line = line.strip()
+        if line.startswith("# "):
+            return line[2:].strip()
+    return fallback
+
+
+def _extract_raw_edges(fm: dict, body: str) -> list[RawEdge]:
+    raw: list[RawEdge] = []
+    seen: set[tuple[str, str]] = set()
+
+    def _add(kind: str, target: str):
+        target = target.strip()
+        if not target:
+            return
+        key = (kind, target)
+        if key in seen:
+            return
+        seen.add(key)
+        raw.append(RawEdge(kind=kind, raw_target=target))
+
+    # 1. frontmatter keys
+    for fm_key, kind in _FM_KEY_TO_KIND.items():
+        if fm_key in fm:
+            val = fm[fm_key]
+            items = val if isinstance(val, list) else [val]
+            for item in items:
+                if item is not None:
+                    _add(kind, str(item))
+
+    # 2. body lines, skipping fenced blocks
+    in_fence = False
+    typed_lines: set[int] = set()
+    for i, line in enumerate(body.splitlines()):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _BODY_REL_RE.match(line)
         if m:
-            key = m.group(1).strip()
-            if key not in fields:
-                fields[key] = m.group(2).strip()
-    return fields
+            label = m.group(1).strip().lower()
+            kind = _LABEL_TO_KIND[label]
+            rest = m.group(2)
+            typed_lines.add(i)
+            for tok in [t.strip() for t in rest.split(",")]:
+                tok = tok.strip().lstrip("[").rstrip("]").strip()
+                if tok:
+                    _add(kind, tok)
 
-
-def _frontmatter_to_display(meta: dict) -> dict:
-    """Convert YAML frontmatter keys (snake_case lowercase) to display form
-    (Title Case with spaces) so the viz UI renders them like the legacy
-    bold-pair labels. Empty values are dropped."""
-    out: dict = {}
-    for k, v in meta.items():
-        if v is None or str(v).strip() == "":
+    # 3. mentions (anything bracketed or bare that survived, skipping typed lines + fences)
+    in_fence = False
+    for i, line in enumerate(body.splitlines()):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
             continue
-        label = k.replace("_", " ").strip()
-        label = " ".join(w.capitalize() for w in label.split())
-        out[label] = str(v).strip()
-    return out
-
-
-def _parse_blocked_by(body: str) -> list:
-    out: list = []
-    for line in body.splitlines():
-        m = _BLOCKED_BY_RE.match(line.strip())
-        if not m:
+        if in_fence or i in typed_lines:
             continue
-        rest = m.group(1)
-        for slug in _LINK_TASK_RE.findall(rest):
-            if slug not in out:
-                out.append(slug)
-        for slug in _BARE_TASK_RE.findall(rest):
-            if slug not in out:
-                out.append(slug)
-    return out
+        for tok in _MENTION_BRACKET_RE.findall(line):
+            _add("mentions", tok)
+        for tok in _MENTION_BARE_RE.findall(line):
+            _add("mentions", tok)
+
+    return raw
 
 
-def _parse_summary_status_map(summary_text: str) -> dict:
-    status_map: dict = {}
-    current: str | None = None
-    for line in summary_text.splitlines():
-        h = _HEADING_RE.match(line)
-        if h:
-            current = _HEADING_TO_STATUS.get(h.group(1).strip().lower())
+def _read_doc(path: Path, id: DocId) -> tuple[Doc, list[RawEdge]]:
+    text = path.read_text(encoding="utf-8")
+    fm, body = _split_frontmatter(text)
+    title = _title_from_body(body, id.slug or id.session or id.workspace or "(untitled)")
+    status = fm.get("status") if id.kind == "task" else None
+    doc = Doc(id=id, title=title, body=body, frontmatter=fm, rel_path=path,
+              edges_out=[], status=status)
+    raw = _extract_raw_edges(fm, body)
+    return doc, raw
+
+
+def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> World:
+    workspaces_root = Path(workspaces_root)
+    docs: dict[str, Doc] = {}
+    edges: list[Edge] = []
+    ghosts: set[str] = set()
+    raw_edges: dict[str, list[RawEdge]] = {}
+
+    # Root hub
+    root = Doc(id=DocId(kind="root"), title="Fred's Work Tracking", body="",
+               frontmatter={}, rel_path=None, edges_out=[])
+    docs["/"] = root
+
+    if not workspaces_root.is_dir():
+        return World(root=root, docs=docs, edges=edges, ghosts=ghosts)
+
+    # Pass 1: discovery + containment
+    for ws_dir in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
+        ws_slug = ws_dir.name
+        if ws_slug in address.RESERVED_WORDS:
             continue
-        if current is None:
-            continue
-        for slug in _LINK_TASK_RE.findall(line):
-            status_map[slug] = current
-        for slug in _BARE_TASK_RE.findall(line):
-            status_map.setdefault(slug, current)
-    return status_map
+        ws_id = DocId(kind="workspace", workspace=ws_slug)
+        ws_doc = Doc(id=ws_id, title=ws_slug, body="", frontmatter={},
+                     rel_path=ws_dir, edges_out=[])
+        docs[ws_id.canonical()] = ws_doc
+        edges.append(Edge(source=root.id, target=ws_id, raw_target=ws_slug,
+                          kind="contains", resolved=True))
 
+        memory_dir = ws_dir / "memory"
+        if memory_dir.is_dir():
+            for mfile in sorted(memory_dir.glob("*.md")):
+                if mfile.name == "index.md":
+                    continue
+                mid = DocId(kind="memory", workspace=ws_slug, slug=mfile.stem)
+                doc, raw = _read_doc(mfile, mid)
+                docs[mid.canonical()] = doc
+                edges.append(Edge(source=ws_id, target=mid, raw_target=mfile.stem,
+                                  kind="contains", resolved=True))
+                raw_edges[mid.canonical()] = raw
 
-def _fallback_status_from_inline(value: str) -> str:
-    v = value.lower()
-    if "resolved" in v or "closed" in v:
-        return STATUS_RESOLVED
-    if "in progress" in v:
-        return STATUS_IN_PROGRESS
-    if "blocked" in v:
-        return STATUS_BLOCKED
-    if v.strip():
-        return STATUS_OPEN
-    return STATUS_UNKNOWN
+        sessions_dir = ws_dir / "sessions"
+        if sessions_dir.is_dir():
+            for sess_dir in sorted(p for p in sessions_dir.iterdir() if p.is_dir()):
+                sess_slug = sess_dir.name
+                if sess_slug in address.RESERVED_WORDS:
+                    continue
+                sess_id = DocId(kind="session", workspace=ws_slug, session=sess_slug)
+                summary = sess_dir / "SUMMARY.md"
+                if summary.is_file():
+                    sess_doc, raw = _read_doc(summary, sess_id)
+                    raw_edges[sess_id.canonical()] = raw
+                else:
+                    sess_doc = Doc(id=sess_id, title=sess_slug, body="", frontmatter={},
+                                   rel_path=sess_dir, edges_out=[])
+                docs[sess_id.canonical()] = sess_doc
+                edges.append(Edge(source=ws_id, target=sess_id, raw_target=sess_slug,
+                                  kind="contains", resolved=True))
 
+                tasks_dir = sess_dir / "tasks"
+                if tasks_dir.is_dir():
+                    for tfile in sorted(tasks_dir.glob("*.md")):
+                        if tfile.name == "index.md":
+                            continue
+                        tid = DocId(kind="task", workspace=ws_slug,
+                                    session=sess_slug, slug=tfile.stem)
+                        doc, raw = _read_doc(tfile, tid)
+                        docs[tid.canonical()] = doc
+                        edges.append(Edge(source=sess_id, target=tid,
+                                          raw_target=tfile.stem,
+                                          kind="contains", resolved=True))
+                        raw_edges[tid.canonical()] = raw
 
-def _count_active(dir_path: Path) -> int:
-    return sum(1 for f in dir_path.iterdir() if f.name.startswith(".active."))
+                wb_dir = sess_dir / "workbench"
+                if wb_dir.is_dir():
+                    for wfile in sorted(wb_dir.glob("*.md")):
+                        if wfile.name == "index.md":
+                            continue
+                        wid = DocId(kind="workbench", workspace=ws_slug,
+                                    session=sess_slug, slug=wfile.stem)
+                        doc, raw = _read_doc(wfile, wid)
+                        docs[wid.canonical()] = doc
+                        edges.append(Edge(source=sess_id, target=wid,
+                                          raw_target=wfile.stem,
+                                          kind="contains", resolved=True))
+                        raw_edges[wid.canonical()] = raw
 
+    # Pass 2: resolve raw edges. Unresolved targets and dangling-after-resolution
+    # targets are dropped; no ghost docs are synthesized.
+    edge_keys: set[tuple[str, str, str]] = {
+        (e.source.canonical(), e.target.canonical(), e.kind) for e in edges
+    }
+    for src_canon, raws in raw_edges.items():
+        src_doc = docs[src_canon]
+        for raw in raws:
+            res = address.resolve(raw.raw_target, referencing=src_doc.id)
+            if not res.resolved:
+                continue
+            tgt = res.doc_id
+            if tgt.canonical() not in docs:
+                continue
+            key = (src_doc.id.canonical(), tgt.canonical(), raw.kind)
+            if key in edge_keys:
+                continue
+            edge_keys.add(key)
+            edge = Edge(source=src_doc.id, target=tgt,
+                        raw_target=raw.raw_target, kind=raw.kind, resolved=True)
+            edges.append(edge)
+            src_doc.edges_out.append(edge)
 
-def _read_active_session_slugs(ws_dir: Path) -> list:
-    slugs: list = []
-    for f in sorted(ws_dir.iterdir()):
-        if not f.name.startswith(".active."):
-            continue
-        try:
-            text = f.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        if text and text not in slugs:
-            slugs.append(text)
-    return slugs
-
-
-def _parse_session(sess_dir: Path, slug: str | None = None) -> Session:
-    sess = Session(slug=slug or sess_dir.name)
-    summary_path = sess_dir / "SUMMARY.md"
-    if summary_path.exists():
-        raw = summary_path.read_text(encoding="utf-8")
-        meta, sess.summary_text = _split_frontmatter(raw)
-        sess.summary_meta = _frontmatter_to_display(meta)
-    sess.active_agent_count = _count_active(sess_dir)
-    status_map = _parse_summary_status_map(sess.summary_text)
-    tasks_dir = sess_dir / "tasks"
-    if tasks_dir.exists():
-        for task_path in sorted(tasks_dir.glob("*.md")):
-            raw = task_path.read_text(encoding="utf-8")
-            task_meta, body = _split_frontmatter(raw)
-            t_slug = task_path.stem
-            inline = _parse_inline_fields(body)
-            for k, v in _frontmatter_to_display(task_meta).items():
-                inline[k] = v  # frontmatter wins over bold-pair
-            status = status_map.get(t_slug)
-            if status is None:
-                status = _fallback_status_from_inline(inline.get("Status", ""))
-            sess.tasks.append(Task(
-                slug=t_slug,
-                body=body,
-                inline_fields=inline,
-                blocked_by=_parse_blocked_by(body),
-                status=status,
-            ))
-    return sess
-
-
-def parse_workspace(workspaces_root: Path, slug: str) -> Workspace:
-    ws_dir = workspaces_root / slug
-    if not ws_dir.is_dir():
-        raise FileNotFoundError(f"workspace not found: {ws_dir}")
-    ws = Workspace(slug=slug, has_meta=(ws_dir / ".meta").exists())
-    ws.active_session_slugs = _read_active_session_slugs(ws_dir)
-    sessions_dir = ws_dir / "sessions"
-    if sessions_dir.exists():
-        for sd in sorted(p for p in sessions_dir.iterdir() if p.is_dir()):
-            ws.sessions.append(_parse_session(sd))
-    archive_dir = ws_dir / "archive"
-    if archive_dir.exists():
-        for ad in sorted(p for p in archive_dir.iterdir() if p.is_dir()):
-            m = _ARCHIVE_DIR_RE.match(ad.name)
-            archived_slug = m.group(1) if m else ad.name
-            sess = _parse_session(ad, slug=archived_slug)
-            sess.archived = True
-            ws.sessions.append(sess)
-    return ws
+    return World(root=root, docs=docs, edges=edges, ghosts=ghosts)

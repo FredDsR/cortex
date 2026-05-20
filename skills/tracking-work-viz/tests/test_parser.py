@@ -1,96 +1,99 @@
+"""Tests for the multi-typed parser."""
 from pathlib import Path
-from work_viz.parser import parse_workspace
-from work_viz.model import (
-    STATUS_IN_PROGRESS, STATUS_OPEN, STATUS_BLOCKED, STATUS_RESOLVED,
-)
+import pytest
+from work_viz.parser import parse_world
+from work_viz.model import DocId
 
 
-def test_enumerates_sessions_and_tasks(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    assert ws.slug == "demo"
-    assert ws.has_meta is True
-    sessions = [s for s in ws.sessions if not s.archived]
-    assert len(sessions) == 1
-    sess = sessions[0]
-    assert sess.slug == "feature-x"
-    assert len(sess.tasks) == 3
-    slugs = {t.slug for t in sess.tasks}
-    assert slugs == {"task-foo", "task-bar", "task-baz"}
+def test_parse_world_discovers_root(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert world.root.id.kind == "root"
+    assert "/" in world.docs
 
 
-def test_captures_task_body(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    foo = next(t for t in sess.tasks if t.slug == "task-foo")
-    assert "The foo task." in foo.body
-    assert foo.body.startswith("# Foo")
+def test_parse_world_discovers_workspaces(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert "demo-ws/" in world.docs
+    assert "other-ws/" in world.docs
+    assert "kb-ghosts-ws/" in world.docs
+    assert world.docs["demo-ws/"].id.kind == "workspace"
 
 
-def test_captures_summary_text(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    assert "# Session: Feature X" in sess.summary_text
-    assert sess.summary_meta.get("Github") == "example/demo"
+def test_parse_world_discovers_sessions(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert "demo-ws/alpha/" in world.docs
+    assert "demo-ws/beta/" in world.docs
+    assert "other-ws/zeta/" in world.docs
 
 
-def test_inline_fields_parsed(workspaces_root: Path):
-    """task-foo uses YAML frontmatter; parser must surface Title-Case keys."""
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    foo = next(t for t in sess.tasks if t.slug == "task-foo")
-    assert foo.inline_fields["Status"] == "In Progress"
-    assert foo.inline_fields["Started"] == "2026-04-20"
+def test_parse_world_discovers_tasks(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert "demo-ws/alpha/task/task-a" in world.docs
+    assert world.docs["demo-ws/alpha/task/task-a"].status == "Open"
 
 
-def test_frontmatter_keys_normalized_to_title_case(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    foo = next(t for t in sess.tasks if t.slug == "task-foo")
-    assert "status" not in foo.inline_fields  # raw lowercase keys not exposed
-    assert foo.body.startswith("# Foo")  # frontmatter stripped from body
+def test_parse_world_contains_edges(workspaces_root):
+    world = parse_world(workspaces_root)
+    contains = [e for e in world.edges if e.kind == "contains"]
+    sources = {e.source.canonical() for e in contains}
+    assert "/" in sources
+    assert "demo-ws/" in sources
+    assert "demo-ws/alpha/" in sources
 
 
-def test_legacy_bold_pair_still_parsed(workspaces_root: Path):
-    """task-bar uses the legacy bold-pair format. Must keep working."""
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    bar = next(t for t in sess.tasks if t.slug == "task-bar")
-    assert bar.inline_fields["Status"] == "Open"
+def test_typed_relations_from_body(workspaces_root):
+    world = parse_world(workspaces_root)
+    blocked = [e for e in world.edges if e.kind == "blocked"]
+    assert any(e.source.slug == "task-a" and e.target.slug == "task-b" for e in blocked)
 
 
-def test_status_from_summary_headings(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    by_slug = {t.slug: t.status for t in sess.tasks}
-    assert by_slug["task-foo"] == STATUS_IN_PROGRESS
-    assert by_slug["task-bar"] == STATUS_OPEN
-    assert by_slug["task-baz"] == STATUS_BLOCKED
+def test_related_to_cross_session(workspaces_root):
+    world = parse_world(workspaces_root)
+    related = [e for e in world.edges if e.kind == "related"]
+    assert any(
+        e.source.slug == "task-a" and e.target.session == "beta" and e.target.slug == "task-c"
+        for e in related
+    )
 
 
-def test_blocked_by_extracted(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    bar = next(t for t in sess.tasks if t.slug == "task-bar")
-    baz = next(t for t in sess.tasks if t.slug == "task-baz")
-    assert bar.blocked_by == ["task-foo"]
-    assert baz.blocked_by == ["task-foo", "task-bar"]
+def test_follows_cross_workspace(workspaces_root):
+    world = parse_world(workspaces_root)
+    follows = [e for e in world.edges if e.kind == "follows"]
+    assert any(
+        e.source.workspace == "demo-ws" and e.target.workspace == "other-ws"
+        and e.target.slug == "task-z"
+        for e in follows
+    )
 
 
-def test_active_agent_count(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    sess = next(s for s in ws.sessions if s.slug == "feature-x")
-    assert sess.active_agent_count == 2
+def test_mention_to_memory_does_not_create_ghost(workspaces_root):
+    world = parse_world(workspaces_root)
+    # No ghost docs are synthesized for unresolved targets.
+    assert "demo-ws/memory/architecture" not in world.docs
+    assert world.ghosts == set()
 
 
-def test_workspace_active_session_slugs(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    assert ws.active_session_slugs == ["feature-x"]
+def test_kb_ghosts_workspace_emits_no_ghost_nodes(workspaces_root):
+    world = parse_world(workspaces_root)
+    # The workspace and its session exist; the missing memory/workbench refs do not.
+    assert "kb-ghosts-ws/" in world.docs
+    assert "kb-ghosts-ws/solo/" in world.docs
+    assert "kb-ghosts-ws/memory/missing-note" not in world.docs
+    assert "kb-ghosts-ws/solo/workbench/draft-x" not in world.docs
 
 
-def test_archived_sessions_present(workspaces_root: Path):
-    ws = parse_workspace(workspaces_root, "demo")
-    archived = [s for s in ws.sessions if s.archived]
-    assert len(archived) == 1
-    s = archived[0]
-    assert s.slug == "old-feature"
-    assert s.archived is True
+def test_unresolved_edges_are_dropped(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert all(e.resolved for e in world.edges)
+    doc_ids = set(world.docs.keys())
+    for e in world.edges:
+        assert e.target.canonical() in doc_ids
+
+
+def test_no_duplicate_edges(workspaces_root):
+    world = parse_world(workspaces_root)
+    seen = set()
+    for e in world.edges:
+        key = (e.source.canonical(), e.target.canonical(), e.kind)
+        assert key not in seen
+        seen.add(key)

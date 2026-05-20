@@ -1,145 +1,458 @@
-"""Render an HTML viewer for a workspace.
-
-The output HTML inlines the parsed workspace data as JSON but loads
-Cytoscape, dagre, marked, and the first-party `app.js` / `app.css` from
-relative `vendor/` paths. `install.sh` populates `~/.work/viz/vendor/`
-with the third-party JS and copies the first-party assets there.
-"""
+"""Static-site generator: World -> filesystem under out_dir."""
 from __future__ import annotations
-import datetime as _dt
 import json
-import os
+import re
+import shutil
 import sys
-from dataclasses import asdict
 from pathlib import Path
+from typing import Optional
 
-from .parser import parse_workspace
+from .model import World, Doc, DocId, Edge
 
-
-def _safe_json_for_script_tag(obj) -> str:
-    """JSON-encode `obj` and escape sequences that could close a <script> tag.
-
-    A task body or workspace slug containing the literal `</script>` would
-    otherwise terminate the inline `<script>` block early and inject the
-    remaining content into the document. Replacing `</` with `<\\/` keeps
-    the value JSON-string-equivalent (JS unescapes `\\/` to `/`) while
-    preventing the parser from seeing a closing tag. We also escape U+2028
-    / U+2029 which are valid in JSON but illegal as raw characters in JS
-    string literals.
-    """
-    raw = json.dumps(obj, ensure_ascii=False)
-    return (raw
-            .replace("</", "<\\/")
-            .replace(" ", "\\u2028")
-            .replace(" ", "\\u2029"))
+_PACKAGE_DIR = Path(__file__).parent.parent
+_VENDOR_SRC = _PACKAGE_DIR / "templates" / "vendor"
+_SHELL_TEMPLATE = (_PACKAGE_DIR / "templates" / "shell.html").read_text(encoding="utf-8")
 
 
-_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
-DEFAULT_OUT_DIR = Path.home() / ".work" / "viz"
+def _stage_vendor(out_dir: Path) -> None:
+    vendor_out = out_dir / "vendor"
+    if vendor_out.exists():
+        shutil.rmtree(vendor_out)
+    shutil.copytree(_VENDOR_SRC, vendor_out)
 
 
-def _render(template_name: str, replacements: dict) -> str:
-    raw = (_TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
-    out = raw
-    for key, value in replacements.items():
-        out = out.replace(key, value)
-    return out
+def _doc_out_path(doc: Doc, out_dir: Path) -> Path:
+    cid = doc.id
+    base = out_dir / "workspaces" / cid.workspace if cid.workspace else out_dir
+    if cid.kind == "workspace":
+        return base / "index.md"
+    if cid.kind == "session":
+        return base / "sessions" / cid.session / "SUMMARY.md"
+    if cid.kind == "task":
+        return base / "sessions" / cid.session / "tasks" / f"{cid.slug}.md"
+    if cid.kind == "memory":
+        return base / "memory" / f"{cid.slug}.md"
+    if cid.kind == "workbench":
+        return base / "sessions" / cid.session / "workbench" / f"{cid.slug}.md"
+    if cid.kind == "root":
+        return out_dir / "index.md"
+    raise ValueError(f"unknown doc kind: {cid.kind!r}")
 
 
-def _list_workspace_slugs(workspaces_root: Path) -> list:
-    if not workspaces_root.is_dir():
-        return []
-    return sorted(p.name for p in workspaces_root.iterdir() if p.is_dir())
+def _copy_markdown(world: World, out_dir: Path) -> None:
+    for doc in world.docs.values():
+        if doc.ghost or doc.rel_path is None or doc.id.kind in ("root", "workspace"):
+            continue
+        # Sessions without a SUMMARY.md keep rel_path = session dir; skip those.
+        if not doc.rel_path.is_file():
+            continue
+        dest = _doc_out_path(doc, out_dir)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(doc.rel_path, dest)
 
 
-def generate_one_shot(workspaces_root: Path, slug: str, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
-    ws = parse_workspace(workspaces_root, slug)
-    data = asdict(ws)
-    # Embed sibling workspace slugs so the UI can render a switcher.
-    data["available_workspaces"] = _list_workspace_slugs(workspaces_root)
-    payload = _safe_json_for_script_tag(data)
-    html = _render("index.html", {
-        '"@@MODE@@"': '"static"',
-        "@@DATA@@": payload,
-    })
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{slug}.html"
-    out_path.write_text(html, encoding="utf-8")
-    return out_path
+def _copy_supplementary_md(world: World, out_dir: Path) -> None:
+    """Mirror any unindexed .md files inside session and memory directories so
+    relative links in author-authored markdown resolve. Indexed docs (SUMMARY,
+    tasks/*.md, workbench/*.md, memory/*.md) are already copied by
+    _copy_markdown; this pass picks up siblings like research/notes.md and
+    dated audit files."""
+    for doc in world.docs.values():
+        if doc.id.kind != "session" or doc.rel_path is None:
+            continue
+        sess_dir = doc.rel_path if doc.rel_path.is_dir() else doc.rel_path.parent
+        if not sess_dir.is_dir():
+            continue
+        out_sess = (out_dir / "workspaces" / doc.id.workspace
+                    / "sessions" / doc.id.session)
+        for md in sess_dir.rglob("*.md"):
+            rel = md.relative_to(sess_dir)
+            # Skip already-indexed flat children (SUMMARY, tasks/*.md, workbench/*.md).
+            if rel.name == "SUMMARY.md" and len(rel.parts) == 1:
+                continue
+            if rel.parts[0] in ("tasks", "workbench") and len(rel.parts) == 2:
+                continue
+            if rel.name == "index.md":
+                continue
+            dest = out_sess / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(md, dest)
+
+    for doc in world.docs.values():
+        if doc.id.kind != "workspace" or doc.rel_path is None:
+            continue
+        mem_dir = doc.rel_path / "memory"
+        if not mem_dir.is_dir():
+            continue
+        out_mem = out_dir / "workspaces" / doc.id.workspace / "memory"
+        for md in mem_dir.rglob("*.md"):
+            rel = md.relative_to(mem_dir)
+            if rel.name == "index.md":
+                continue
+            if len(rel.parts) == 1:
+                continue  # already copied by _copy_markdown
+            dest = out_mem / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(md, dest)
 
 
-def _summarize_one(workspaces_root: Path, ws_dir: Path) -> dict:
-    """Build the dashboard row for a single workspace. Raises on parse failure."""
-    slug = ws_dir.name
-    ws = parse_workspace(workspaces_root, slug)
-    active_sessions = [s for s in ws.sessions if not s.archived]
-    session_count = len(active_sessions)
-    all_tasks = [t for s in active_sessions for t in s.tasks]
-    task_count = len(all_tasks)
-    status_counts = {"in_progress": 0, "open": 0, "blocked": 0, "resolved": 0, "unknown": 0}
-    for t in all_tasks:
-        status_counts[t.status] = status_counts.get(t.status, 0) + 1
-    last_mtime = 0.0
-    for dp, _, fns in os.walk(ws_dir):
-        for fn in fns:
-            try:
-                mt = (Path(dp) / fn).stat().st_mtime
-                if mt > last_mtime:
-                    last_mtime = mt
-            except OSError:
-                pass
-    last_iso = (
-        _dt.datetime.fromtimestamp(last_mtime).strftime("%Y-%m-%d %H:%M")
-        if last_mtime else ""
-    )
+def _children_of(world: World, parent_canon: str, kind: str) -> list[Doc]:
+    out = []
+    for doc in world.docs.values():
+        if doc.ghost or doc.id.kind != kind:
+            continue
+        # Filter by parent
+        if kind == "workspace" and parent_canon == "/":
+            out.append(doc)
+        elif kind == "session" and doc.id.workspace and f"{doc.id.workspace}/" == parent_canon:
+            out.append(doc)
+        elif kind == "memory" and doc.id.workspace and f"{doc.id.workspace}/" == parent_canon:
+            out.append(doc)
+        elif kind == "task" and doc.id.workspace and doc.id.session and \
+             f"{doc.id.workspace}/{doc.id.session}/" == parent_canon:
+            out.append(doc)
+        elif kind == "workbench" and doc.id.workspace and doc.id.session and \
+             f"{doc.id.workspace}/{doc.id.session}/" == parent_canon:
+            out.append(doc)
+    return sorted(out, key=lambda d: d.id.canonical())
+
+
+def _emit_root_index(world: World, out_dir: Path) -> None:
+    workspaces = _children_of(world, "/", "workspace")
+    lines = ["# Fred's Work Tracking", "", "## Workspaces", ""]
+    for ws in workspaces:
+        lines.append(f"- [{ws.id.workspace}](workspaces/{ws.id.workspace}/index.html)")
+    lines.append("")
+    (out_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _emit_workspace_index(world: World, ws: Doc, out_dir: Path) -> None:
+    ws_dir = out_dir / "workspaces" / ws.id.workspace
+    ws_dir.mkdir(parents=True, exist_ok=True)
+    sessions = _children_of(world, ws.id.canonical(), "session")
+    memories = _children_of(world, ws.id.canonical(), "memory")
+    lines = [f"# {ws.id.workspace}", "",
+             "[<- Dashboard](../../index.html)", "",
+             f"## Sessions ({len(sessions)})", ""]
+    for s in sessions:
+        lines.append(f"- [{s.id.session}](sessions/{s.id.session}/index.html)")
+    lines.extend(["", f"## Memory ({len(memories)})", "",
+                  "[Open memory folder](memory/index.md)", ""])
+    (ws_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _emit_memory_index(world: World, ws: Doc, out_dir: Path) -> None:
+    mem_dir = out_dir / "workspaces" / ws.id.workspace / "memory"
+    mem_dir.mkdir(parents=True, exist_ok=True)
+    docs = _children_of(world, ws.id.canonical(), "memory")
+    lines = [f"# {ws.id.workspace} / memory", "",
+             "[<- Workspace](../index.html)", "",
+             f"## Memory docs ({len(docs)})", ""]
+    if not docs:
+        lines.append("_No memory docs yet._")
+    else:
+        for d in docs:
+            lines.append(f"- [{d.id.slug}]({d.id.slug}.md)")
+    (mem_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _emit_session_index(world: World, sess: Doc, out_dir: Path) -> None:
+    sess_dir = out_dir / "workspaces" / sess.id.workspace / "sessions" / sess.id.session
+    sess_dir.mkdir(parents=True, exist_ok=True)
+    parent_canon = sess.id.canonical()
+    tasks = _children_of(world, parent_canon, "task")
+    workbenches = _children_of(world, parent_canon, "workbench")
+    lines = [f"# {sess.id.session}", "",
+             f"_In workspace `{sess.id.workspace}`_", "",
+             "[<- Workspace](../../index.html)", "",
+             f"## Tasks ({len(tasks)})", ""]
+    if not tasks:
+        lines.append("_No tasks yet._")
+    else:
+        for t in tasks:
+            status = t.status or "(unstated)"
+            lines.append(f"- [{t.id.slug}](tasks/{t.id.slug}.md) - {status}")
+    lines.extend(["", f"## Workbench ({len(workbenches)})", ""])
+    if not workbenches:
+        lines.append("_No workbench docs yet._")
+    else:
+        for w in workbenches:
+            lines.append(f"- [{w.id.slug}](workbench/{w.id.slug}.md)")
+    if sess.body:
+        excerpt = sess.body.strip()[:400]
+        lines.extend(["", "## Summary excerpt", "", excerpt])
+    (sess_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _emit_workbench_index(world: World, sess: Doc, out_dir: Path) -> None:
+    wb_dir = out_dir / "workspaces" / sess.id.workspace / "sessions" / sess.id.session / "workbench"
+    wb_dir.mkdir(parents=True, exist_ok=True)
+    docs = _children_of(world, sess.id.canonical(), "workbench")
+    lines = [f"# {sess.id.session} / workbench", "",
+             "[<- Session](../index.html)", "",
+             f"## Workbench docs ({len(docs)})", ""]
+    if not docs:
+        lines.append("_No workbench docs yet._")
+    else:
+        for d in docs:
+            lines.append(f"- [{d.id.slug}]({d.id.slug}.md)")
+    (wb_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _emit_tasks_index(world: World, sess: Doc, out_dir: Path) -> None:
+    tasks_dir = out_dir / "workspaces" / sess.id.workspace / "sessions" / sess.id.session / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+    docs = _children_of(world, sess.id.canonical(), "task")
+    lines = [f"# {sess.id.session} / tasks", "",
+             "[<- Session](../index.html)", "",
+             f"## Tasks ({len(docs)})", ""]
+    if not docs:
+        lines.append("_No tasks yet._")
+    else:
+        for d in docs:
+            lines.append(f"- [{d.id.slug}]({d.id.slug}.md) - {d.status or '(unstated)'}")
+    (tasks_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _emit_all_indices(world: World, out_dir: Path) -> None:
+    _emit_root_index(world, out_dir)
+    for ws in _children_of(world, "/", "workspace"):
+        _emit_workspace_index(world, ws, out_dir)
+        _emit_memory_index(world, ws, out_dir)
+        for sess in _children_of(world, ws.id.canonical(), "session"):
+            _emit_session_index(world, sess, out_dir)
+            _emit_workbench_index(world, sess, out_dir)
+            _emit_tasks_index(world, sess, out_dir)
+
+
+def _content_path(cid: DocId) -> Optional[str]:
+    """Root-relative path to a doc's markdown content. The frontend prepends a
+    page-scope prefix derived from payload.rootHref before fetching."""
+    if cid.kind == "root":
+        return "index.md"
+    if cid.kind == "workspace":
+        return f"workspaces/{cid.workspace}/index.md"
+    if cid.kind == "session":
+        return f"workspaces/{cid.workspace}/sessions/{cid.session}/SUMMARY.md"
+    if cid.kind == "task":
+        return f"workspaces/{cid.workspace}/sessions/{cid.session}/tasks/{cid.slug}.md"
+    if cid.kind == "memory":
+        return f"workspaces/{cid.workspace}/memory/{cid.slug}.md"
+    if cid.kind == "workbench":
+        return f"workspaces/{cid.workspace}/sessions/{cid.session}/workbench/{cid.slug}.md"
+    return None
+
+
+def _node_dict(world: World, doc: Doc) -> dict:
+    cid = doc.id
+    if cid.kind == "workspace":
+        parent = "/"
+    elif cid.kind == "session":
+        parent = f"{cid.workspace}/"
+    elif cid.kind in ("task", "workbench"):
+        parent = f"{cid.workspace}/{cid.session}/"
+    elif cid.kind == "memory":
+        parent = f"{cid.workspace}/"
+    else:
+        parent = None
+    label = cid.slug or cid.session or cid.workspace or "root"
+    content_path = None if doc.ghost else _content_path(cid)
     return {
-        "slug": slug,
-        "session_count": session_count,
-        "task_count": task_count,
-        "last_updated": last_iso,
-        "last_mtime": last_mtime,
-        "agent_count": len(ws.active_session_slugs),
-        "status_counts": status_counts,
+        "id": cid.canonical(),
+        "label": label,
+        "kind": cid.kind,
+        "parent": parent,
+        "status": doc.status,
+        "ghost": doc.ghost,
+        "contentPath": content_path,
     }
 
 
-def _summarize(workspaces_root: Path) -> dict:
-    out: dict = {"workspaces": []}
-    if not workspaces_root.is_dir():
-        return out
-    for ws_dir in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
-        try:
-            out["workspaces"].append(_summarize_one(workspaces_root, ws_dir))
-        except Exception as exc:
-            # Don't let one corrupt workspace blow up the whole dashboard;
-            # surface it as a placeholder row so the user notices.
-            print(f"warning: failed to summarize {ws_dir.name}: {exc}", file=sys.stderr)
-            out["workspaces"].append({
-                "slug": ws_dir.name,
-                "session_count": 0,
-                "task_count": 0,
-                "last_updated": "",
-                "last_mtime": 0,
-                "agent_count": 0,
-                "status_counts": {"in_progress": 0, "open": 0, "blocked": 0, "resolved": 0, "unknown": 0},
-                "error": str(exc),
-            })
+def _edge_dict(e: Edge) -> dict:
+    return {
+        "source": e.source.canonical(),
+        "target": e.target.canonical(),
+        "kind": e.kind,
+        "resolved": e.resolved,
+    }
+
+
+def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], list[dict]]:
+    if scope == "root":
+        nodes = [_node_dict(world, d) for d in world.docs.values()]
+        edges = [_edge_dict(e) for e in world.edges]
+        return nodes, edges
+    if scope == "workspace":
+        ws = scope_id.rstrip("/")
+        in_scope = {cid for cid, d in world.docs.items()
+                    if d.id.workspace == ws or cid == "/"}
+    else:  # session
+        ws, sess = scope_id.rstrip("/").split("/", 1)
+        in_scope = {cid for cid, d in world.docs.items()
+                    if d.id.workspace == ws and d.id.session == sess}
+        in_scope.add(f"{ws}/")
+        in_scope.add("/")
+    neighbours: set[str] = set()
+    keep_edges = []
+    for e in world.edges:
+        s, t = e.source.canonical(), e.target.canonical()
+        if s in in_scope or t in in_scope:
+            keep_edges.append(e)
+            neighbours.add(s)
+            neighbours.add(t)
+    keep_ids = in_scope | neighbours
+    # Sort the keep_ids so payload node order is deterministic across builds
+    # (Python sets iterate in hash-randomized order otherwise).
+    nodes = [_node_dict(world, world.docs[cid]) for cid in sorted(keep_ids) if cid in world.docs]
+    edges = [_edge_dict(e) for e in keep_edges]
+    return nodes, edges
+
+
+def _global_wikilink_index(world: World) -> dict[str, str]:
+    """Map slug -> root-relative contentPath for every non-ghost doc with
+    content. First-seen wins; the world is iterated in dict order which is
+    insertion order from the parser pass-1."""
+    out: dict[str, str] = {}
+    for doc in world.docs.values():
+        if doc.ghost:
+            continue
+        path = _content_path(doc.id)
+        if not path:
+            continue
+        cid = doc.id
+        slug = cid.slug or cid.session or cid.workspace
+        if slug and slug not in out:
+            out[slug] = path
     return out
 
 
-def generate_dashboard(workspaces_root: Path, out_dir: Path = DEFAULT_OUT_DIR) -> Path:
-    summary = _summarize(workspaces_root)
+def _build_tree(world: World) -> list[dict]:
+    root_doc = world.docs.get("/")
+    root_node = {"id": "/", "label": "Fred's Work Tracking", "kind": "root",
+                 "scopeId": "/", "href": "index.html",
+                 "contentPath": _content_path(root_doc.id) if root_doc else "index.md",
+                 "children": []}
+    for ws in _children_of(world, "/", "workspace"):
+        ws_node = {
+            "id": ws.id.canonical(),
+            "scopeId": ws.id.canonical(),
+            "label": ws.id.workspace, "kind": "workspace",
+            "href": f"workspaces/{ws.id.workspace}/index.html",
+            "contentPath": _content_path(ws.id),
+            "children": [],
+        }
+        for sess in _children_of(world, ws.id.canonical(), "session"):
+            sess_node = {
+                "id": sess.id.canonical(),
+                "scopeId": sess.id.canonical(),
+                "label": sess.id.session, "kind": "session",
+                "href": f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/index.html",
+                "contentPath": _content_path(sess.id),
+                "children": [],
+            }
+            for t in _children_of(world, sess.id.canonical(), "task"):
+                sess_node["children"].append({
+                    "id": t.id.canonical(),
+                    "scopeId": t.id.canonical(),
+                    "label": t.id.slug, "kind": "task", "href": None,
+                    "contentPath": _content_path(t.id),
+                    "children": [],
+                })
+            ws_node["children"].append(sess_node)
+        root_node["children"].append(ws_node)
+    return [root_node]
+
+
+def _render_shell(scope: str, scope_id: str, payload: dict, vendor_rel: str,
+                  title: str, title_line: str, subtitle_line: str) -> str:
+    blob = json.dumps(payload, ensure_ascii=False)
+    html = _SHELL_TEMPLATE
+    html = html.replace("__TITLE__", title)
+    html = html.replace("__TITLE_LINE__", title_line)
+    html = html.replace("__SUBTITLE_LINE__", subtitle_line)
+    html = html.replace("__VENDOR__", vendor_rel)
+    html = html.replace("__ROOT_HREF__", payload.get("rootHref", "index.html"))
+    html = html.replace("__SCOPE_JSON__", blob)
+    return html
+
+
+def _vendor_rel(scope: str, scope_id: str) -> str:
+    if scope == "root":
+        return "vendor"
+    if scope == "workspace":
+        return "../../vendor"
+    return "../../../../vendor"  # session
+
+
+def _default_content_path(scope: str) -> str:
+    return "index.md"
+
+
+def _emit_html_pages(world: World, out_dir: Path) -> None:
+    wikilinks = _global_wikilink_index(world)
+    tree = _build_tree(world)
+    nodes, edges = _scope_filter(world, "root", "/")
+    payload = {
+        "scope": "root", "scopeId": "/", "rootHref": "index.html",
+        "tree": tree,
+        "nodes": nodes, "edges": edges,
+        "defaultContentPath": "index.md",
+        "wikilinks": wikilinks,
+    }
+    (out_dir / "index.html").write_text(
+        _render_shell("root", "/", payload, _vendor_rel("root", "/"),
+                      "Fred's Work Tracking",
+                      title_line="Fred's Work Tracking",
+                      subtitle_line="all workspaces"),
+        encoding="utf-8")
+
+    for ws in _children_of(world, "/", "workspace"):
+        ws_scope_id = ws.id.canonical()
+        nodes, edges = _scope_filter(world, "workspace", ws_scope_id)
+        payload = {
+            "scope": "workspace", "scopeId": ws_scope_id,
+            "rootHref": "../../index.html",
+            "tree": tree,
+            "nodes": nodes, "edges": edges,
+            "defaultContentPath": f"workspaces/{ws.id.workspace}/index.md",
+            "wikilinks": wikilinks,
+        }
+        ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
+        ws_html.write_text(
+            _render_shell("workspace", ws_scope_id, payload,
+                          _vendor_rel("workspace", ws_scope_id),
+                          ws.id.workspace,
+                          title_line=ws.id.workspace,
+                          subtitle_line="workspace"),
+            encoding="utf-8")
+        for sess in _children_of(world, ws_scope_id, "session"):
+            sess_scope_id = sess.id.canonical()
+            nodes, edges = _scope_filter(world, "session", sess_scope_id)
+            payload = {
+                "scope": "session", "scopeId": sess_scope_id,
+                "rootHref": "../../../../index.html",
+                "tree": tree,
+                "nodes": nodes, "edges": edges,
+                "defaultContentPath": (
+                    f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/SUMMARY.md"
+                ),
+                "wikilinks": wikilinks,
+            }
+            sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
+            sess_html.write_text(
+                _render_shell("session", sess_scope_id, payload,
+                              _vendor_rel("session", sess_scope_id),
+                              f"{sess.id.session} - {ws.id.workspace}",
+                              title_line=sess.id.session,
+                              subtitle_line=f"session in workspace {ws.id.workspace}"),
+                encoding="utf-8")
+
+
+def build(world: World, out_dir: Path) -> None:
+    out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    # Also generate per-workspace pages so dashboard links resolve.
-    for entry in summary["workspaces"]:
-        if entry.get("error"):
-            continue  # parse already failed; don't try to render the per-workspace page
-        try:
-            generate_one_shot(workspaces_root, entry["slug"], out_dir=out_dir)
-        except Exception as exc:
-            print(f"warning: failed to generate {entry['slug']}.html: {exc}", file=sys.stderr)
-    payload = _safe_json_for_script_tag(summary)
-    html = _render("dashboard.html", {"@@DATA@@": payload})
-    out_path = out_dir / "dashboard.html"
-    out_path.write_text(html, encoding="utf-8")
-    return out_path
+    _stage_vendor(out_dir)
+    _copy_markdown(world, out_dir)
+    _copy_supplementary_md(world, out_dir)
+    _emit_all_indices(world, out_dir)
+    _emit_html_pages(world, out_dir)

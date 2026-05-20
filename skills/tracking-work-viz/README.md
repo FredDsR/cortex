@@ -1,6 +1,6 @@
 # tracking-work-viz
 
-Browser-based viewer for `~/.work/workspaces/<slug>/`. Three panes: tree (workspace > session > task), Cytoscape graph (with blocker edges and status colors), rendered markdown content. Plus a cross-workspace dashboard with status proportion bars and aggregate counts.
+Static browser-based viewer for `~/.work/workspaces/`. Three panes (collapsible tree, hub-and-spoke Cytoscape graph, rendered markdown content) over a copied markdown tree. Read-only.
 
 ## Install
 
@@ -8,73 +8,86 @@ From the repo root:
 
     bash install.sh
 
-This symlinks `bin/work-viz` to `~/.work/bin/work-viz` and downloads four vendor JS files (Cytoscape, dagre, cytoscape-dagre, marked) into `vendor/`, then copies them plus first-party `app.js` / `app.css` to `~/.work/viz/vendor/`. Add `~/.work/bin` to your `PATH` if it isn't already.
+This symlinks `bin/work-viz` to `~/.work/bin/work-viz` and fetches four third-party JS files (Cytoscape, dagre, cytoscape-dagre, marked) into `skills/tracking-work-viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
 
 ## Usage
 
 ```text
-work-viz <slug>                    # generate ~/.work/viz/<slug>.html (one-shot)
-work-viz <slug> --watch            # per-workspace server with SSE hot reload
-work-viz --workspace=all           # one-shot dashboard + per-workspace pages
-work-viz serve                     # dashboard server with SSE hot reload
-work-viz <slug> --json             # parsed model as JSON (debugging)
-
-work-viz <slug> --out-dir _site    # write HTML somewhere other than ~/.work/viz
-work-viz <slug> --watch --port 8765 --no-open
+work-viz                                              # build + serve, opens browser
+work-viz build [WORKSPACES_ROOT] [--out OUT]          # static build only
+work-viz serve [OUT_DIR] [--host H] [--port P]        # serve an existing build
+work-viz serve [OUT_DIR] --no-open                    # skip browser auto-open
 ```
 
-Both side panes are individually collapsible via the topbar. The topbar also has a workspace switcher dropdown, a search input, and filters for "Hide closed" and "Show archive".
+`WORKSPACES_ROOT` defaults to `~/.work/workspaces/`. `OUT` and `OUT_DIR` default to `~/.cache/work-viz/out/`.
+
+The build is a folder you can browse via the bundled static server, via `python -m http.server`, or as a plain markdown wiki in any markdown viewer (Obsidian, etc.). Opening the HTML directly via `file://` works for navigation but the content pane's marked.js fetch requires a server.
 
 ## UI panes
 
-- **Tree** pane: workspace > session > task, with status pills, per-session agent badges, and ellipsis-truncated long names.
-- **Graph** pane: Cytoscape with dagre LR layout. Status-colored nodes, dashed red blocker edges. Auto-fits on resize and pane toggle.
-- **Content** pane: kicker + title + status pill header, key/value field grid, rendered markdown body. Intra-task links navigate inside the UI.
-- **Search**: substring filter against session and task slugs; tree and graph both update live.
-- **Idle workspaces** on the dashboard: workspaces with no in-progress / blocked / open work, no active agents, and >7 days since last edit fold under an "N idle workspaces" expander.
-- **Hot reload**: in `--watch` and `serve`, an injected SSE listener does `location.reload()` (serve) or hot-swap (watch) when files under the workspace tree change.
+- **Tree** (left): the full hierarchy from `Fred's Work Tracking` down to individual tasks. Workspaces and sessions are links; tasks, memory docs, and workbench docs load their `.md` into the content pane on click.
+- **Graph** (center): Cytoscape with dagre LR layout. Containment edges (root -> workspace -> session -> task) drawn as thin gray lines. Typed relations layered on top with colour. Ghost nodes (targets that did not resolve to a doc on disk) render with a dashed border and faded label.
+- **Content** (right): the .md content of whichever doc is selected, rendered via `marked.js`.
 
-## Publishing to GitHub Pages
+## Typed edge kinds
 
-`--out-dir` is intended for Pages workflows: `work-viz --workspace=all --out-dir _site` stages HTML + vendor in a build directory ready for `actions/upload-pages-artifact`. The published Pages site is a static snapshot; hot reload works only on the local `serve` mode.
+Four authored relation kinds plus auto-generated containment. Footer chips toggle visibility per kind; state is persisted in the URL fragment so reloads keep the same view.
 
-## When to use which mode
+| Kind        | Default | Colour     | Stroke      | Source        |
+|-------------|---------|------------|-------------|---------------|
+| `blocked`   | on      | red        | solid       | typed         |
+| `related`   | on      | mid-gray   | solid       | typed         |
+| `follows`   | on      | dark-gray  | dashed      | typed         |
+| `mentions`  | off     | light-blue | dotted      | inferred      |
+| `contains`  | on      | thin gray  | thin solid  | auto (always) |
 
-- `<slug>` (one-shot): you want an HTML file you can email or open later.
-- `<slug> --watch`: you're actively editing one workspace and want the viewer to stay in sync.
-- `--workspace=all`: snapshot of every workspace plus a dashboard, all static files.
-- `serve`: you want the dashboard open and the page to update automatically when ANY workspace changes. Also the right answer if your browser is snap-confined and can't read `file://` paths under `~/.work/`.
+## Addressing grammar
 
-## Output layout
+Authored references in task / memory / workbench body or frontmatter resolve against the referencing doc's location:
 
 ```
-~/.work/viz/
-├── dashboard.html            # cross-workspace overview (--workspace=all or serve)
-├── <workspace-slug>.html     # one per workspace
-└── vendor/                   # cytoscape, dagre, marked, app.js, app.css
+task-foo                            -> local task, current session
+memory/note                         -> memory doc in current workspace
+workbench/draft                     -> workbench doc in current session
+other-sess/task-bar                 -> task in sibling session, same workspace
+other-sess/workbench/draft          -> workbench in sibling session
+other-ws/memory/note                -> memory in another workspace
+other-ws/other-sess/task-baz        -> task across both boundaries
+other-ws/other-sess/workbench/foo   -> workbench across both boundaries
 ```
 
-`--out-dir <path>` overrides `~/.work/viz` for the generated HTML. Vendor assets must already exist under `<out-dir>/vendor/` (used by GitHub Actions workflows that stage Pages artifacts).
+`memory` and `workbench` are reserved keywords. They cannot be used as workspace or session slugs. A target whose canonical id parses cleanly but has no on-disk file becomes a ghost node. A target that fails the grammar entirely is preserved on the source node but does not render as an edge.
+
+## Output folder
+
+```
+<out>/
+  index.html, index.md
+  vendor/   (cytoscape, dagre, cytoscape-dagre, marked, app.js, app.css)
+  workspaces/<ws>/
+    index.html, index.md
+    memory/index.md
+    sessions/<sess>/
+      index.html, index.md, SUMMARY.md
+      workbench/index.md
+      tasks/index.md, <slug>.md
+```
+
+`<slug>.md` and `SUMMARY.md` are byte-for-byte copies of the source files in `~/.work/`. The HTML shells render whichever `.md` the user clicks via `marked.js`.
 
 ## Tests
 
 ```bash
 cd skills/tracking-work-viz
-uv run --with pytest python -m pytest -v
+uvx --with pyyaml pytest -v
 ```
 
-23 tests covering the parser, generator, CLI, watch-mode SSE, dashboard server, hot-reload script injection, path-traversal protection, and the script-tag JSON injection escape.
-
-## Security
-
-- Both servers bind to `127.0.0.1` only.
-- The `/vendor/<rel>` route validates resolved paths against the vendor base directory; `..` traversal returns 404.
-- Inlined JSON escapes `</` and the JS-illegal U+2028 / U+2029 characters, so workspace data containing `</script>` cannot break out of inline `<script>` blocks.
-- `/data.json` returns clean JSON error responses on parse failure rather than torn TCP connections.
-- `_summarize` isolates per-workspace failures so one corrupt workspace never aborts the whole dashboard.
+The suite covers the address grammar, parser (typed-relation extraction, mentions, ghost generation, cross-workspace resolution, code-fence skipping, edge dedup), generator (vendor staging, markdown copy, index.md emission per scope, HTML shell + JSON blob shape, scope filtering), the static server, and the CLI.
 
 ## Limitations
 
-- Watch mode hot-swaps data without a full page reload (preserves zoom/pan/selection); serve mode does `location.reload()` (simpler, drops UI state).
-- The workspace-level "focused session" marker (which session a given agent currently has selected) is not surfaced in the UI; only per-session agent counts appear.
-- Polling-based watcher does an `os.walk()` per second; fine for thousands of files, may be worth replacing with a fingerprint or `inotify` for tens-of-thousands.
+- Memory and workbench folders are first-class node kinds, but Spec A does not yet emit content into them. References to `memory/*` or `workbench/*` render as ghost nodes. Spec B fills in the read/write path.
+- No search across the world (Spec B).
+- No graph algorithm beyond dagre LR layout.
+- No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).
+- Opening `out/index.html` via `file://` works for graph + tree but the content pane needs a server because browsers block `fetch` on `file://`. Use `work-viz serve` or `python -m http.server` from inside `out/`.

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>__TITLE__</title>
+  <link rel="stylesheet" href="__VENDOR__/app.css">
+</head>
+<body>
+  <header id="appbar">
+    <div class="appbar-title">
+      <h1><a id="appbar-home" href="__ROOT_HREF__">__TITLE_LINE__</a></h1>
+      <div class="subtitle">__SUBTITLE_LINE__</div>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <span class="theme-icon theme-sun">☀</span>
+      <span class="theme-icon theme-moon">☾</span>
+      <span class="theme-knob"></span>
+    </button>
+  </header>
+  <main id="layout">
+    <aside id="tree"></aside>
+    <section id="graph"></section>
+    <div id="resizer-right" title="Drag to resize the content pane"></div>
+    <article id="content"></article>
+  </main>
+  <footer id="chips">
+    <div class="chip-group" id="edge-chips">
+      <button class="chip on" data-kind="blocked">Blocked</button>
+      <button class="chip on" data-kind="related">Related</button>
+      <button class="chip on" data-kind="follows">Follows</button>
+      <button class="chip" data-kind="mentions">Mentions</button>
+    </div>
+    <div class="chip-divider"></div>
+    <div class="chip-group" id="layout-toggle">
+      <button class="chip" data-layout="concentric-hier">Hierarchical</button>
+      <button class="chip" data-layout="cose">Organic</button>
+    </div>
+    <div class="chip-divider"></div>
+    <div class="chip-group">
+      <button class="chip" id="fit-all" title="Reset zoom to show every node">Fit all</button>
+      <button class="chip" id="toggle-graph" title="Hide / show the graph pane">Hide graph</button>
+    </div>
+  </footer>
+  <script id="__SCOPE__" type="application/json">__SCOPE_JSON__</script>
+  <script src="__VENDOR__/cytoscape.min.js"></script>
+  <script src="__VENDOR__/marked.min.js"></script>
+  <script src="__VENDOR__/app.js"></script>
+</body>
+</html>

@@ -75,6 +75,48 @@ branch:
 
 Legacy `**Field:** value` bold-pair format is still parsed by the viz, but new files should use frontmatter. Run `scripts/migrate_to_frontmatter.py --apply` once to convert legacy files in place.
 
+## Cross-task relations
+
+Task files can declare typed edges to other tasks. The viz reads these and renders them as typed graph edges.
+
+### Edge kinds
+
+- **Blocked by**: this task cannot proceed until the target is done. Red solid edge in the graph.
+- **Related to**: thematically linked, no dependency order. Gray solid edge.
+- **Follows**: this task starts after the target, but is not hard-blocked. Dashed edge.
+- **Mentions**: a task slug that appears in prose but was not declared as a typed relation. Dotted edge. Auto-detected; not written explicitly.
+
+### Addressing forms
+
+A target is one of:
+- `task-slug` -- resolves within the same session.
+- `session-slug/task-slug` -- resolves within the same workspace.
+- `ws-slug/session-slug/task-slug` -- fully qualified, resolves across workspaces.
+
+### Where edges may appear
+
+Body-line form (label followed by a colon, targets separated by commas):
+
+```
+Blocked by: [task-foo], [task-bar]
+Related to: session-a/task-baz
+Follows: task-prev
+```
+
+Frontmatter list form (keys `blocked_by`, `related_to`, `follows` only):
+
+```yaml
+blocked_by: [task-foo, task-bar]
+related_to: [session-a/task-baz]
+follows: [task-prev]
+```
+
+`mentions` is auto-detected from prose slugs and cannot be declared explicitly.
+
+### Ghost nodes
+
+If a target does not match any known task file, the viz still renders it as a ghost node: dashed border, faded label, `resolved=False` in the data model. Ghost nodes appear for cross-workspace targets in local mode and for genuinely missing tasks.
+
 ## `.meta` (global store only)
 
 Workspace registry record. See `slug-resolution.md` for fields.

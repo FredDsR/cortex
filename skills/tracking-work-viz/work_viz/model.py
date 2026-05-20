@@ -1,37 +1,77 @@
-"""Data model for parsed workspaces, sessions, and tasks."""
+"""Multi-typed graph model: every first-class doc is a node."""
+from __future__ import annotations
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
-STATUS_OPEN = "open"
-STATUS_IN_PROGRESS = "in_progress"
-STATUS_BLOCKED = "blocked"
-STATUS_RESOLVED = "resolved"
-STATUS_UNKNOWN = "unknown"
+STATUS_OPEN = "Open"
+STATUS_IN_PROGRESS = "In Progress"
+STATUS_BLOCKED = "Blocked"
+STATUS_RESOLVED = "Resolved"
+STATUS_UNKNOWN = None
 
-ALL_STATUSES = (STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED, STATUS_UNKNOWN)
+ALL_STATUSES = (STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED)
+
+NODE_KINDS = ("root", "workspace", "session", "task", "memory", "workbench")
+AUTHORED_EDGE_KINDS = ("blocked", "related", "follows", "mentions")
+ALL_EDGE_KINDS = AUTHORED_EDGE_KINDS + ("contains",)
+
+
+@dataclass(frozen=True)
+class DocId:
+    """Canonical identifier for any first-class node."""
+    kind: str
+    workspace: Optional[str] = None
+    session: Optional[str] = None
+    slug: Optional[str] = None
+
+    def canonical(self) -> str:
+        if self.kind == "root":
+            return "/"
+        if self.kind == "workspace":
+            return f"{self.workspace}/"
+        if self.kind == "session":
+            return f"{self.workspace}/{self.session}/"
+        if self.kind == "task":
+            return f"{self.workspace}/{self.session}/task/{self.slug}"
+        if self.kind == "memory":
+            return f"{self.workspace}/memory/{self.slug}"
+        if self.kind == "workbench":
+            return f"{self.workspace}/{self.session}/workbench/{self.slug}"
+        raise ValueError(f"unknown DocId kind: {self.kind!r}")
+
+
+@dataclass(frozen=True)
+class RawEdge:
+    """An authored relation before address resolution."""
+    kind: str
+    raw_target: str
 
 
 @dataclass
-class Task:
-    slug: str
-    body: str = ""
-    inline_fields: dict = field(default_factory=dict)
-    blocked_by: list = field(default_factory=list)
-    status: str = STATUS_UNKNOWN
+class Doc:
+    id: DocId
+    title: str
+    body: str
+    frontmatter: dict
+    rel_path: Optional[Path]
+    edges_out: list = field(default_factory=list)
+    ghost: bool = False
+    status: Optional[str] = None
 
 
 @dataclass
-class Session:
-    slug: str
-    summary_text: str = ""
-    summary_meta: dict = field(default_factory=dict)
-    active_agent_count: int = 0
-    archived: bool = False
-    tasks: list = field(default_factory=list)
+class Edge:
+    source: DocId
+    target: DocId
+    raw_target: str
+    kind: str
+    resolved: bool = True
 
 
 @dataclass
-class Workspace:
-    slug: str
-    has_meta: bool = False
-    active_session_slugs: list = field(default_factory=list)
-    sessions: list = field(default_factory=list)
+class World:
+    root: Doc
+    docs: dict
+    edges: list = field(default_factory=list)
+    ghosts: set = field(default_factory=set)
