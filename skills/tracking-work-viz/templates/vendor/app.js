@@ -571,8 +571,10 @@
 
   function applyLayout(cy, payload, name) {
     if (name === 'cose') {
+      // randomize:false → start from current positions (preset from
+      // hierarchical, or last cose result) so each run is reproducible.
       cy.layout({
-        name: 'cose', animate: false,
+        name: 'cose', animate: false, randomize: false,
         nodeRepulsion: 14000, idealEdgeLength: 80, edgeElasticity: 100,
         gravity: 0.2, numIter: 2000, padding: 30,
       }).run();

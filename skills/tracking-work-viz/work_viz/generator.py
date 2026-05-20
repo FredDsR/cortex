@@ -301,7 +301,9 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
             neighbours.add(s)
             neighbours.add(t)
     keep_ids = in_scope | neighbours
-    nodes = [_node_dict(world, world.docs[cid]) for cid in keep_ids if cid in world.docs]
+    # Sort the keep_ids so payload node order is deterministic across builds
+    # (Python sets iterate in hash-randomized order otherwise).
+    nodes = [_node_dict(world, world.docs[cid]) for cid in sorted(keep_ids) if cid in world.docs]
     edges = [_edge_dict(e) for e in keep_edges]
     return nodes, edges
 
