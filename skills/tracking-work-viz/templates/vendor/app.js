@@ -9,6 +9,25 @@
   var SIBLING_GAP_FRAC = 0.28;
   var MAX_LABEL_CHARS = 22;
 
+  // Green checkmark badge painted on top of resolved task nodes. SVG inlined
+  // as a base64 data URI for two reasons: (1) Cytoscape's image loader
+  // rejects partially-escaped utf8 SVG payloads (bare `<`, `>`, quotes choke
+  // it), and (2) the SVG MUST declare intrinsic width/height attributes, not
+  // just viewBox — without them the browser reports naturalWidth=150 and
+  // Cytoscape's positioning math at sub-node sizes produces nothing visible.
+  var RESOLVED_BADGE_SVG =
+      "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
+    + "<circle cx='12' cy='12' r='11' fill='#22a06b' stroke='white' stroke-width='1.5'/>"
+    + "<path d='M7 12.5l3.2 3.2L17 9' stroke='white' stroke-width='2.8'"
+    + " fill='none' stroke-linecap='round' stroke-linejoin='round'/>"
+    + "</svg>";
+  var RESOLVED_BADGE_SRC = "data:image/svg+xml;base64," + btoa(RESOLVED_BADGE_SVG);
+
+  function isResolved(status) {
+    if (!status || typeof status !== 'string') return false;
+    return /^resolved\b/i.test(status.trim());
+  }
+
   function parsePayload() {
     var node = document.getElementById('__SCOPE__');
     if (!node) throw new Error('missing __SCOPE__ payload');
@@ -93,6 +112,7 @@
       var el = document.createElement('span');
       el.className = 'tree-node kind-' + n.kind;
       if (n.id === scopeId) el.classList.add('current');
+      if (isResolved(n.status)) el.classList.add('resolved');
       el.textContent = n.label;
       el.dataset.id = n.id;
       el.dataset.kind = n.kind;
@@ -366,9 +386,11 @@
     }
     if (kind === 'root') {
       s['background-color'] = '#1f2933'; s['color'] = '#fff';
-      s['width'] = 86; s['height'] = 86; s['font-size'] = 14;
+      s['width'] = 120; s['height'] = 120; s['font-size'] = 16;
       s['text-valign'] = 'center'; s['text-margin-y'] = 0;
       s['text-background-opacity'] = 0;
+      s['text-wrap'] = 'wrap';
+      s['text-max-width'] = '100px';
       s['font-weight'] = 700;
       s['border-width'] = 0;
     }
@@ -396,7 +418,7 @@
     // share a soft pastel, all sessions in a workspace are distinct hues, and
     // tasks of different sessions in the same workspace are visually grouped.
     var dark = isDark();
-    if (node.kind === 'root') return dark ? '#0c1119' : '#1f2933';
+    if (node.kind === 'root') return dark ? '#5a6884' : '#1f2933';
     var key;
     if (node.kind === 'workspace') key = node.id.replace(/\/$/, '');
     else key = (node.id.split('/').slice(0, 2).join('/'));
@@ -425,16 +447,23 @@
           'text-background-color': dark ? '#1a212c' : '#ffffff',
         })
       .selector('node[kind="root"]')
-        .style({ 'color': '#ffffff', 'border-width': 0 })
+        .style({ 'color': '#ffffff', 'border-width': 0,
+                 'background-color': dark ? '#5a6884' : '#1f2933' })
       .selector('edge[kind="contains"]')
-        .style({ 'line-color': dark ? '#2c3548' : '#dde2e8',
-                 'opacity': dark ? 0.55 : 0.4 })
+        .style({ 'line-color': dark ? '#6b7790' : '#8a929c',
+                 'opacity': dark ? 0.75 : 0.7 })
       .selector('edge[kind="related"]')
-        .style({ 'line-color': dark ? '#9aa4b5' : '#5a6573',
-                 'target-arrow-color': dark ? '#9aa4b5' : '#5a6573' })
+        .style({ 'line-color': dark ? '#c8d0de' : '#3a4250',
+                 'target-arrow-color': dark ? '#c8d0de' : '#3a4250' })
       .selector('edge[kind="follows"]')
-        .style({ 'line-color': dark ? '#cad2dd' : '#1f2933',
-                 'target-arrow-color': dark ? '#cad2dd' : '#1f2933' })
+        .style({ 'line-color': dark ? '#e6ecf5' : '#1f2933',
+                 'target-arrow-color': dark ? '#e6ecf5' : '#1f2933' })
+      .selector('edge[kind="blocked"]')
+        .style({ 'line-color': dark ? '#ff6a5e' : '#c62828',
+                 'target-arrow-color': dark ? '#ff6a5e' : '#c62828' })
+      .selector('edge[kind="mentions"]')
+        .style({ 'line-color': dark ? '#5cb0ff' : '#0f5cb5',
+                 'target-arrow-color': dark ? '#5cb0ff' : '#0f5cb5' })
       .selector('node.selected')
         .style({
           'border-color': dark ? '#7bbfff' : '#1f7ae0',
@@ -462,12 +491,15 @@
     var archivedIds = new Set();
     payload.nodes.forEach(function (n) {
       if (n.archived) archivedIds.add(n.id);
+      var cls = [];
+      if (n.archived) cls.push('archived');
+      if (isResolved(n.status)) cls.push('resolved');
       elements.push({ group: 'nodes',
                       data: { id: n.id, label: shortenLabel(n.label),
                               fullLabel: n.label, kind: n.kind,
                               contentPath: n.contentPath,
                               tint: tintForNode(n) },
-                      classes: n.archived ? 'archived' : '' });
+                      classes: cls.join(' ') });
     });
     payload.edges.forEach(function (e) {
       var touchesArchived = archivedIds.has(e.source) || archivedIds.has(e.target);
@@ -517,6 +549,22 @@
       'opacity': 0.55, 'border-style': 'dashed', 'font-style': 'italic' } });
     styles.push({ selector: 'edge.archived', style: { 'opacity': 0.4, 'line-style': 'dashed' } });
     styles.push({ selector: '.hidden-archived', style: { 'display': 'none' } });
+    // Resolved: green checkmark badge in the top-right of the node. Sits over
+    // the per-kind tint without changing the fill, so resolved nodes stay
+    // grouped by hue but read as "done" at a glance. Stacks cleanly with
+    // .archived (dashed/muted + badge) when a closed session contains a
+    // resolved task.
+    styles.push({ selector: 'node.resolved', style: {
+      'background-image': RESOLVED_BADGE_SRC,
+      'background-fit': 'none',
+      'background-image-containment': 'over',
+      'background-clip': 'none',
+      'background-width': '14px',
+      'background-height': '14px',
+      'background-position-x': '95%',
+      'background-position-y': '5%',
+      'background-image-opacity': 1,
+    } });
 
     var cy = cytoscape({
       container: document.getElementById('graph'),
