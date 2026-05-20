@@ -505,14 +505,28 @@
     function setContentWidth(w) {
       var clamped = Math.max(240, Math.min(window.innerWidth - 400, w));
       STORE.contentWidth = clamped;
+      var cy = STORE.cy;
+      // Capture the world-coordinate point currently at the viewport center
+      // BEFORE the container changes size, so we can pan after the resize to
+      // keep the same view (no drift, no jump to selected node).
+      var preCenterWorld = null;
+      if (cy) {
+        var z = cy.zoom();
+        var pan = cy.pan();
+        preCenterWorld = {
+          x: (cy.width() / 2 - pan.x) / z,
+          y: (cy.height() / 2 - pan.y) / z,
+        };
+      }
       layout.style.gridTemplateColumns = '260px 1fr 6px ' + clamped + 'px';
-      if (STORE.cy) {
-        STORE.cy.resize();
-        // Re-center the selected node so it stays visible as the graph
-        // viewport reflows. Pan only; zoom is preserved.
-        if (STORE.selectedId) {
-          var n = STORE.cy.getElementById(STORE.selectedId);
-          if (n && n.length) STORE.cy.center(n);
+      if (cy) {
+        cy.resize();
+        if (preCenterWorld) {
+          var z2 = cy.zoom();
+          cy.pan({
+            x: cy.width() / 2 - preCenterWorld.x * z2,
+            y: cy.height() / 2 - preCenterWorld.y * z2,
+          });
         }
       }
     }
