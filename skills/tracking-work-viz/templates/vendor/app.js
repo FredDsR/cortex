@@ -419,6 +419,11 @@
       .selector('edge[kind="follows"]')
         .style({ 'line-color': dark ? '#cad2dd' : '#1f2933',
                  'target-arrow-color': dark ? '#cad2dd' : '#1f2933' })
+      .selector('node.selected')
+        .style({
+          'border-color': dark ? '#7bbfff' : '#1f7ae0',
+          'shadow-color': dark ? '#7bbfff' : '#1f7ae0',
+        })
       .update();
   }
 
@@ -462,26 +467,24 @@
       'border-color': '#1f7ae0',
       'border-width': 2,
     } });
-    // Selected (currently shown in the content pane): soft accent glow.
-    // Uses a Gaussian shadow rather than an overlay rectangle so the halo
-    // follows the node's ellipse shape and feels lit rather than fenced.
+    // Selected (currently shown in the content pane): bright accent glow.
+    // Uses a Gaussian shadow so the halo follows the node's ellipse shape.
+    // Theme-aware: applyCyTheme overrides border/shadow color per theme.
     styles.push({ selector: 'node.selected', style: {
       'z-index': 100,
       'border-color': '#1f7ae0',
-      'border-width': 2,
+      'border-width': 2.5,
       'border-opacity': 1,
-      'shadow-blur': 24,
+      'shadow-blur': 28,
       'shadow-color': '#1f7ae0',
-      'shadow-opacity': 0.55,
+      'shadow-opacity': 0.85,
       'shadow-offset-x': 0,
       'shadow-offset-y': 0,
     } });
-    // Hover wins when hovering the selected node: stronger glow + thicker
-    // border so the interaction stays visible.
     styles.push({ selector: 'node.selected.hovered', style: {
-      'border-width': 2.5,
-      'shadow-blur': 28,
-      'shadow-opacity': 0.7,
+      'border-width': 3,
+      'shadow-blur': 34,
+      'shadow-opacity': 0.95,
     } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
