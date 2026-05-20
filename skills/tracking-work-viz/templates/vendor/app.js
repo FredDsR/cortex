@@ -305,11 +305,17 @@
     styles.push({ selector: 'node.hovered', style: { 'z-index': 99,
                                                       'border-color': '#1f7ae0',
                                                       'border-width': 2.5 } });
-    // Selected (currently shown in the content pane): persistent ring.
-    styles.push({ selector: 'node.selected', style: { 'z-index': 100,
-                                                       'border-color': '#1f7ae0',
-                                                       'border-width': 3,
-                                                       'border-opacity': 1 } });
+    // Selected (currently shown in the content pane): blue halo + thick ring.
+    styles.push({ selector: 'node.selected', style: {
+      'z-index': 100,
+      'border-color': '#1f7ae0',
+      'border-width': 4,
+      'border-opacity': 1,
+      'overlay-color': '#1f7ae0',
+      'overlay-padding': 10,
+      'overlay-opacity': 0.18,
+    } });
+    styles.push({ selector: 'node.selected:active', style: { 'overlay-opacity': 0.18 } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
     });
