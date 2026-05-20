@@ -546,6 +546,12 @@
       document.body.classList.add('resizing');
       ev.preventDefault();
     });
+    resizer.addEventListener('dblclick', function (ev) {
+      // Reset to default content width (matches the initial CSS grid value).
+      ev.preventDefault();
+      setContentWidth(380);
+      updateFragment({ cw: null });
+    });
     document.addEventListener('mousemove', function (ev) {
       if (!dragging) return;
       var dx = ev.clientX - startX;
