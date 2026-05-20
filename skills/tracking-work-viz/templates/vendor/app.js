@@ -414,23 +414,25 @@
       'border-width': 2,
     } });
     // Selected (currently shown in the content pane): soft accent glow.
-    // Two-layer effect: thin border for crisp definition + larger, softer
-    // overlay halo so the node feels lit rather than fenced.
+    // Uses a Gaussian shadow rather than an overlay rectangle so the halo
+    // follows the node's ellipse shape and feels lit rather than fenced.
     styles.push({ selector: 'node.selected', style: {
       'z-index': 100,
       'border-color': '#1f7ae0',
       'border-width': 2,
       'border-opacity': 1,
-      'overlay-color': '#1f7ae0',
-      'overlay-padding': 18,
-      'overlay-opacity': 0.12,
+      'shadow-blur': 24,
+      'shadow-color': '#1f7ae0',
+      'shadow-opacity': 0.55,
+      'shadow-offset-x': 0,
+      'shadow-offset-y': 0,
     } });
-    styles.push({ selector: 'node.selected:active', style: { 'overlay-opacity': 0.12 } });
-    // Hover wins when hovering the selected node: keep halo, add a brighter
-    // border so it's visibly clickable.
+    // Hover wins when hovering the selected node: stronger glow + thicker
+    // border so the interaction stays visible.
     styles.push({ selector: 'node.selected.hovered', style: {
       'border-width': 2.5,
-      'overlay-opacity': 0.16,
+      'shadow-blur': 28,
+      'shadow-opacity': 0.7,
     } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
