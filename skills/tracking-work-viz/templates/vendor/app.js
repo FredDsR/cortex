@@ -95,31 +95,73 @@
     rootNodes.forEach(function (n) { rec(n, ul, 0); });
     aside.appendChild(ul);
 
-    // Stepwise depth controller. visibleDepth = deepest level shown.
-    //   0 = only root visible (root li collapsed)
-    //   1 = root + workspaces       (workspace lis collapsed)
-    //   2 = + sessions              (session lis collapsed)
-    //   3 = + tasks (fully expanded)
+    // Stepwise depth controller. The buttons are asymmetric to match how a
+    // user mentally navigates a tree:
+    //   + raises everyone to (min visible depth + 1) — open closed branches,
+    //     even at the cost of collapsing deeper branches that were further
+    //     open, because the user is asking for a uniform view at the next
+    //     level.
+    //   - lowers only the deepest visible level by 1 — close just the
+    //     deepest branches, leave shallower branches alone.
     STORE.treeMaxDepth = maxDepth;
-    if (typeof STORE.treeDepth !== 'number') STORE.treeDepth = maxDepth;
-    function applyDepth() {
+
+    function isVisibleLi(li) {
+      var p = li.parentElement;
+      while (p && p !== aside) {
+        if (p.tagName === 'LI' && p.classList.contains('collapsed')) return false;
+        p = p.parentElement;
+      }
+      return true;
+    }
+    function visibleHasChildren() {
+      return Array.from(aside.querySelectorAll('li.has-children')).filter(isVisibleLi);
+    }
+    function setUniformDepth(target) {
       aside.querySelectorAll('li.has-children').forEach(function (li) {
         var d = parseInt(li.dataset.depth, 10);
-        if (d >= STORE.treeDepth) li.classList.add('collapsed');
+        if (d >= target) li.classList.add('collapsed');
         else li.classList.remove('collapsed');
       });
-      var label = document.getElementById('tree-depth-label');
-      if (label) label.textContent = STORE.treeDepth + ' / ' + STORE.treeMaxDepth;
+      updateDepthLabel();
     }
-    applyDepth();
+    function stepExpand() {
+      var coll = visibleHasChildren().filter(function (li) { return li.classList.contains('collapsed'); });
+      if (coll.length === 0) return;
+      var minD = Math.min.apply(null, coll.map(function (li) { return parseInt(li.dataset.depth, 10); }));
+      setUniformDepth(minD + 1);
+    }
+    function stepCollapse() {
+      var open = visibleHasChildren().filter(function (li) { return !li.classList.contains('collapsed'); });
+      if (open.length === 0) return;
+      var maxD = Math.max.apply(null, open.map(function (li) { return parseInt(li.dataset.depth, 10); }));
+      open.forEach(function (li) {
+        if (parseInt(li.dataset.depth, 10) === maxD) li.classList.add('collapsed');
+      });
+      updateDepthLabel();
+    }
+    function updateDepthLabel() {
+      var label = document.getElementById('tree-depth-label');
+      if (!label) return;
+      // Effective visible depth per branch = depth of first .collapsed ancestor,
+      // or treeMaxDepth if fully open. Show min-max range when they differ.
+      var hc = visibleHasChildren();
+      var openDepths = hc.filter(function (li) { return !li.classList.contains('collapsed'); })
+                          .map(function (li) { return parseInt(li.dataset.depth, 10) + 1; });
+      var collDepths = hc.filter(function (li) { return li.classList.contains('collapsed'); })
+                          .map(function (li) { return parseInt(li.dataset.depth, 10); });
+      var maxV = openDepths.length ? Math.max.apply(null, openDepths) : 0;
+      var minV = collDepths.length ? Math.min.apply(null, collDepths) : maxV;
+      // If every branch is fully expanded, both equal treeMaxDepth.
+      if (collDepths.length === 0) minV = maxV;
+      label.textContent = (minV === maxV)
+        ? minV + ' / ' + STORE.treeMaxDepth
+        : minV + '–' + maxV + ' / ' + STORE.treeMaxDepth;
+    }
+    updateDepthLabel();
     toolbar.querySelectorAll('.tree-toolbtn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        if (btn.dataset.cmd === 'expand') {
-          STORE.treeDepth = Math.min(STORE.treeMaxDepth, STORE.treeDepth + 1);
-        } else {
-          STORE.treeDepth = Math.max(0, STORE.treeDepth - 1);
-        }
-        applyDepth();
+        if (btn.dataset.cmd === 'expand') stepExpand();
+        else stepCollapse();
       });
     });
   }
