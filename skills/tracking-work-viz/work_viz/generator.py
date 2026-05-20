@@ -256,6 +256,11 @@ def _node_dict(world: World, doc: Doc) -> dict:
     else:
         parent = None
     label = cid.slug or cid.session or cid.workspace or "root"
+    # Strip the YYYY-MM-DD- prefix that archived session dirs use, so the
+    # tree shows a readable name; the canonical id still embeds the prefix.
+    if doc.archived and cid.kind == "session" and label:
+        import re as _re
+        label = _re.sub(r"^\d{4}-\d{2}-\d{2}-", "", label)
     content_path = None if doc.ghost else _content_path(cid)
     return {
         "id": cid.canonical(),
@@ -264,6 +269,7 @@ def _node_dict(world: World, doc: Doc) -> dict:
         "parent": parent,
         "status": doc.status,
         "ghost": doc.ghost,
+        "archived": doc.archived,
         "contentPath": content_path,
     }
 
@@ -310,27 +316,39 @@ def _scope_filter(world: World, scope: str, scope_id: str) -> tuple[list[dict], 
 
 def _global_wikilink_index(world: World) -> dict[str, str]:
     """Map slug -> root-relative contentPath for every non-ghost doc with
-    content. First-seen wins; the world is iterated in dict order which is
-    insertion order from the parser pass-1."""
+    content. Live docs are indexed first so they win on slug collisions with
+    archived ones; archived sessions also get an alias under their
+    stripped-date slug so [[task-graph]] still resolves to the closed session
+    when no live one exists by that name."""
+    import re as _re
     out: dict[str, str] = {}
-    for doc in world.docs.values():
-        if doc.ghost:
-            continue
-        path = _content_path(doc.id)
-        if not path:
-            continue
-        cid = doc.id
-        slug = cid.slug or cid.session or cid.workspace
-        if slug and slug not in out:
-            out[slug] = path
+    def _index_pass(predicate):
+        for doc in world.docs.values():
+            if doc.ghost or not predicate(doc):
+                continue
+            path = _content_path(doc.id)
+            if not path:
+                continue
+            cid = doc.id
+            slug = cid.slug or cid.session or cid.workspace
+            if slug and slug not in out:
+                out[slug] = path
+            if doc.archived and cid.kind == "session":
+                alias = _re.sub(r"^\d{4}-\d{2}-\d{2}-", "", slug or "")
+                if alias and alias != slug and alias not in out:
+                    out[alias] = path
+    _index_pass(lambda d: not d.archived)
+    _index_pass(lambda d: d.archived)
     return out
 
 
 def _build_tree(world: World) -> list[dict]:
+    import re as _re
     root_doc = world.docs.get("/")
     root_node = {"id": "/", "label": "Fred's Work Tracking", "kind": "root",
                  "scopeId": "/", "href": "index.html",
                  "contentPath": _content_path(root_doc.id) if root_doc else "index.md",
+                 "archived": False,
                  "children": []}
     for ws in _children_of(world, "/", "workspace"):
         ws_node = {
@@ -339,15 +357,20 @@ def _build_tree(world: World) -> list[dict]:
             "label": ws.id.workspace, "kind": "workspace",
             "href": f"workspaces/{ws.id.workspace}/index.html",
             "contentPath": _content_path(ws.id),
+            "archived": False,
             "children": [],
         }
         for sess in _children_of(world, ws.id.canonical(), "session"):
+            sess_label = sess.id.session or ""
+            if sess.archived:
+                sess_label = _re.sub(r"^\d{4}-\d{2}-\d{2}-", "", sess_label)
             sess_node = {
                 "id": sess.id.canonical(),
                 "scopeId": sess.id.canonical(),
-                "label": sess.id.session, "kind": "session",
+                "label": sess_label, "kind": "session",
                 "href": f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/index.html",
                 "contentPath": _content_path(sess.id),
+                "archived": sess.archived,
                 "children": [],
             }
             for t in _children_of(world, sess.id.canonical(), "task"):
@@ -356,6 +379,7 @@ def _build_tree(world: World) -> list[dict]:
                     "scopeId": t.id.canonical(),
                     "label": t.id.slug, "kind": "task", "href": None,
                     "contentPath": _content_path(t.id),
+                    "archived": t.archived,
                     "children": [],
                 })
             ws_node["children"].append(sess_node)

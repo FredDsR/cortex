@@ -198,6 +198,17 @@ body.resizing { cursor: col-resize !important; user-select: none; }
 #tree > ul { padding-left: 0; }
 #tree li { margin: 1px 0; }
 #tree li.collapsed > ul { display: none; }
+/* Archived: hidden by default; revealed (muted) when body.show-archived. */
+#tree li.archived { display: none; }
+body.show-archived #tree li.archived { display: block; }
+body.show-archived #tree li.archived > .tree-row .tree-node {
+  opacity: 0.65;
+  font-style: italic;
+}
+/* Container rows (workspace, session) where every descendant is archived: hide
+   the container too when archived is off, otherwise it sits empty. */
+#tree li.all-children-archived { display: none; }
+body.show-archived #tree li.all-children-archived { display: block; }
 
 .tree-row {
   display: flex;
