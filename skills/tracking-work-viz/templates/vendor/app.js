@@ -407,22 +407,31 @@
     ['root','workspace','session','task','memory','workbench'].forEach(function (k) {
       styles.push({ selector: 'node[kind="' + k + '"]', style: nodeStyleByKind(k) });
     });
-    // Hover highlight: lifted to top, accented border. Labels stay visible
-    // at all times so we don't toggle text-opacity here.
-    styles.push({ selector: 'node.hovered', style: { 'z-index': 99,
-                                                      'border-color': '#1f7ae0',
-                                                      'border-width': 2.5 } });
-    // Selected (currently shown in the content pane): blue halo + thick ring.
+    // Hover highlight: subtle accent border, no halo.
+    styles.push({ selector: 'node.hovered', style: {
+      'z-index': 99,
+      'border-color': '#1f7ae0',
+      'border-width': 2,
+    } });
+    // Selected (currently shown in the content pane): soft accent glow.
+    // Two-layer effect: thin border for crisp definition + larger, softer
+    // overlay halo so the node feels lit rather than fenced.
     styles.push({ selector: 'node.selected', style: {
       'z-index': 100,
       'border-color': '#1f7ae0',
-      'border-width': 4,
+      'border-width': 2,
       'border-opacity': 1,
       'overlay-color': '#1f7ae0',
-      'overlay-padding': 10,
-      'overlay-opacity': 0.18,
+      'overlay-padding': 18,
+      'overlay-opacity': 0.12,
     } });
-    styles.push({ selector: 'node.selected:active', style: { 'overlay-opacity': 0.18 } });
+    styles.push({ selector: 'node.selected:active', style: { 'overlay-opacity': 0.12 } });
+    // Hover wins when hovering the selected node: keep halo, add a brighter
+    // border so it's visibly clickable.
+    styles.push({ selector: 'node.selected.hovered', style: {
+      'border-width': 2.5,
+      'overlay-opacity': 0.16,
+    } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
     });
