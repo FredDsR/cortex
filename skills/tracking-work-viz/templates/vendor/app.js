@@ -447,7 +447,8 @@
           'text-background-color': dark ? '#1a212c' : '#ffffff',
         })
       .selector('node[kind="root"]')
-        .style({ 'color': '#ffffff', 'border-width': 0 })
+        .style({ 'color': '#ffffff', 'border-width': 0,
+                 'background-color': dark ? '#5a6884' : '#1f2933' })
       .selector('edge[kind="contains"]')
         .style({ 'line-color': dark ? '#6b7790' : '#8a929c',
                  'opacity': dark ? 0.75 : 0.7 })
