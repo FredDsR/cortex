@@ -478,11 +478,20 @@
     if (!layout) return;
     if (hidden) {
       layout.classList.add('graph-hidden');
+      // Clear any inline grid-template-columns from the resizer so the
+      // .graph-hidden CSS rule (260px 0 6px minmax(0,1fr)) actually applies.
+      layout.style.gridTemplateColumns = '';
       if (btn) { btn.textContent = 'Show graph'; btn.classList.add('on'); }
     } else {
       layout.classList.remove('graph-hidden');
+      // Restore the resized-content-pane width if any; otherwise let CSS default.
+      if (STORE.contentWidth) {
+        layout.style.gridTemplateColumns = '260px 1fr 6px ' + STORE.contentWidth + 'px';
+      } else {
+        layout.style.gridTemplateColumns = '';
+      }
       if (btn) { btn.textContent = 'Hide graph'; btn.classList.remove('on'); }
-      if (STORE.cy) STORE.cy.resize();  // recompute viewport after layout change
+      if (STORE.cy) STORE.cy.resize();
     }
     updateFragment({ graph: hidden ? 'hidden' : null });
   }
