@@ -50,19 +50,23 @@
     var toolbar = document.createElement('div');
     toolbar.id = 'tree-toolbar';
     toolbar.innerHTML =
-      '<button class="tree-toolbtn" data-cmd="expand" title="Expand all">+ all</button>' +
-      '<button class="tree-toolbtn" data-cmd="collapse" title="Collapse all">- all</button>';
+      '<button class="tree-toolbtn" data-cmd="collapse" title="Collapse one level">−</button>' +
+      '<button class="tree-toolbtn" data-cmd="expand" title="Expand one level">+</button>' +
+      '<span class="tree-depth-label" id="tree-depth-label"></span>';
     aside.appendChild(toolbar);
     var ul = document.createElement('ul');
-    function rec(n, parent) {
+    var maxDepth = 0;
+    function rec(n, parent, depth) {
+      if (depth > maxDepth) maxDepth = depth;
       var li = document.createElement('li');
+      li.dataset.depth = depth;
       var hasChildren = n.children && n.children.length > 0;
       if (hasChildren) li.classList.add('has-children');
       var row = document.createElement('div');
       row.className = 'tree-row';
       var arrow = document.createElement('span');
       arrow.className = hasChildren ? 'tree-arrow' : 'tree-arrow tree-arrow-empty';
-      arrow.textContent = hasChildren ? '▾' : ''; // ▾
+      arrow.textContent = hasChildren ? '▾' : '';
       if (hasChildren) {
         arrow.addEventListener('click', function (ev) {
           ev.stopPropagation();
@@ -83,20 +87,39 @@
       li.appendChild(row);
       if (hasChildren) {
         var sub = document.createElement('ul');
-        n.children.forEach(function (c) { rec(c, sub); });
+        n.children.forEach(function (c) { rec(c, sub, depth + 1); });
         li.appendChild(sub);
       }
       parent.appendChild(li);
     }
-    rootNodes.forEach(function (n) { rec(n, ul); });
+    rootNodes.forEach(function (n) { rec(n, ul, 0); });
     aside.appendChild(ul);
+
+    // Stepwise depth controller. visibleDepth = deepest level shown.
+    //   0 = only root visible (root li collapsed)
+    //   1 = root + workspaces       (workspace lis collapsed)
+    //   2 = + sessions              (session lis collapsed)
+    //   3 = + tasks (fully expanded)
+    STORE.treeMaxDepth = maxDepth;
+    if (typeof STORE.treeDepth !== 'number') STORE.treeDepth = maxDepth;
+    function applyDepth() {
+      aside.querySelectorAll('li.has-children').forEach(function (li) {
+        var d = parseInt(li.dataset.depth, 10);
+        if (d >= STORE.treeDepth) li.classList.add('collapsed');
+        else li.classList.remove('collapsed');
+      });
+      var label = document.getElementById('tree-depth-label');
+      if (label) label.textContent = STORE.treeDepth + ' / ' + STORE.treeMaxDepth;
+    }
+    applyDepth();
     toolbar.querySelectorAll('.tree-toolbtn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        var cmd = btn.dataset.cmd;
-        aside.querySelectorAll('li.has-children').forEach(function (li) {
-          if (cmd === 'collapse') li.classList.add('collapsed');
-          else li.classList.remove('collapsed');
-        });
+        if (btn.dataset.cmd === 'expand') {
+          STORE.treeDepth = Math.min(STORE.treeMaxDepth, STORE.treeDepth + 1);
+        } else {
+          STORE.treeDepth = Math.max(0, STORE.treeDepth - 1);
+        }
+        applyDepth();
       });
     });
   }

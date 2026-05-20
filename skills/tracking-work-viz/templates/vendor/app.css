@@ -95,6 +95,12 @@ body { display: flex; flex-direction: column; height: 100vh; }
   font-family: inherit;
 }
 .tree-toolbtn:hover { border-color: var(--accent); color: var(--accent); }
+.tree-depth-label {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  align-self: center;
+}
 
 #tree ul { list-style: none; padding-left: 14px; margin: 0; }
 #tree > ul { padding-left: 0; }
