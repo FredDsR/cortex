@@ -2,7 +2,8 @@
   'use strict';
 
   var STORE = { cy: null, payload: null, layout: 'concentric-hier',
-                rootPrefix: '', contentBase: '', wikilinkIndex: new Map() };
+                rootPrefix: '', contentBase: '', wikilinkIndex: new Map(),
+                selectedId: null };
   var KIND_RADIUS = { root: 0, workspace: 320, session: 600, task: 1050,
                       memory: 600, workbench: 600 };
   var SIBLING_GAP_FRAC = 0.28;
@@ -102,12 +103,11 @@
                    { duration: 300, easing: 'ease-in-out' });
       }
     }
-    document.querySelectorAll('#tree .tree-node.current').forEach(function (el) {
-      el.classList.remove('current');
-    });
-    var elNow = ev.currentTarget;
-    if (elNow && elNow.classList) elNow.classList.add('current');
-    if (n.contentPath) loadContent(n.contentPath);
+    if (n.contentPath) {
+      loadContent(n.contentPath);  // also calls setSelected via the derived id
+    } else {
+      setSelected(n.id);
+    }
   }
 
   function clusterFor(cy, n) {
@@ -305,6 +305,11 @@
     styles.push({ selector: 'node.hovered', style: { 'z-index': 99,
                                                       'border-color': '#1f7ae0',
                                                       'border-width': 2.5 } });
+    // Selected (currently shown in the content pane): persistent ring.
+    styles.push({ selector: 'node.selected', style: { 'z-index': 100,
+                                                       'border-color': '#1f7ae0',
+                                                       'border-width': 3,
+                                                       'border-opacity': 1 } });
     ['contains','blocked','related','follows','mentions'].forEach(function (k) {
       styles.push({ selector: 'edge[kind="' + k + '"]', style: edgeStyle(k) });
     });
@@ -445,6 +450,44 @@
     return STORE.rootPrefix + path;
   }
 
+  function idFromContentPath(path) {
+    if (!path) return null;
+    var p = path.replace(/^\//, '');
+    if (p === 'index.md') return '/';
+    var m;
+    m = /^workspaces\/([^/]+)\/index\.md$/.exec(p);
+    if (m) return m[1] + '/';
+    m = /^workspaces\/([^/]+)\/sessions\/([^/]+)\/SUMMARY\.md$/.exec(p);
+    if (m) return m[1] + '/' + m[2] + '/';
+    m = /^workspaces\/([^/]+)\/sessions\/([^/]+)\/tasks\/([^/]+)\.md$/.exec(p);
+    if (m) return m[1] + '/' + m[2] + '/task/' + m[3];
+    m = /^workspaces\/([^/]+)\/sessions\/([^/]+)\/workbench\/([^/]+)\.md$/.exec(p);
+    if (m) return m[1] + '/' + m[2] + '/workbench/' + m[3];
+    m = /^workspaces\/([^/]+)\/memory\/([^/]+)\.md$/.exec(p);
+    if (m) return m[1] + '/memory/' + m[2];
+    return null;
+  }
+
+  function setSelected(id) {
+    STORE.selectedId = id;
+    document.querySelectorAll('#tree .tree-node.current').forEach(function (el) {
+      el.classList.remove('current');
+    });
+    if (id) {
+      var rows = document.querySelectorAll('#tree .tree-node');
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].dataset.id === id) { rows[i].classList.add('current'); break; }
+      }
+    }
+    if (STORE.cy) {
+      STORE.cy.nodes('.selected').removeClass('selected');
+      if (id) {
+        var n = STORE.cy.getElementById(id);
+        if (n && n.length) n.addClass('selected');
+      }
+    }
+  }
+
   function stripFrontmatter(text) {
     if (!text.startsWith('---\n')) return text;
     var end = text.indexOf('\n---\n', 4);
@@ -485,6 +528,7 @@
     var pane = document.getElementById('content');
     var url = resolveContent(path);
     STORE.contentBase = url.replace(/[^/]+$/, ''); // dirname + trailing slash
+    setSelected(idFromContentPath(path));
     fetch(url).then(function (r) {
       if (!r.ok) throw new Error('Could not load ' + url + ': ' + r.status);
       return r.text();
