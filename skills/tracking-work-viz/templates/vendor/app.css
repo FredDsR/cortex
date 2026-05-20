@@ -54,7 +54,10 @@ body { display: flex; flex-direction: column; height: 100vh; }
   flex: 1 1 auto;
   min-height: 0;
 }
-#layout.graph-hidden { grid-template-columns: 260px 0 1fr; }
+#tree    { grid-column: 1; }
+#graph   { grid-column: 2; }
+#content { grid-column: 3; }
+#layout.graph-hidden { grid-template-columns: 260px 0 minmax(0, 1fr); }
 #layout.graph-hidden #graph { display: none; }
 
 #tree {
