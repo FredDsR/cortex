@@ -50,15 +50,29 @@ body { display: flex; flex-direction: column; height: 100vh; }
 
 #layout {
   display: grid;
-  grid-template-columns: 260px 1fr 380px;
+  grid-template-columns: 260px 1fr 6px 380px;
   flex: 1 1 auto;
   min-height: 0;
 }
-#tree    { grid-column: 1; }
-#graph   { grid-column: 2; }
-#content { grid-column: 3; }
-#layout.graph-hidden { grid-template-columns: 260px 0 minmax(0, 1fr); }
+#tree           { grid-column: 1; }
+#graph          { grid-column: 2; }
+#resizer-right  { grid-column: 3; }
+#content        { grid-column: 4; }
+
+#resizer-right {
+  cursor: col-resize;
+  background: transparent;
+  border-left: 1px solid var(--border);
+  transition: background 0.1s;
+  user-select: none;
+}
+#resizer-right:hover { background: var(--accent-bg); }
+body.resizing #resizer-right { background: var(--accent-bg); }
+body.resizing { cursor: col-resize !important; user-select: none; }
+
+#layout.graph-hidden { grid-template-columns: 260px 0 6px minmax(0, 1fr); }
 #layout.graph-hidden #graph { display: none; }
+#layout.graph-hidden #resizer-right { display: none; }
 
 #tree {
   overflow: auto;

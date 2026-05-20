@@ -485,6 +485,42 @@
     });
   }
 
+  function bindContentResizer() {
+    var resizer = document.getElementById('resizer-right');
+    var layout = document.getElementById('layout');
+    var content = document.getElementById('content');
+    if (!resizer || !layout || !content) return;
+    var dragging = false, startX = 0, startWidth = 0;
+    function setContentWidth(w) {
+      var clamped = Math.max(240, Math.min(window.innerWidth - 400, w));
+      STORE.contentWidth = clamped;
+      layout.style.gridTemplateColumns = '260px 1fr 6px ' + clamped + 'px';
+      if (STORE.cy) STORE.cy.resize();
+    }
+    resizer.addEventListener('mousedown', function (ev) {
+      dragging = true;
+      startX = ev.clientX;
+      startWidth = content.getBoundingClientRect().width;
+      document.body.classList.add('resizing');
+      ev.preventDefault();
+    });
+    document.addEventListener('mousemove', function (ev) {
+      if (!dragging) return;
+      var dx = ev.clientX - startX;
+      setContentWidth(startWidth - dx);
+    });
+    document.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false;
+      document.body.classList.remove('resizing');
+      updateFragment({ cw: String(Math.round(STORE.contentWidth)) });
+    });
+    // Apply persisted width on load.
+    var params = readFragment();
+    var cw = parseInt(params.cw, 10);
+    if (!isNaN(cw) && cw > 0) setContentWidth(cw);
+  }
+
   function applyLayout(cy, payload, name) {
     if (name === 'cose') {
       cy.layout({
@@ -699,6 +735,7 @@
     bindLayoutToggle();
     bindFitAllButton();
     bindToggleGraphButton();
+    bindContentResizer();
     bindContentPaneLinks();
     var params = readFragment();
     STORE.layout = params.layout === 'cose' ? 'cose' : 'concentric-hier';
