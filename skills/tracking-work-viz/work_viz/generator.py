@@ -380,6 +380,7 @@ def _build_tree(world: World) -> list[dict]:
                     "label": t.id.slug, "kind": "task", "href": None,
                     "contentPath": _content_path(t.id),
                     "archived": t.archived,
+                    "status": t.status,
                     "children": [],
                 })
             ws_node["children"].append(sess_node)

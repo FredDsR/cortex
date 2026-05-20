@@ -209,6 +209,17 @@ body.show-archived #tree li.archived > .tree-row .tree-node {
    the container too when archived is off, otherwise it sits empty. */
 #tree li.all-children-archived { display: none; }
 body.show-archived #tree li.all-children-archived { display: block; }
+/* Resolved tasks: small green checkmark glyph sized to the row's text. Pure
+   unicode + color keeps it crisp at the line's font-size without an extra
+   asset and stacks visually with the archived treatment. */
+.tree-node.resolved::before {
+  content: '\2713';
+  color: #1f8a5a;
+  font-weight: 700;
+  margin-right: 5px;
+  display: inline-block;
+}
+body.dark .tree-node.resolved::before { color: #4dcb8e; }
 
 .tree-row {
   display: flex;
