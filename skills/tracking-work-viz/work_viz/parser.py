@@ -153,51 +153,66 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
                                   kind="contains", resolved=True))
                 raw_edges[mid.canonical()] = raw
 
+        # Collect (sess_dir, sess_slug, archived) tuples for both live sessions
+        # and (optionally) archived ones, then process them with the same body.
         sessions_dir = ws_dir / "sessions"
+        session_sources: list[tuple[Path, str, bool]] = []
         if sessions_dir.is_dir():
             for sess_dir in sorted(p for p in sessions_dir.iterdir() if p.is_dir()):
-                sess_slug = sess_dir.name
-                if sess_slug in address.RESERVED_WORDS:
+                if sess_dir.name in address.RESERVED_WORDS:
                     continue
-                sess_id = DocId(kind="session", workspace=ws_slug, session=sess_slug)
-                summary = sess_dir / "SUMMARY.md"
-                if summary.is_file():
-                    sess_doc, raw = _read_doc(summary, sess_id)
-                    raw_edges[sess_id.canonical()] = raw
-                else:
-                    sess_doc = Doc(id=sess_id, title=sess_slug, body="", frontmatter={},
-                                   rel_path=sess_dir, edges_out=[])
-                docs[sess_id.canonical()] = sess_doc
-                edges.append(Edge(source=ws_id, target=sess_id, raw_target=sess_slug,
-                                  kind="contains", resolved=True))
+                session_sources.append((sess_dir, sess_dir.name, False))
+        if include_archive:
+            archive_dir = ws_dir / "archive"
+            if archive_dir.is_dir():
+                for sess_dir in sorted(p for p in archive_dir.iterdir() if p.is_dir()):
+                    session_sources.append((sess_dir, sess_dir.name, True))
 
-                tasks_dir = sess_dir / "tasks"
-                if tasks_dir.is_dir():
-                    for tfile in sorted(tasks_dir.glob("*.md")):
-                        if tfile.name == "index.md":
-                            continue
-                        tid = DocId(kind="task", workspace=ws_slug,
-                                    session=sess_slug, slug=tfile.stem)
-                        doc, raw = _read_doc(tfile, tid)
-                        docs[tid.canonical()] = doc
-                        edges.append(Edge(source=sess_id, target=tid,
-                                          raw_target=tfile.stem,
-                                          kind="contains", resolved=True))
-                        raw_edges[tid.canonical()] = raw
+        for sess_dir, sess_slug, archived in session_sources:
+            sess_id = DocId(kind="session", workspace=ws_slug, session=sess_slug)
+            if sess_id.canonical() in docs:
+                continue  # collision between live and archived; live wins
+            summary = sess_dir / "SUMMARY.md"
+            if summary.is_file():
+                sess_doc, raw = _read_doc(summary, sess_id)
+                raw_edges[sess_id.canonical()] = raw
+            else:
+                sess_doc = Doc(id=sess_id, title=sess_slug, body="", frontmatter={},
+                               rel_path=sess_dir, edges_out=[])
+            sess_doc.archived = archived
+            docs[sess_id.canonical()] = sess_doc
+            edges.append(Edge(source=ws_id, target=sess_id, raw_target=sess_slug,
+                              kind="contains", resolved=True))
 
-                wb_dir = sess_dir / "workbench"
-                if wb_dir.is_dir():
-                    for wfile in sorted(wb_dir.glob("*.md")):
-                        if wfile.name == "index.md":
-                            continue
-                        wid = DocId(kind="workbench", workspace=ws_slug,
-                                    session=sess_slug, slug=wfile.stem)
-                        doc, raw = _read_doc(wfile, wid)
-                        docs[wid.canonical()] = doc
-                        edges.append(Edge(source=sess_id, target=wid,
-                                          raw_target=wfile.stem,
-                                          kind="contains", resolved=True))
-                        raw_edges[wid.canonical()] = raw
+            tasks_dir = sess_dir / "tasks"
+            if tasks_dir.is_dir():
+                for tfile in sorted(tasks_dir.glob("*.md")):
+                    if tfile.name == "index.md":
+                        continue
+                    tid = DocId(kind="task", workspace=ws_slug,
+                                session=sess_slug, slug=tfile.stem)
+                    doc, raw = _read_doc(tfile, tid)
+                    doc.archived = archived
+                    docs[tid.canonical()] = doc
+                    edges.append(Edge(source=sess_id, target=tid,
+                                      raw_target=tfile.stem,
+                                      kind="contains", resolved=True))
+                    raw_edges[tid.canonical()] = raw
+
+            wb_dir = sess_dir / "workbench"
+            if wb_dir.is_dir():
+                for wfile in sorted(wb_dir.glob("*.md")):
+                    if wfile.name == "index.md":
+                        continue
+                    wid = DocId(kind="workbench", workspace=ws_slug,
+                                session=sess_slug, slug=wfile.stem)
+                    doc, raw = _read_doc(wfile, wid)
+                    doc.archived = archived
+                    docs[wid.canonical()] = doc
+                    edges.append(Edge(source=sess_id, target=wid,
+                                      raw_target=wfile.stem,
+                                      kind="contains", resolved=True))
+                    raw_edges[wid.canonical()] = raw
 
     # Pass 2: resolve raw edges. Unresolved targets and dangling-after-resolution
     # targets are dropped; no ghost docs are synthesized.

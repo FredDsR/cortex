@@ -44,6 +44,17 @@
 
   // ---- Tree ----------------------------------------------------------------
 
+  function anyLiveDescendant(node) {
+    if (!node.archived) {
+      if (node.kind === 'task' || node.kind === 'session') return true;
+    }
+    if (!node.children || node.children.length === 0) return !node.archived;
+    for (var i = 0; i < node.children.length; i++) {
+      if (anyLiveDescendant(node.children[i])) return true;
+    }
+    return false;
+  }
+
   function renderTree(rootNodes, scopeId) {
     var aside = document.getElementById('tree');
     aside.innerHTML = '';
@@ -62,6 +73,11 @@
       li.dataset.depth = depth;
       var hasChildren = n.children && n.children.length > 0;
       if (hasChildren) li.classList.add('has-children');
+      if (n.archived) li.classList.add('archived');
+      // For container nodes: also hide them if every descendant is archived.
+      if (hasChildren && !n.archived && !anyLiveDescendant(n)) {
+        li.classList.add('all-children-archived');
+      }
       var row = document.createElement('div');
       row.className = 'tree-row';
       var arrow = document.createElement('span');
@@ -443,17 +459,22 @@
 
   function buildCy(payload) {
     var elements = [];
+    var archivedIds = new Set();
     payload.nodes.forEach(function (n) {
+      if (n.archived) archivedIds.add(n.id);
       elements.push({ group: 'nodes',
                       data: { id: n.id, label: shortenLabel(n.label),
                               fullLabel: n.label, kind: n.kind,
                               contentPath: n.contentPath,
-                              tint: tintForNode(n) } });
+                              tint: tintForNode(n) },
+                      classes: n.archived ? 'archived' : '' });
     });
     payload.edges.forEach(function (e) {
+      var touchesArchived = archivedIds.has(e.source) || archivedIds.has(e.target);
       elements.push({ group: 'edges',
                       data: { id: e.source + '|' + e.kind + '|' + e.target,
-                              source: e.source, target: e.target, kind: e.kind } });
+                              source: e.source, target: e.target, kind: e.kind },
+                      classes: touchesArchived ? 'archived' : '' });
     });
     var styles = [
       { selector: 'node', style: nodeStyleByKind('task') },
@@ -491,6 +512,11 @@
     });
     styles.push({ selector: 'edge', style: { 'curve-style': 'bezier' } });
     styles.push({ selector: 'edge.hidden', style: { 'display': 'none' } });
+    // Archived: muted look when shown, fully hidden when toggle is off.
+    styles.push({ selector: 'node.archived', style: {
+      'opacity': 0.55, 'border-style': 'dashed', 'font-style': 'italic' } });
+    styles.push({ selector: 'edge.archived', style: { 'opacity': 0.4, 'line-style': 'dashed' } });
+    styles.push({ selector: '.hidden-archived', style: { 'display': 'none' } });
 
     var cy = cytoscape({
       container: document.getElementById('graph'),
@@ -554,6 +580,28 @@
     btn.addEventListener('click', function () {
       var layout = document.getElementById('layout');
       setGraphHidden(!layout.classList.contains('graph-hidden'));
+    });
+  }
+
+  function setShowArchived(show) {
+    document.body.classList.toggle('show-archived', show);
+    var btn = document.getElementById('toggle-archived');
+    if (btn) btn.classList.toggle('on', show);
+    if (STORE.cy) {
+      if (show) {
+        STORE.cy.elements('.archived').removeClass('hidden-archived');
+      } else {
+        STORE.cy.elements('.archived').addClass('hidden-archived');
+      }
+    }
+    updateFragment({ archived: show ? '1' : null });
+  }
+
+  function bindArchivedToggle() {
+    var btn = document.getElementById('toggle-archived');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      setShowArchived(!document.body.classList.contains('show-archived'));
     });
   }
 
@@ -858,6 +906,7 @@
     bindLayoutToggle();
     bindFitAllButton();
     bindToggleGraphButton();
+    bindArchivedToggle();
     bindContentResizer();
     bindContentPaneLinks();
     bindThemeToggle();
@@ -866,6 +915,7 @@
     STORE.layout = params.layout === 'cose' ? 'cose' : 'concentric-hier';
     applyLayout(cy, payload, STORE.layout);
     if (params.graph === 'hidden') setGraphHidden(true);
+    setShowArchived(params.archived === '1');
     if (payload.defaultContentPath) loadContent(payload.defaultContentPath);
   }
 

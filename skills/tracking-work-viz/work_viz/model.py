@@ -58,6 +58,7 @@ class Doc:
     edges_out: list = field(default_factory=list)
     ghost: bool = False
     status: Optional[str] = None
+    archived: bool = False
 
 
 @dataclass
