@@ -373,18 +373,67 @@
     return Math.abs(h);
   }
 
+  function isDark() { return document.body.classList.contains('dark'); }
+
   function tintForNode(node) {
     // Hue derived from the (workspace, session) pair so all tasks in a session
     // share a soft pastel, all sessions in a workspace are distinct hues, and
     // tasks of different sessions in the same workspace are visually grouped.
-    if (node.kind === 'root') return '#1f2933';
+    var dark = isDark();
+    if (node.kind === 'root') return dark ? '#0c1119' : '#1f2933';
     var key;
     if (node.kind === 'workspace') key = node.id.replace(/\/$/, '');
-    else key = (node.id.split('/').slice(0, 2).join('/'));  // workspace/session
+    else key = (node.id.split('/').slice(0, 2).join('/'));
     var hue = hashString(key) % 360;
+    if (dark) {
+      var dSat = node.kind === 'task' ? 30 : 45;
+      var dLight = node.kind === 'task' ? 22 : 28;
+      return 'hsl(' + hue + ', ' + dSat + '%, ' + dLight + '%)';
+    }
     var sat = node.kind === 'task' ? 35 : 50;
     var light = node.kind === 'task' ? 92 : 86;
     return 'hsl(' + hue + ', ' + sat + '%, ' + light + '%)';
+  }
+
+  function applyCyTheme() {
+    if (!STORE.cy) return;
+    var dark = isDark();
+    STORE.cy.nodes().forEach(function (n) {
+      n.data('tint', tintForNode({ id: n.id(), kind: n.data('kind') }));
+    });
+    STORE.cy.style()
+      .selector('node')
+        .style({
+          'color': dark ? '#e6e9ef' : '#1f2933',
+          'border-color': dark ? '#8a929c' : '#5a6573',
+          'text-background-color': dark ? '#1a212c' : '#ffffff',
+        })
+      .selector('node[kind="root"]')
+        .style({ 'color': '#ffffff', 'border-width': 0 })
+      .selector('edge[kind="contains"]')
+        .style({ 'line-color': dark ? '#2c3548' : '#dde2e8',
+                 'opacity': dark ? 0.55 : 0.4 })
+      .selector('edge[kind="related"]')
+        .style({ 'line-color': dark ? '#9aa4b5' : '#5a6573',
+                 'target-arrow-color': dark ? '#9aa4b5' : '#5a6573' })
+      .selector('edge[kind="follows"]')
+        .style({ 'line-color': dark ? '#cad2dd' : '#1f2933',
+                 'target-arrow-color': dark ? '#cad2dd' : '#1f2933' })
+      .update();
+  }
+
+  function applyTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    applyCyTheme();
+    var btn = document.getElementById('theme-toggle');
+    if (btn) btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    updateFragment({ theme: dark ? 'dark' : null });
+  }
+
+  function bindThemeToggle() {
+    var btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () { applyTheme(!isDark()); });
   }
 
   function buildCy(payload) {
@@ -808,7 +857,9 @@
     bindToggleGraphButton();
     bindContentResizer();
     bindContentPaneLinks();
+    bindThemeToggle();
     var params = readFragment();
+    if (params.theme === 'dark') applyTheme(true);
     STORE.layout = params.layout === 'cose' ? 'cose' : 'concentric-hier';
     applyLayout(cy, payload, STORE.layout);
     if (params.graph === 'hidden') setGraphHidden(true);

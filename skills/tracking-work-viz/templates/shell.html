@@ -7,8 +7,15 @@
 </head>
 <body>
   <header id="appbar">
-    <h1><a id="appbar-home" href="__ROOT_HREF__">__TITLE_LINE__</a></h1>
-    <div class="subtitle">__SUBTITLE_LINE__</div>
+    <div class="appbar-title">
+      <h1><a id="appbar-home" href="__ROOT_HREF__">__TITLE_LINE__</a></h1>
+      <div class="subtitle">__SUBTITLE_LINE__</div>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <span class="theme-icon theme-sun">☀</span>
+      <span class="theme-icon theme-moon">☾</span>
+      <span class="theme-knob"></span>
+    </button>
   </header>
   <main id="layout">
     <aside id="tree"></aside>

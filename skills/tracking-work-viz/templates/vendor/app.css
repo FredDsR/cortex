@@ -15,6 +15,24 @@
   --text-muted: #5a6573;
 }
 
+body.dark {
+  --bg: #11151c;
+  --surface: #1a212c;
+  --border: #2a3340;
+  --accent: #4a9eff;
+  --accent-bg: #1e2a3d;
+
+  --text-primary: #e6e9ef;
+  --text-muted: #8a929c;
+}
+body.dark #appbar {
+  background: linear-gradient(to bottom, #1d242f, #131820);
+}
+body.dark #content code { background: #232b39; }
+body.dark #content pre { background: #1c2430; }
+body.dark #chips { background: #161c27; }
+body.dark #content .wikilink-broken { color: var(--text-muted); }
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0; padding: 0; height: 100%;
@@ -30,7 +48,62 @@ body { display: flex; flex-direction: column; height: 100vh; }
   padding: 14px 24px;
   background: linear-gradient(to bottom, #fdfdfe, #f3f5f8);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
+.appbar-title { flex: 1 1 auto; min-width: 0; }
+
+/* Light-switch-style theme toggle */
+.theme-toggle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 60px;
+  height: 30px;
+  border-radius: 15px;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, #d6e3f7, #c2d3ea);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+  outline: none;
+  font: inherit;
+}
+.theme-toggle:hover { box-shadow: inset 0 1px 2px rgba(0,0,0,0.08), 0 0 0 3px rgba(31,122,224,0.12); }
+.theme-toggle .theme-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffffff, #f1f3f7);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, box-shadow 0.3s ease;
+}
+.theme-toggle .theme-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
+  transition: opacity 0.25s, color 0.25s;
+}
+.theme-toggle .theme-sun  { left: 8px;  color: #f7b733; opacity: 1; }
+.theme-toggle .theme-moon { right: 8px; color: #6a7388; opacity: 0.5; }
+body.dark .theme-toggle {
+  background: linear-gradient(135deg, #2c3a55, #1f2a3d);
+  border-color: #3d4d6e;
+}
+body.dark .theme-toggle .theme-knob {
+  left: 32px;
+  background: linear-gradient(135deg, #e8eef8, #c8d3e6);
+}
+body.dark .theme-toggle .theme-sun  { opacity: 0.35; color: #6a7388; }
+body.dark .theme-toggle .theme-moon { opacity: 1;   color: #f0d97d; }
+
 #appbar h1 {
   margin: 0;
   font-size: 17px;
