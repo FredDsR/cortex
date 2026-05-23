@@ -138,6 +138,8 @@
       el.className = 'tree-node kind-' + n.kind;
       if (n.id === scopeId) el.classList.add('current');
       if (isResolved(n.status)) el.classList.add('resolved');
+      var rowAbk = authorBadgeKind(n);
+      if (rowAbk) el.classList.add('authored-' + rowAbk);
       el.textContent = n.label;
       el.dataset.id = n.id;
       el.dataset.kind = n.kind;
