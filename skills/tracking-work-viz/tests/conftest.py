@@ -12,6 +12,6 @@ def workspaces_root(tmp_path):
     import shutil
     root = tmp_path / "workspaces"
     root.mkdir()
-    for sub in ("demo-ws", "other-ws", "kb-ghosts-ws"):
+    for sub in ("demo-ws", "other-ws", "kb-ghosts-ws", "authored-ws"):
         shutil.copytree(FIXTURES / sub, root / sub)
     return root
