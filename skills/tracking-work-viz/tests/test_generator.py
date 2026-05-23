@@ -35,8 +35,8 @@ def test_build_skips_ghosts(workspaces_root, tmp_path):
     out = tmp_path / "out"
     world = parse_world(workspaces_root)
     build(world, out)
-    # The ghost memory/architecture reference must not produce a file.
-    assert not (out / "workspaces/demo-ws/memory/architecture.md").exists()
+    # The ghost knowledge/architecture reference must not produce a file.
+    assert not (out / "workspaces/demo-ws/knowledge/architecture.md").exists()
 
 
 def test_build_emits_root_index(workspaces_root, tmp_path):
@@ -69,12 +69,12 @@ def test_build_emits_session_index(workspaces_root, tmp_path):
     assert "Open" in idx
 
 
-def test_build_emits_memory_index(workspaces_root, tmp_path):
+def test_build_emits_knowledge_index(workspaces_root, tmp_path):
     out = tmp_path / "out"
     world = parse_world(workspaces_root)
     build(world, out)
-    idx = (out / "workspaces" / "demo-ws" / "memory" / "index.md").read_text()
-    assert "memory" in idx.lower()
+    idx = (out / "workspaces" / "demo-ws" / "knowledge" / "index.md").read_text()
+    assert "knowledge" in idx.lower()
 
 
 def test_build_emits_root_html(workspaces_root, tmp_path):

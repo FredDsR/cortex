@@ -141,17 +141,17 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
         edges.append(Edge(source=root.id, target=ws_id, raw_target=ws_slug,
                           kind="contains", resolved=True))
 
-        memory_dir = ws_dir / "memory"
-        if memory_dir.is_dir():
-            for mfile in sorted(memory_dir.glob("*.md")):
-                if mfile.name == "index.md":
+        knowledge_dir = ws_dir / "knowledge"
+        if knowledge_dir.is_dir():
+            for kfile in sorted(knowledge_dir.glob("*.md")):
+                if kfile.name == "index.md":
                     continue
-                mid = DocId(kind="memory", workspace=ws_slug, slug=mfile.stem)
-                doc, raw = _read_doc(mfile, mid)
-                docs[mid.canonical()] = doc
-                edges.append(Edge(source=ws_id, target=mid, raw_target=mfile.stem,
+                kid = DocId(kind="knowledge", workspace=ws_slug, slug=kfile.stem)
+                doc, raw = _read_doc(kfile, kid)
+                docs[kid.canonical()] = doc
+                edges.append(Edge(source=ws_id, target=kid, raw_target=kfile.stem,
                                   kind="contains", resolved=True))
-                raw_edges[mid.canonical()] = raw
+                raw_edges[kid.canonical()] = raw
 
         # Collect (sess_dir, sess_slug, archived) tuples for both live sessions
         # and (optionally) archived ones, then process them with the same body.

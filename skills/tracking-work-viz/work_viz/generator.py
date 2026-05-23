@@ -30,8 +30,8 @@ def _doc_out_path(doc: Doc, out_dir: Path) -> Path:
         return base / "sessions" / cid.session / "SUMMARY.md"
     if cid.kind == "task":
         return base / "sessions" / cid.session / "tasks" / f"{cid.slug}.md"
-    if cid.kind == "memory":
-        return base / "memory" / f"{cid.slug}.md"
+    if cid.kind == "knowledge":
+        return base / "knowledge" / f"{cid.slug}.md"
     if cid.kind == "workbench":
         return base / "sessions" / cid.session / "workbench" / f"{cid.slug}.md"
     if cid.kind == "root":
@@ -52,9 +52,9 @@ def _copy_markdown(world: World, out_dir: Path) -> None:
 
 
 def _copy_supplementary_md(world: World, out_dir: Path) -> None:
-    """Mirror any unindexed .md files inside session and memory directories so
+    """Mirror any unindexed .md files inside session and knowledge directories so
     relative links in author-authored markdown resolve. Indexed docs (SUMMARY,
-    tasks/*.md, workbench/*.md, memory/*.md) are already copied by
+    tasks/*.md, workbench/*.md, knowledge/*.md) are already copied by
     _copy_markdown; this pass picks up siblings like research/notes.md and
     dated audit files."""
     for doc in world.docs.values():
@@ -81,17 +81,17 @@ def _copy_supplementary_md(world: World, out_dir: Path) -> None:
     for doc in world.docs.values():
         if doc.id.kind != "workspace" or doc.rel_path is None:
             continue
-        mem_dir = doc.rel_path / "memory"
-        if not mem_dir.is_dir():
+        k_dir = doc.rel_path / "knowledge"
+        if not k_dir.is_dir():
             continue
-        out_mem = out_dir / "workspaces" / doc.id.workspace / "memory"
-        for md in mem_dir.rglob("*.md"):
-            rel = md.relative_to(mem_dir)
+        out_k = out_dir / "workspaces" / doc.id.workspace / "knowledge"
+        for md in k_dir.rglob("*.md"):
+            rel = md.relative_to(k_dir)
             if rel.name == "index.md":
                 continue
             if len(rel.parts) == 1:
                 continue  # already copied by _copy_markdown
-            dest = out_mem / rel
+            dest = out_k / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(md, dest)
 
@@ -106,7 +106,7 @@ def _children_of(world: World, parent_canon: str, kind: str) -> list[Doc]:
             out.append(doc)
         elif kind == "session" and doc.id.workspace and f"{doc.id.workspace}/" == parent_canon:
             out.append(doc)
-        elif kind == "memory" and doc.id.workspace and f"{doc.id.workspace}/" == parent_canon:
+        elif kind == "knowledge" and doc.id.workspace and f"{doc.id.workspace}/" == parent_canon:
             out.append(doc)
         elif kind == "task" and doc.id.workspace and doc.id.session and \
              f"{doc.id.workspace}/{doc.id.session}/" == parent_canon:
@@ -130,30 +130,30 @@ def _emit_workspace_index(world: World, ws: Doc, out_dir: Path) -> None:
     ws_dir = out_dir / "workspaces" / ws.id.workspace
     ws_dir.mkdir(parents=True, exist_ok=True)
     sessions = _children_of(world, ws.id.canonical(), "session")
-    memories = _children_of(world, ws.id.canonical(), "memory")
+    knowledge_docs = _children_of(world, ws.id.canonical(), "knowledge")
     lines = [f"# {ws.id.workspace}", "",
              "[<- Dashboard](../../index.html)", "",
              f"## Sessions ({len(sessions)})", ""]
     for s in sessions:
         lines.append(f"- [{s.id.session}](sessions/{s.id.session}/index.html)")
-    lines.extend(["", f"## Memory ({len(memories)})", "",
-                  "[Open memory folder](memory/index.md)", ""])
+    lines.extend(["", f"## Knowledge ({len(knowledge_docs)})", "",
+                  "[Open knowledge folder](knowledge/index.md)", ""])
     (ws_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def _emit_memory_index(world: World, ws: Doc, out_dir: Path) -> None:
-    mem_dir = out_dir / "workspaces" / ws.id.workspace / "memory"
-    mem_dir.mkdir(parents=True, exist_ok=True)
-    docs = _children_of(world, ws.id.canonical(), "memory")
-    lines = [f"# {ws.id.workspace} / memory", "",
+def _emit_knowledge_index(world: World, ws: Doc, out_dir: Path) -> None:
+    k_dir = out_dir / "workspaces" / ws.id.workspace / "knowledge"
+    k_dir.mkdir(parents=True, exist_ok=True)
+    docs = _children_of(world, ws.id.canonical(), "knowledge")
+    lines = [f"# {ws.id.workspace} / knowledge", "",
              "[<- Workspace](../index.html)", "",
-             f"## Memory docs ({len(docs)})", ""]
+             f"## Knowledge docs ({len(docs)})", ""]
     if not docs:
-        lines.append("_No memory docs yet._")
+        lines.append("_No knowledge docs yet._")
     else:
         for d in docs:
             lines.append(f"- [{d.id.slug}]({d.id.slug}.md)")
-    (mem_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    (k_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def _emit_session_index(world: World, sess: Doc, out_dir: Path) -> None:
@@ -218,7 +218,7 @@ def _emit_all_indices(world: World, out_dir: Path) -> None:
     _emit_root_index(world, out_dir)
     for ws in _children_of(world, "/", "workspace"):
         _emit_workspace_index(world, ws, out_dir)
-        _emit_memory_index(world, ws, out_dir)
+        _emit_knowledge_index(world, ws, out_dir)
         for sess in _children_of(world, ws.id.canonical(), "session"):
             _emit_session_index(world, sess, out_dir)
             _emit_workbench_index(world, sess, out_dir)
@@ -236,8 +236,8 @@ def _content_path(cid: DocId) -> Optional[str]:
         return f"workspaces/{cid.workspace}/sessions/{cid.session}/SUMMARY.md"
     if cid.kind == "task":
         return f"workspaces/{cid.workspace}/sessions/{cid.session}/tasks/{cid.slug}.md"
-    if cid.kind == "memory":
-        return f"workspaces/{cid.workspace}/memory/{cid.slug}.md"
+    if cid.kind == "knowledge":
+        return f"workspaces/{cid.workspace}/knowledge/{cid.slug}.md"
     if cid.kind == "workbench":
         return f"workspaces/{cid.workspace}/sessions/{cid.session}/workbench/{cid.slug}.md"
     return None
@@ -251,7 +251,7 @@ def _node_dict(world: World, doc: Doc) -> dict:
         parent = f"{cid.workspace}/"
     elif cid.kind in ("task", "workbench"):
         parent = f"{cid.workspace}/{cid.session}/"
-    elif cid.kind == "memory":
+    elif cid.kind == "knowledge":
         parent = f"{cid.workspace}/"
     else:
         parent = None

@@ -37,7 +37,7 @@ The viewer's sidebar tree spans every workspace and session, so once a page is o
   index.html, index.md                    # root dashboard
   vendor/                                 # cytoscape, dagre, cytoscape-dagre, marked, app.js, app.css
   workspaces/<ws>/index.html, index.md
-  workspaces/<ws>/memory/index.md
+  workspaces/<ws>/knowledge/index.md
   workspaces/<ws>/sessions/<sess>/index.html, index.md
   workspaces/<ws>/sessions/<sess>/SUMMARY.md           # copied from ~/.work/
   workspaces/<ws>/sessions/<sess>/tasks/<slug>.md      # copied from ~/.work/

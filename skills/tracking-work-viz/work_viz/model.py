@@ -12,7 +12,7 @@ STATUS_UNKNOWN = None
 
 ALL_STATUSES = (STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED)
 
-NODE_KINDS = ("root", "workspace", "session", "task", "memory", "workbench")
+NODE_KINDS = ("root", "workspace", "session", "task", "knowledge", "workbench")
 AUTHORED_EDGE_KINDS = ("blocked", "related", "follows", "mentions")
 ALL_EDGE_KINDS = AUTHORED_EDGE_KINDS + ("contains",)
 
@@ -34,8 +34,8 @@ class DocId:
             return f"{self.workspace}/{self.session}/"
         if self.kind == "task":
             return f"{self.workspace}/{self.session}/task/{self.slug}"
-        if self.kind == "memory":
-            return f"{self.workspace}/memory/{self.slug}"
+        if self.kind == "knowledge":
+            return f"{self.workspace}/knowledge/{self.slug}"
         if self.kind == "workbench":
             return f"{self.workspace}/{self.session}/workbench/{self.slug}"
         raise ValueError(f"unknown DocId kind: {self.kind!r}")

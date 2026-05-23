@@ -19,9 +19,9 @@ def test_docid_task_canonical():
     assert cid == "foo/bar/task/task-baz"
 
 
-def test_docid_memory_canonical():
-    cid = DocId(kind="memory", workspace="foo", slug="note").canonical()
-    assert cid == "foo/memory/note"
+def test_docid_knowledge_canonical():
+    cid = DocId(kind="knowledge", workspace="foo", slug="note").canonical()
+    assert cid == "foo/knowledge/note"
 
 
 def test_docid_workbench_canonical():
