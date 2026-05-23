@@ -23,6 +23,31 @@
     + "</svg>";
   var RESOLVED_BADGE_SRC = "data:image/svg+xml;base64," + btoa(RESOLVED_BADGE_SVG);
 
+  // Author badges: small H or A glyph on knowledge / workbench nodes.
+  // Same encoding rules as RESOLVED_BADGE: base64, explicit width/height.
+  var AUTHOR_HUMAN_SVG =
+      "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
+    + "<circle cx='12' cy='12' r='11' fill='white' stroke='#4a6fa5' stroke-width='1.8'/>"
+    + "<text x='12' y='16' font-family='ui-sans-serif,system-ui,sans-serif'"
+    + " font-size='13' font-weight='700' fill='#4a6fa5' text-anchor='middle'>H</text>"
+    + "</svg>";
+  var AUTHOR_AGENT_SVG =
+      "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
+    + "<circle cx='12' cy='12' r='11' fill='white' stroke='#6b46a8' stroke-width='1.8'/>"
+    + "<text x='12' y='16' font-family='ui-sans-serif,system-ui,sans-serif'"
+    + " font-size='13' font-weight='700' fill='#6b46a8' text-anchor='middle'>A</text>"
+    + "</svg>";
+  var AUTHOR_HUMAN_SRC = "data:image/svg+xml;base64," + btoa(AUTHOR_HUMAN_SVG);
+  var AUTHOR_AGENT_SRC = "data:image/svg+xml;base64," + btoa(AUTHOR_AGENT_SVG);
+
+  function authorBadgeKind(node) {
+    // Author badges only apply to knowledge and workbench nodes.
+    if (!node || !node.author) return null;
+    if (node.kind !== 'knowledge' && node.kind !== 'workbench') return null;
+    if (node.author === 'human' || node.author === 'agent') return node.author;
+    return null;
+  }
+
   function isResolved(status) {
     if (!status || typeof status !== 'string') return false;
     return /^resolved\b/i.test(status.trim());
@@ -494,6 +519,8 @@
       var cls = [];
       if (n.archived) cls.push('archived');
       if (isResolved(n.status)) cls.push('resolved');
+      var abk = authorBadgeKind(n);
+      if (abk) cls.push('authored-' + abk);
       elements.push({ group: 'nodes',
                       data: { id: n.id, label: shortenLabel(n.label),
                               fullLabel: n.label, kind: n.kind,
@@ -562,6 +589,31 @@
       'background-width': '14px',
       'background-height': '14px',
       'background-position-x': '95%',
+      'background-position-y': '5%',
+      'background-image-opacity': 1,
+    } });
+    // Author badge: top-LEFT corner so it does not collide with the
+    // resolved checkmark at top-right. Knowledge / workbench only, gated
+    // by the class added at element creation time.
+    styles.push({ selector: 'node.authored-human', style: {
+      'background-image': AUTHOR_HUMAN_SRC,
+      'background-fit': 'none',
+      'background-image-containment': 'over',
+      'background-clip': 'none',
+      'background-width': '14px',
+      'background-height': '14px',
+      'background-position-x': '5%',
+      'background-position-y': '5%',
+      'background-image-opacity': 1,
+    } });
+    styles.push({ selector: 'node.authored-agent', style: {
+      'background-image': AUTHOR_AGENT_SRC,
+      'background-fit': 'none',
+      'background-image-containment': 'over',
+      'background-clip': 'none',
+      'background-width': '14px',
+      'background-height': '14px',
+      'background-position-x': '5%',
       'background-position-y': '5%',
       'background-image-opacity': 1,
     } });
