@@ -270,6 +270,7 @@ def _node_dict(world: World, doc: Doc) -> dict:
         "status": doc.status,
         "ghost": doc.ghost,
         "archived": doc.archived,
+        "author": doc.author,
         "contentPath": content_path,
     }
 

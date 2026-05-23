@@ -247,3 +247,31 @@ def test_build_does_not_stage_dagre(workspaces_root, tmp_path):
     build(parse_world(workspaces_root), out)
     assert not (out / "vendor" / "dagre.min.js").exists()
     assert not (out / "vendor" / "cytoscape-dagre.min.js").exists()
+
+
+def test_payload_includes_author_for_knowledge(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    assert by_id["authored-ws/knowledge/by-human"]["author"] == "human"
+    assert by_id["authored-ws/knowledge/by-agent"]["author"] == "agent"
+
+
+def test_payload_includes_author_for_workbench(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    assert by_id["authored-ws/s1/workbench/wb-agent"]["author"] == "agent"
+
+
+def test_payload_author_null_for_unauthored_kinds(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    # Tasks, sessions, workspaces always have author None.
+    assert by_id["demo-ws/alpha/task/task-a"]["author"] is None
+    assert by_id["demo-ws/alpha/"]["author"] is None
+    assert by_id["demo-ws/"]["author"] is None
