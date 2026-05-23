@@ -5,7 +5,7 @@ from typing import Optional
 
 from .model import DocId
 
-RESERVED_WORDS = frozenset({"memory", "workbench"})
+RESERVED_WORDS = frozenset({"knowledge", "workbench"})
 
 
 @dataclass(frozen=True)
@@ -30,14 +30,14 @@ def resolve(raw: str, *, referencing: DocId) -> ResolveResult:
     if any(p == "" for p in parts):
         return ResolveResult(resolved=False)
 
-    if "memory" in parts:
-        idx = parts.index("memory")
+    if "knowledge" in parts:
+        idx = parts.index("knowledge")
         if idx == 0 and len(parts) == 2:
             return ResolveResult(True, DocId(
-                kind="memory", workspace=referencing.workspace, slug=parts[1]))
+                kind="knowledge", workspace=referencing.workspace, slug=parts[1]))
         if idx == 1 and len(parts) == 3:
             return ResolveResult(True, DocId(
-                kind="memory", workspace=parts[0], slug=parts[2]))
+                kind="knowledge", workspace=parts[0], slug=parts[2]))
         return ResolveResult(resolved=False)
 
     if "workbench" in parts:

@@ -12,8 +12,8 @@ def _src(workspace="w", session="s"):
     ("task-foo",                "task",      "w",       "s",       "task-foo"),
     ("other-sess/task-bar",     "task",      "w",       "other-sess", "task-bar"),
     ("other-ws/sess/task-baz",  "task",      "other-ws", "sess",   "task-baz"),
-    ("memory/note",             "memory",    "w",       None,      "note"),
-    ("other-ws/memory/note",    "memory",    "other-ws", None,     "note"),
+    ("knowledge/note",          "knowledge", "w",       None,      "note"),
+    ("other-ws/knowledge/note", "knowledge", "other-ws", None,     "note"),
     ("workbench/draft",         "workbench", "w",       "s",       "draft"),
     ("sess2/workbench/draft",   "workbench", "w",       "sess2",   "draft"),
     ("other-ws/sess/workbench/draft", "workbench", "other-ws", "sess", "draft"),
@@ -31,8 +31,8 @@ def test_resolve_happy(token, expected_kind, expected_ws, expected_sess, expecte
     "",                                # empty
     "a/b/c/d",                         # too many components, no keyword
     "a/b/c/d/e",                       # really too many
-    "a/memory",                        # memory at position 1 but no slug
-    "a/b/memory/note",                 # memory at position >= 2
+    "a/knowledge",                     # knowledge at position 1 but no slug
+    "a/b/knowledge/note",              # knowledge at position >= 2
     "a/b/c/workbench/d",               # workbench at position 3, 5 tokens, invalid
 ])
 def test_resolve_grammar_rejects(token):
@@ -41,7 +41,7 @@ def test_resolve_grammar_rejects(token):
 
 
 def test_reserved_words_constant():
-    assert "memory" in RESERVED_WORDS
+    assert "knowledge" in RESERVED_WORDS
     assert "workbench" in RESERVED_WORDS
 
 
@@ -55,3 +55,19 @@ def test_resolve_strips_whitespace():
     r = resolve("  task-foo  ", referencing=_src())
     assert r.resolved is True
     assert r.doc_id.slug == "task-foo"
+
+
+def test_resolve_knowledge_in_referencing_workspace():
+    r = resolve("[knowledge/glossary]", referencing=_src(workspace="ws-a"))
+    assert r.resolved is True
+    assert r.doc_id.kind == "knowledge"
+    assert r.doc_id.workspace == "ws-a"
+    assert r.doc_id.slug == "glossary"
+
+
+def test_resolve_knowledge_cross_workspace():
+    r = resolve("[ws-b/knowledge/api-notes]", referencing=_src(workspace="ws-a"))
+    assert r.resolved is True
+    assert r.doc_id.kind == "knowledge"
+    assert r.doc_id.workspace == "ws-b"
+    assert r.doc_id.slug == "api-notes"

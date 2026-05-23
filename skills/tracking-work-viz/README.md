@@ -25,7 +25,7 @@ The build is a folder you can browse via the bundled static server, via `python 
 
 ## UI panes
 
-- **Tree** (left): the full hierarchy from `Fred's Work Tracking` down to individual tasks. Workspaces and sessions are links; tasks, memory docs, and workbench docs load their `.md` into the content pane on click.
+- **Tree** (left): the full hierarchy from `Fred's Work Tracking` down to individual tasks. Workspaces and sessions are links; tasks, knowledge docs, and workbench docs load their `.md` into the content pane on click.
 - **Graph** (center): Cytoscape with dagre LR layout. Containment edges (root -> workspace -> session -> task) drawn as thin gray lines. Typed relations layered on top with colour. Ghost nodes (targets that did not resolve to a doc on disk) render with a dashed border and faded label.
 - **Content** (right): the .md content of whichever doc is selected, rendered via `marked.js`.
 
@@ -43,20 +43,20 @@ Four authored relation kinds plus auto-generated containment. Footer chips toggl
 
 ## Addressing grammar
 
-Authored references in task / memory / workbench body or frontmatter resolve against the referencing doc's location:
+Authored references in task / knowledge / workbench body or frontmatter resolve against the referencing doc's location:
 
 ```
 task-foo                            -> local task, current session
-memory/note                         -> memory doc in current workspace
+knowledge/note                      -> knowledge doc in current workspace
 workbench/draft                     -> workbench doc in current session
 other-sess/task-bar                 -> task in sibling session, same workspace
 other-sess/workbench/draft          -> workbench in sibling session
-other-ws/memory/note                -> memory in another workspace
+other-ws/knowledge/note             -> knowledge in another workspace
 other-ws/other-sess/task-baz        -> task across both boundaries
 other-ws/other-sess/workbench/foo   -> workbench across both boundaries
 ```
 
-`memory` and `workbench` are reserved keywords. They cannot be used as workspace or session slugs. A target whose canonical id parses cleanly but has no on-disk file becomes a ghost node. A target that fails the grammar entirely is preserved on the source node but does not render as an edge.
+`knowledge` and `workbench` are reserved keywords. They cannot be used as workspace or session slugs. A target whose canonical id parses cleanly but has no on-disk file becomes a ghost node. A target that fails the grammar entirely is preserved on the source node but does not render as an edge.
 
 ## Output folder
 
@@ -66,7 +66,7 @@ other-ws/other-sess/workbench/foo   -> workbench across both boundaries
   vendor/   (cytoscape, dagre, cytoscape-dagre, marked, app.js, app.css)
   workspaces/<ws>/
     index.html, index.md
-    memory/index.md
+    knowledge/index.md
     sessions/<sess>/
       index.html, index.md, SUMMARY.md
       workbench/index.md
@@ -86,7 +86,7 @@ The suite covers the address grammar, parser (typed-relation extraction, mention
 
 ## Limitations
 
-- Memory and workbench folders are first-class node kinds, but Spec A does not yet emit content into them. References to `memory/*` or `workbench/*` render as ghost nodes. Spec B fills in the read/write path.
+- Knowledge and workbench folders are first-class node kinds, but Spec A does not yet emit content into them. References to `knowledge/*` or `workbench/*` render as ghost nodes. Spec B fills in the read/write path.
 - No search across the world (Spec B).
 - No graph algorithm beyond dagre LR layout.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).

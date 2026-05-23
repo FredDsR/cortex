@@ -5,4 +5,4 @@ status: In Progress
 
 # Task b
 
-See [memory/architecture] for context.
+See [knowledge/architecture] for context.

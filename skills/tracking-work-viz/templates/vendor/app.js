@@ -5,7 +5,7 @@
                 rootPrefix: '', contentBase: '', wikilinkIndex: new Map(),
                 selectedId: null };
   var KIND_RADIUS = { root: 0, workspace: 320, session: 600, task: 1050,
-                      memory: 600, workbench: 600 };
+                      knowledge: 600, workbench: 600 };
   var SIBLING_GAP_FRAC = 0.28;
   var MAX_LABEL_CHARS = 22;
 
@@ -511,7 +511,7 @@
     var styles = [
       { selector: 'node', style: nodeStyleByKind('task') },
     ];
-    ['root','workspace','session','task','memory','workbench'].forEach(function (k) {
+    ['root','workspace','session','task','knowledge','workbench'].forEach(function (k) {
       styles.push({ selector: 'node[kind="' + k + '"]', style: nodeStyleByKind(k) });
     });
     // Hover highlight: subtle accent border, no halo.
@@ -831,8 +831,8 @@
     if (m) return m[1] + '/' + m[2] + '/task/' + m[3];
     m = /^workspaces\/([^/]+)\/sessions\/([^/]+)\/workbench\/([^/]+)\.md$/.exec(p);
     if (m) return m[1] + '/' + m[2] + '/workbench/' + m[3];
-    m = /^workspaces\/([^/]+)\/memory\/([^/]+)\.md$/.exec(p);
-    if (m) return m[1] + '/memory/' + m[2];
+    m = /^workspaces\/([^/]+)\/knowledge\/([^/]+)\.md$/.exec(p);
+    if (m) return m[1] + '/knowledge/' + m[2];
     return null;
   }
 
