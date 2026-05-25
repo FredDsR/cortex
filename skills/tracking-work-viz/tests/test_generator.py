@@ -247,3 +247,55 @@ def test_build_does_not_stage_dagre(workspaces_root, tmp_path):
     build(parse_world(workspaces_root), out)
     assert not (out / "vendor" / "dagre.min.js").exists()
     assert not (out / "vendor" / "cytoscape-dagre.min.js").exists()
+
+
+def test_payload_includes_author_for_knowledge(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    assert by_id["authored-ws/knowledge/by-human"]["author"] == "human"
+    assert by_id["authored-ws/knowledge/by-agent"]["author"] == "agent"
+
+
+def test_payload_includes_author_for_workbench(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    assert by_id["authored-ws/s1/workbench/wb-agent"]["author"] == "agent"
+
+
+def test_tree_includes_knowledge_with_author(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    root = payload["tree"][0]
+    ws = next(c for c in root["children"] if c["id"] == "authored-ws/")
+    k_ids = {c["id"]: c for c in ws["children"] if c["kind"] == "knowledge"}
+    assert "authored-ws/knowledge/by-human" in k_ids
+    assert k_ids["authored-ws/knowledge/by-human"]["author"] == "human"
+    assert k_ids["authored-ws/knowledge/by-agent"]["author"] == "agent"
+
+
+def test_tree_includes_workbench_with_author(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    root = payload["tree"][0]
+    ws = next(c for c in root["children"] if c["id"] == "authored-ws/")
+    sess = next(c for c in ws["children"] if c["id"] == "authored-ws/s1/")
+    wb_children = [c for c in sess["children"] if c["kind"] == "workbench"]
+    assert any(c["id"] == "authored-ws/s1/workbench/wb-agent" and c["author"] == "agent"
+               for c in wb_children)
+
+
+def test_payload_author_null_for_unauthored_kinds(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    by_id = {n["id"]: n for n in payload["nodes"]}
+    # Tasks, sessions, workspaces always have author None.
+    assert by_id["demo-ws/alpha/task/task-a"]["author"] is None
+    assert by_id["demo-ws/alpha/"]["author"] is None
+    assert by_id["demo-ws/"]["author"] is None

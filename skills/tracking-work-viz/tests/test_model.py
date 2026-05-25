@@ -43,6 +43,18 @@ def test_doc_defaults():
     assert doc.edges_out == []
 
 
+def test_doc_has_author_field_default_none():
+    doc = Doc(id=DocId(kind="knowledge", workspace="w", slug="x"),
+              title="x", body="", frontmatter={}, rel_path=None)
+    assert doc.author is None
+
+
+def test_doc_author_field_can_be_set():
+    doc = Doc(id=DocId(kind="knowledge", workspace="w", slug="x"),
+              title="x", body="", frontmatter={}, rel_path=None, author="human")
+    assert doc.author == "human"
+
+
 def test_edge_basic():
     src = DocId(kind="task", workspace="w", session="s", slug="a")
     tgt = DocId(kind="task", workspace="w", session="s", slug="b")

@@ -97,3 +97,38 @@ def test_no_duplicate_edges(workspaces_root):
         key = (e.source.canonical(), e.target.canonical(), e.kind)
         assert key not in seen
         seen.add(key)
+
+
+def test_parser_extracts_author_on_knowledge(workspaces_root):
+    world = parse_world(workspaces_root)
+    human = world.docs.get("authored-ws/knowledge/by-human")
+    agent = world.docs.get("authored-ws/knowledge/by-agent")
+    assert human is not None and human.author == "human"
+    assert agent is not None and agent.author == "agent"
+
+
+def test_parser_extracts_author_on_workbench(workspaces_root):
+    world = parse_world(workspaces_root)
+    wb = world.docs.get("authored-ws/s1/workbench/wb-agent")
+    assert wb is not None and wb.author == "agent"
+
+
+def test_parser_ignores_author_on_task(tmp_path):
+    """Author is only meaningful on knowledge/workbench; tasks ignore the field."""
+    import textwrap
+    ws = tmp_path / "workspaces" / "tmp-ws"
+    sess = ws / "sessions" / "s1"
+    (sess / "tasks").mkdir(parents=True)
+    (sess / "SUMMARY.md").write_text("---\nslug: s1\n---\n# s1\n")
+    (sess / "tasks" / "task-x.md").write_text(textwrap.dedent("""\
+        ---
+        status: Open
+        author: agent
+        ---
+
+        Body
+    """))
+    world = parse_world(tmp_path / "workspaces")
+    task = world.docs.get("tmp-ws/s1/task/task-x")
+    assert task is not None
+    assert task.author is None

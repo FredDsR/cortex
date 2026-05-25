@@ -59,6 +59,7 @@ class Doc:
     ghost: bool = False
     status: Optional[str] = None
     archived: bool = False
+    author: Optional[str] = None
 
 
 @dataclass

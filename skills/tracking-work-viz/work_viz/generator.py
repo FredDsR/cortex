@@ -270,6 +270,7 @@ def _node_dict(world: World, doc: Doc) -> dict:
         "status": doc.status,
         "ghost": doc.ghost,
         "archived": doc.archived,
+        "author": doc.author,
         "contentPath": content_path,
     }
 
@@ -383,7 +384,27 @@ def _build_tree(world: World) -> list[dict]:
                     "status": t.status,
                     "children": [],
                 })
+            for wb in _children_of(world, sess.id.canonical(), "workbench"):
+                sess_node["children"].append({
+                    "id": wb.id.canonical(),
+                    "scopeId": wb.id.canonical(),
+                    "label": wb.id.slug, "kind": "workbench", "href": None,
+                    "contentPath": _content_path(wb.id),
+                    "archived": wb.archived,
+                    "author": wb.author,
+                    "children": [],
+                })
             ws_node["children"].append(sess_node)
+        for k in _children_of(world, ws.id.canonical(), "knowledge"):
+            ws_node["children"].append({
+                "id": k.id.canonical(),
+                "scopeId": k.id.canonical(),
+                "label": k.id.slug, "kind": "knowledge", "href": None,
+                "contentPath": _content_path(k.id),
+                "archived": False,
+                "author": k.author,
+                "children": [],
+            })
         root_node["children"].append(ws_node)
     return [root_node]
 

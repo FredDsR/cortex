@@ -221,6 +221,26 @@ body.show-archived #tree li.all-children-archived { display: block; }
 }
 body.dark .tree-node.resolved::before { color: #4dcb8e; }
 
+/* Author glyph for knowledge / workbench rows in the tree. Pure text +
+   color keeps it crisp at the row's font-size without an extra asset.
+   Mirrors the graph badge: H (blue) = human, A (purple) = agent. */
+.tree-node.authored-human::before {
+  content: 'H';
+  color: #4a6fa5;
+  font-weight: 700;
+  margin-right: 5px;
+  display: inline-block;
+}
+.tree-node.authored-agent::before {
+  content: 'A';
+  color: #6b46a8;
+  font-weight: 700;
+  margin-right: 5px;
+  display: inline-block;
+}
+body.dark .tree-node.authored-human::before { color: #88aedb; }
+body.dark .tree-node.authored-agent::before { color: #b994e0; }
+
 .tree-row {
   display: flex;
   align-items: center;

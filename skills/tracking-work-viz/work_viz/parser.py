@@ -108,8 +108,9 @@ def _read_doc(path: Path, id: DocId) -> tuple[Doc, list[RawEdge]]:
     fm, body = _split_frontmatter(text)
     title = _title_from_body(body, id.slug or id.session or id.workspace or "(untitled)")
     status = fm.get("status") if id.kind == "task" else None
+    author = fm.get("author") if id.kind in ("knowledge", "workbench") else None
     doc = Doc(id=id, title=title, body=body, frontmatter=fm, rel_path=path,
-              edges_out=[], status=status)
+              edges_out=[], status=status, author=author)
     raw = _extract_raw_edges(fm, body)
     return doc, raw
 
