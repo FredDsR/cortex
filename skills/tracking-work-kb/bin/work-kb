@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# work-kb: create knowledge / workbench markdown files in ~/.work or <repo>/.work.
+# Agent-primary CLI. Spec B (kb write paths). See SKILL.md for full surface.
+set -euo pipefail
+
+WORK_KB_AUTHOR_DEFAULT="agent"
+
+die() { echo "error: $*" >&2; exit "${2:-1}"; }
+usage() {
+    cat >&2 <<EOF
+Usage:
+  work-kb new knowledge <slug> [--workspace <ws>] [--author <human|agent>]
+                                [--body <text>] [--body-from <file|->]
+                                [--open]
+  work-kb new workbench <slug> [--session <sess>] [--workspace <ws>] [--author ...]
+                                [--body ...] [--body-from ...] [--open]
+EOF
+    exit 2
+}
+
+validate_slug() {
+    local s="$1"
+    [[ "$s" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "invalid slug: '$s' (must match [a-z0-9][a-z0-9-]*)"
+}
+
+# Walk up from cwd looking for nearest ancestor with .work/. Only searches
+# within $HOME; refuses to walk outside (e.g., into /var or /tmp) where a
+# stray .work/ would not be the user's intended local store.
+find_local_store() {
+    local d
+    d="$(pwd -P)"
+    # Require cwd to be inside $HOME (resolved). If not, no local store.
+    local home_real
+    home_real="$(cd "$HOME" 2>/dev/null && pwd -P)" || return 1
+    case "$d/" in
+        "$home_real"/*) : ;;
+        "$home_real/") return 1 ;;  # cwd == $HOME: no ancestor to search
+        *) return 1 ;;
+    esac
+    while [[ "$d" != "/" && "$d" != "$home_real" ]]; do
+        if [[ -d "$d/.work" ]]; then echo "$d/.work"; return 0; fi
+        d="$(dirname "$d")"
+    done
+    return 1
+}
+
+resolve_workspace() {
+    local explicit_ws="$1"
+    if [[ -n "$explicit_ws" ]]; then
+        local global="$HOME/.work/workspaces/$explicit_ws"
+        [[ -d "$global" ]] || die "workspace '$explicit_ws' not found"
+        echo "$global"; return 0
+    fi
+    local local_root
+    if local_root="$(find_local_store 2>/dev/null)"; then
+        echo "$local_root"; return 0
+    fi
+    # Global scan: find workspaces with any .active.* pointer.
+    local matches=()
+    if [[ -d "$HOME/.work/workspaces" ]]; then
+        while IFS= read -r -d '' ws; do
+            shopt -s nullglob
+            local actives=("$ws"/.active.*)
+            shopt -u nullglob
+            if (( ${#actives[@]} > 0 )); then
+                matches+=("$ws")
+            fi
+        done < <(find "$HOME/.work/workspaces" -mindepth 1 -maxdepth 1 -type d -print0)
+    fi
+    case "${#matches[@]}" in
+        0) die "no workspace context; pass --workspace <ws>" ;;
+        1) echo "${matches[0]}" ;;
+        *)
+            local names=()
+            for m in "${matches[@]}"; do names+=("$(basename "$m")"); done
+            die "multiple active workspaces (${names[*]}); pass --workspace <ws>"
+            ;;
+    esac
+}
+
+resolve_session() {
+    local ws_root="$1" explicit_sess="$2"
+    if [[ -n "$explicit_sess" ]]; then
+        [[ -d "$ws_root/sessions/$explicit_sess" ]] || \
+            die "session '$explicit_sess' not found in workspace '$(basename "$ws_root")'"
+        echo "$explicit_sess"; return 0
+    fi
+    local sessions=()
+    shopt -s nullglob
+    for f in "$ws_root"/.active.*; do
+        sessions+=("$(cat "$f")")
+    done
+    shopt -u nullglob
+    if (( ${#sessions[@]} == 0 )); then
+        die "no active session in '$(basename "$ws_root")'; pass --session <sess>"
+    fi
+    local unique
+    unique="$(printf '%s\n' "${sessions[@]}" | sort -u)"
+    local count
+    count="$(printf '%s\n' "$unique" | wc -l)"
+    if (( count == 1 )); then
+        printf '%s' "$unique"
+    else
+        die "multiple sessions active in '$(basename "$ws_root")'; pass --session <sess>"
+    fi
+}
+
+read_body() {
+    local body_text="$1" body_from="$2"
+    if [[ -n "$body_text" ]]; then printf '%s' "$body_text"; return 0; fi
+    if [[ -n "$body_from" ]]; then
+        if [[ "$body_from" == "-" ]]; then cat; else cat "$body_from"; fi
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then cat; return 0; fi
+    printf ''
+}
+
+write_file() {
+    local path="$1" author="$2" body="$3"
+    [[ -f "$path" ]] && die "$path already exists"
+    mkdir -p "$(dirname "$path")"
+    {
+        printf '%s\n' '---'
+        printf 'author: %s\n' "$author"
+        printf 'created: %s\n' "$(date +%Y-%m-%d)"
+        printf '%s\n' '---'
+        printf '\n'
+        printf '%s' "$body"
+    } > "$path"
+    printf '%s\n' "$path"
+}
+
+cmd_new() {
+    local kind="$1"; shift
+    [[ "$kind" == "knowledge" || "$kind" == "workbench" ]] || \
+        die "kind must be 'knowledge' or 'workbench'" 2
+    local slug=""
+    local ws_flag="" sess_flag="" author_flag="" body_text="" body_from="" open_flag=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --workspace) ws_flag="$2"; shift 2 ;;
+            --session)   sess_flag="$2"; shift 2 ;;
+            --author)    author_flag="$2"; shift 2 ;;
+            --body)      body_text="$2"; shift 2 ;;
+            --body-from) body_from="$2"; shift 2 ;;
+            --open)      open_flag=1; shift ;;
+            --) shift; break ;;
+            -*) die "unknown flag: $1" 2 ;;
+            *) [[ -z "$slug" ]] && slug="$1" || die "extra argument: $1" 2; shift ;;
+        esac
+    done
+    [[ -n "$slug" ]] || usage
+    validate_slug "$slug"
+
+    local author="$author_flag"
+    if [[ -z "$author" ]]; then
+        if (( open_flag )); then author="human"; else author="$WORK_KB_AUTHOR_DEFAULT"; fi
+    fi
+    [[ "$author" == "human" || "$author" == "agent" ]] || \
+        die "author must be 'human' or 'agent'"
+
+    local ws_root path
+    ws_root="$(resolve_workspace "$ws_flag")"
+
+    if [[ "$kind" == "knowledge" ]]; then
+        path="$ws_root/knowledge/$slug.md"
+    else
+        local sess
+        sess="$(resolve_session "$ws_root" "$sess_flag")"
+        path="$ws_root/sessions/$sess/workbench/$slug.md"
+    fi
+
+    local body
+    body="$(read_body "$body_text" "$body_from")"
+    write_file "$path" "$author" "$body"
+
+    # commit_push.sh from tracking-work-sync (no-op if sync disabled/unavailable).
+    local sync_script="$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh"
+    if [[ -x "$sync_script" ]]; then
+        bash "$sync_script" "track(kb): add $kind $slug" >/dev/null 2>&1 || true
+    fi
+
+    if (( open_flag )); then
+        exec "${EDITOR:-vi}" "$path"
+    fi
+}
+
+[[ $# -ge 1 ]] || usage
+case "$1" in
+    new) shift; [[ $# -ge 1 ]] || usage; cmd_new "$@" ;;
+    -h|--help) usage ;;
+    *) die "unknown subcommand: $1" 2 ;;
+esac

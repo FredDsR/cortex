@@ -19,6 +19,7 @@ Sub-skills handle optional concerns:
 - `tracking-work-github` — PR/commit sync when a session has a `github:` field.
 - `tracking-work-migration` — per-session moves between local and global stores.
 - `tracking-work-sync` — cross-device sync of `~/.work/` via a private GitHub repo (opt-in).
+- `tracking-work-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `work-kb` CLI.
 
 ## When to Use
 

@@ -1,6 +1,6 @@
 {
   "name": "tracking-work",
-  "description": "File-based session/task tracking for AI coding agents. Bundles main skill + github/migration/sync sub-skills. Works with Claude Code, Codex, Gemini CLI, Copilot CLI (any harness reading SKILL.md).",
+  "description": "File-based session/task tracking for AI coding agents. Bundles main skill + github/migration/sync/kb/viz sub-skills. Works with Claude Code, Codex, Gemini CLI, Copilot CLI (any harness reading SKILL.md).",
   "version": "1.0.0",
   "author": {
     "name": "FredDsR"

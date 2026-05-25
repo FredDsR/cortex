@@ -172,3 +172,10 @@ fi
 
 echo "tracking-work-viz: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: work-viz"
 # --- end tracking-work-viz install ---
+
+# --- tracking-work-kb install ---
+KB_BIN_DIR="$HOME/.work/bin"
+mkdir -p "$KB_BIN_DIR"
+ln -sf "$REPO_DIR/skills/tracking-work-kb/bin/work-kb" "$KB_BIN_DIR/work-kb"
+echo "tracking-work-kb: installed. Add $KB_BIN_DIR to PATH if not already, then run: work-kb"
+# --- end tracking-work-kb install ---
