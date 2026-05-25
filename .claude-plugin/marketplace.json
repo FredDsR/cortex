@@ -8,7 +8,7 @@
     {
       "name": "tracking-work",
       "source": ".",
-      "description": "Main tracking-work skill plus sub-skills (github, migration, sync).",
+      "description": "Main tracking-work skill plus sub-skills (github, migration, sync, kb, viz).",
       "version": "1.0.0"
     }
   ]
