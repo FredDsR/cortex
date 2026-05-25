@@ -4,9 +4,13 @@
   var STORE = { cy: null, payload: null, layout: 'concentric-hier',
                 rootPrefix: '', contentBase: '', wikilinkIndex: new Map(),
                 selectedId: null };
-  var KIND_RADIUS = { root: 0, workspace: 320, session: 600, task: 1050,
-                      knowledge: 600, workbench: 600 };
-  var SIBLING_GAP_FRAC = 0.28;
+  var KIND_RADIUS = { root: 0, workspace: 320, session: 600, task: 1400,
+                      knowledge: 460, workbench: 1050 };
+  // Angular weight per leaf-kind. Knowledge / workbench leaves count for
+  // less than a task so they share a narrow wedge (visually stacked /
+  // overlapping), leaving the angular budget for tasks to wave-arc wide.
+  var KIND_LEAF_WEIGHT = { task: 1, knowledge: 0.25, workbench: 0.25 };
+  var SIBLING_GAP_FRAC = 0.16;
   var MAX_LABEL_CHARS = 22;
 
   // Green checkmark badge painted on top of resolved task nodes. SVG inlined
@@ -322,8 +326,15 @@
     var leafCount = new Map();
     function countLeaves(id) {
       if (leafCount.has(id)) return leafCount.get(id);
+      var node = byId.get(id);
       var kids = children.get(id) || [];
-      var n = kids.length === 0 ? 1 : kids.reduce(function (a, k) { return a + countLeaves(k); }, 0);
+      var n;
+      if (kids.length === 0) {
+        n = (node && KIND_LEAF_WEIGHT[node.kind] !== undefined)
+              ? KIND_LEAF_WEIGHT[node.kind] : 1;
+      } else {
+        n = kids.reduce(function (a, k) { return a + countLeaves(k); }, 0);
+      }
       leafCount.set(id, n);
       return n;
     }
@@ -409,6 +420,19 @@
       s['border-width'] = 1.5;
     }
     if (kind === 'task') {
+      s['width'] = 24; s['height'] = 24;
+    }
+    if (kind === 'knowledge') {
+      // Custom polygon: folded-corner note. Universal "document" icon.
+      // Sized to match task ellipses for visual parity.
+      s['shape'] = 'polygon';
+      s['shape-polygon-points'] = '-1 -1, 0.55 -1, 1 -0.55, 1 1, -1 1';
+      s['width'] = 24; s['height'] = 24;
+    }
+    if (kind === 'workbench') {
+      // Simple block (sharp-cornered rectangle) at task size. Reads as
+      // a session-scoped artifact distinct from the rounded ellipses.
+      s['shape'] = 'rectangle';
       s['width'] = 24; s['height'] = 24;
     }
     if (kind === 'root') {
