@@ -132,8 +132,6 @@ fetch_if_missing() {
 
 REQUIRED_VENDOR=(
   "cytoscape.min.js|https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"
-  "dagre.min.js|https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"
-  "cytoscape-dagre.min.js|https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"
   "marked.min.js|https://unpkg.com/marked@12.0.2/marked.min.js"
 )
 
