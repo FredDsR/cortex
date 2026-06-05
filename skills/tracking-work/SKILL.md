@@ -72,8 +72,45 @@ Then decide:
 | After any write to `tasks/*.md` or `SUMMARY.md` | Run `commit_push.sh "<track: ... message>"`. |
 | `pull.sh` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
 | On session close (after archive move) | Run `commit_push.sh "track: archive session <slug>"`. |
+| User says "close the day" / "see you tomorrow" / `/tracking-work:close-day` | Run the **Closing the Day** routine: snapshot via `close_day.sh`, propose updates, confirm once, write + `commit_push.sh`, sign off. Never archive. |
 
 All `tracking-work-sync/scripts/*` no-op when sync is unavailable, so checkpoints call them unconditionally. Full path: `$HOME/.claude/skills/tracking-work-sync/scripts/`.
+
+## Closing the Day
+
+Explicit, user-triggered wrap-up of the active session. This is NOT "Closing a
+Session" — it never archives the session and never deletes `.active.<id>`. The
+session stays live so the next day resumes seamlessly.
+
+**Triggers:** the `/tracking-work:close-day` slash command, or any of these
+phrases (phrases are the cross-harness mechanism): "close the day", "that's all
+for today", "see you tomorrow", "I'm done for today", "wrapping up".
+
+**Scope:** the current workspace's active session(s). It saves *all* work
+accumulated in the session so far — not just today's — so multi-day sessions are
+fully covered.
+
+Routine:
+
+1. Run `bash "$SKILL_DIR/scripts/close_day.sh"` for the snapshot. If `STATUS` is
+   not `ok`, tell the user there is nothing to close and stop.
+2. Compose ONE proposal, reconciled against what is already recorded in
+   `tasks/*.md` / `SUMMARY.md`:
+   - Task status / Notes updates inferred from `COMMITS`, `UNCOMMITTED`, and the
+     conversation.
+   - Candidate knowledge notes worth capturing — author via `tracking-work-kb`
+     (`work-kb`).
+   - Whether sync will run (configured vs. not).
+3. Present the batch and get a SINGLE confirmation.
+4. On confirm: write `tasks/*.md` and update `SUMMARY.md` (bump `last_updated`);
+   create/update knowledge notes via `work-kb`; then run
+   `bash "$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh" "track: close day — <session-slug>"`
+   (this is the commit+push path; it no-ops when sync is unavailable).
+5. Sign off using `NEXT_DAY`: "Saved and synced. See you tomorrow." / "… See you
+   Monday." If sync is unavailable, say "Saved." instead of "Saved and synced."
+
+If more than one active session exists in the workspace, list them and ask which
+to wrap up (or all). Never archive.
 
 ## Closing a Session
 

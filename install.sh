@@ -132,8 +132,6 @@ fetch_if_missing() {
 
 REQUIRED_VENDOR=(
   "cytoscape.min.js|https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"
-  "dagre.min.js|https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"
-  "cytoscape-dagre.min.js|https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"
   "marked.min.js|https://unpkg.com/marked@12.0.2/marked.min.js"
 )
 
@@ -172,6 +170,17 @@ fi
 
 echo "tracking-work-viz: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: work-viz"
 # --- end tracking-work-viz install ---
+
+# --- slash command install (Claude Code symlink path) ---
+# Plugin/marketplace installs pick up commands/ natively. For symlink installs,
+# expose the command from ~/.claude/commands/ when that harness is present.
+CC_COMMANDS_DIR="$HOME/.claude/commands"
+if [ -d "$HOME/.claude" ]; then
+  mkdir -p "$CC_COMMANDS_DIR"
+  ln -sfn "$REPO_DIR/commands/close-day.md" "$CC_COMMANDS_DIR/close-day.md"
+  echo "slash command: linked close-day.md → $CC_COMMANDS_DIR (use /close-day)"
+fi
+# --- end slash command install ---
 
 # --- tracking-work-kb install ---
 KB_BIN_DIR="$HOME/.work/bin"

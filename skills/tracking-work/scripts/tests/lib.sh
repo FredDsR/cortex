@@ -31,6 +31,18 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local haystack="$1" needle="$2" msg="${3:-}"
+  if [[ "$haystack" != *"$needle"* ]]; then
+    _pass=$((_pass + 1))
+  else
+    _fail=$((_fail + 1))
+    echo "  FAIL: ${_current_test} ${msg}"
+    echo "    unexpected substring: '${needle}'"
+    echo "    in:                   '${haystack}'"
+  fi
+}
+
 assert_file_exists() {
   local path="$1" msg="${2:-}"
   if [ -e "$path" ]; then
