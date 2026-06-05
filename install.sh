@@ -173,6 +173,17 @@ fi
 echo "tracking-work-viz: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: work-viz"
 # --- end tracking-work-viz install ---
 
+# --- slash command install (Claude Code symlink path) ---
+# Plugin/marketplace installs pick up commands/ natively. For symlink installs,
+# expose the command from ~/.claude/commands/ when that harness is present.
+CC_COMMANDS_DIR="$HOME/.claude/commands"
+if [ -d "$HOME/.claude" ]; then
+  mkdir -p "$CC_COMMANDS_DIR"
+  ln -sfn "$REPO_DIR/commands/close-day.md" "$CC_COMMANDS_DIR/close-day.md"
+  echo "slash command: linked close-day.md → $CC_COMMANDS_DIR (use /close-day)"
+fi
+# --- end slash command install ---
+
 # --- tracking-work-kb install ---
 KB_BIN_DIR="$HOME/.work/bin"
 mkdir -p "$KB_BIN_DIR"
