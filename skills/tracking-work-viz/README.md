@@ -8,7 +8,7 @@ From the repo root:
 
     bash install.sh
 
-This symlinks `bin/work-viz` to `~/.work/bin/work-viz` and fetches four third-party JS files (Cytoscape, dagre, cytoscape-dagre, marked) into `skills/tracking-work-viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
+This symlinks `bin/work-viz` to `~/.work/bin/work-viz` and fetches two third-party JS files (Cytoscape, marked) into `skills/tracking-work-viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
 
 ## Usage
 
@@ -26,7 +26,7 @@ The build is a folder you can browse via the bundled static server, via `python 
 ## UI panes
 
 - **Tree** (left): the full hierarchy from `Fred's Work Tracking` down to individual tasks. Workspaces and sessions are links; tasks, knowledge docs, and workbench docs load their `.md` into the content pane on click.
-- **Graph** (center): Cytoscape with dagre LR layout. Containment edges (root -> workspace -> session -> task) drawn as thin gray lines. Typed relations layered on top with colour. Ghost nodes (targets that did not resolve to a doc on disk) render with a dashed border and faded label.
+- **Graph** (center): Cytoscape with a hierarchical layout (`concentric-hier` by default, with an optional force-directed `cose` mode toggled from the topbar). Containment edges (root -> workspace -> session -> task) drawn as thin gray lines. Typed relations layered on top with colour. Ghost nodes (targets that did not resolve to a doc on disk) render with a dashed border and faded label.
 - **Content** (right): the .md content of whichever doc is selected, rendered via `marked.js`.
 
 ## Typed edge kinds
@@ -63,7 +63,7 @@ other-ws/other-sess/workbench/foo   -> workbench across both boundaries
 ```
 <out>/
   index.html, index.md
-  vendor/   (cytoscape, dagre, cytoscape-dagre, marked, app.js, app.css)
+  vendor/   (cytoscape, marked, app.js, app.css)
   workspaces/<ws>/
     index.html, index.md
     knowledge/index.md
@@ -88,6 +88,6 @@ The suite covers the address grammar, parser (typed-relation extraction, mention
 
 - Knowledge and workbench folders are first-class node kinds, but Spec A does not yet emit content into them. References to `knowledge/*` or `workbench/*` render as ghost nodes. Spec B fills in the read/write path.
 - No search across the world (Spec B).
-- No graph algorithm beyond dagre LR layout.
+- No graph algorithm beyond the built-in hierarchical and `cose` layouts.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).
 - Opening `out/index.html` via `file://` works for graph + tree but the content pane needs a server because browsers block `fetch` on `file://`. Use `work-viz serve` or `python -m http.server` from inside `out/`.
