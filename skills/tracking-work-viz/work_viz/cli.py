@@ -29,6 +29,10 @@ def _build_argparser() -> argparse.ArgumentParser:
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=0)
     s.add_argument("--no-open", action="store_true")
+    s.add_argument("--edit", action="store_true",
+                   help="Enable in-browser editing (localhost only).")
+    s.add_argument("--workspaces-root", type=Path, default=None,
+                   help="Source root for --edit (overrides build manifest).")
 
     return p
 
@@ -57,7 +61,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "serve":
         serve(args.out_dir, host=args.host, port=args.port,
-              open_browser=not args.no_open)
+              open_browser=not args.no_open,
+              edit=args.edit, workspaces_root=args.workspaces_root)
         return 0
     parser.error(f"unknown subcommand: {args.cmd}")
     return 2
