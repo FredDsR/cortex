@@ -17,6 +17,7 @@ from urllib.parse import urlparse, parse_qs
 
 from .parser import parse_world
 from .generator import build, build_payload
+from .address import abbreviate
 from . import edit_backend
 
 
@@ -77,10 +78,26 @@ class EditHandler(http.server.SimpleHTTPRequestHandler):
             return self._json(404, {"error": "no source file"})
         except PermissionError:
             return self._json(400, {"error": "not editable"})
+        candidates = []
+        for other in world.docs.values():
+            if other.ghost:
+                continue
+            if other.id.kind not in ("task", "knowledge", "workbench"):
+                continue
+            ocid = other.id.canonical()
+            if ocid == cid:
+                continue
+            candidates.append({
+                "id": ocid,
+                "label": other.id.slug,
+                "kind": other.id.kind,
+                "token": abbreviate(other.id, doc.id),
+            })
         return self._json(200, {
             "editable": True,
             "content": path.read_text(encoding="utf-8"),
             "hash": edit_backend.file_hash(path),
+            "candidates": candidates,
         })
 
     def _handle_save(self, req: dict):
