@@ -375,3 +375,22 @@ li.collapsed > .tree-row > .tree-arrow { transform: rotate(-90deg); }
   resize: vertical;
 }
 .content-editor:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* Save button in-flight state */
+.content-editbar .chip.is-saving { opacity: .8; cursor: progress; }
+.wv-spinner {
+  display: inline-block; width: .8em; height: .8em; margin-right: .45em;
+  vertical-align: -1px; border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; animation: wv-spin .6s linear infinite;
+}
+@keyframes wv-spin { to { transform: rotate(360deg); } }
+
+/* Transient save confirmation toast */
+.wv-toast {
+  position: fixed; bottom: 1.2rem; right: 1.2rem; z-index: 1000;
+  padding: .5rem .85rem; border-radius: 6px;
+  background: var(--status-resolved); color: #fff; font-size: .85rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s;
+}
+.wv-toast.show { opacity: 1; transform: translateY(0); }

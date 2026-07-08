@@ -1032,7 +1032,7 @@
     var ta = document.createElement('textarea');
     ta.className = 'content-editor';
     ta.value = content;
-    save.addEventListener('click', function () { saveEdit(id, ta.value, hash); });
+    save.addEventListener('click', function () { saveEdit(id, ta.value, hash, save); });
     bar.appendChild(save);
     if (cancelPath) {
       var cancel = document.createElement('button');
@@ -1056,7 +1056,35 @@
       .catch(function (err) { alert('Could not open editor: ' + err.message); });
   }
 
-  function saveEdit(id, content, baseHash) {
+  function setSaving(btn, saving) {
+    if (!btn) return;
+    if (saving) {
+      btn.disabled = true;
+      btn.classList.add('is-saving');
+      btn.innerHTML = '<span class="wv-spinner"></span>Saving…';
+    } else {
+      btn.disabled = false;
+      btn.classList.remove('is-saving');
+      btn.textContent = 'Save';
+    }
+  }
+
+  function wvToast(msg) {
+    var t = document.createElement('div');
+    t.className = 'wv-toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    // force reflow so the fade-in transition runs, then schedule removal
+    void t.offsetWidth;
+    t.classList.add('show');
+    setTimeout(function () {
+      t.classList.remove('show');
+      setTimeout(function () { t.remove(); }, 300);
+    }, 1600);
+  }
+
+  function saveEdit(id, content, baseHash, btn) {
+    setSaving(btn, true);
     var body = JSON.stringify({
       id: id, content: content, baseHash: baseHash,
       scope: STORE.payload.scope, scopeId: STORE.payload.scopeId,
@@ -1085,8 +1113,12 @@
       var pane = document.getElementById('content');
       pane.innerHTML = renderWikilinks(marked.parse(stripFrontmatter(d.content)));
       maybeAddEditButton(STORE.currentContentPath);
+      wvToast('Saved ✓');
     }).catch(function (err) {
-      if (err.message !== 'conflict') alert(err.message);
+      if (err.message !== 'conflict') {
+        setSaving(btn, false);
+        alert(err.message);
+      }
     });
   }
 
