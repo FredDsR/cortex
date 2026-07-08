@@ -972,6 +972,7 @@
 
   function loadContent(path) {
     var pane = document.getElementById('content');
+    removeStalePickers();
     var url = resolveContent(path);
     STORE.contentBase = url.replace(/[^/]+$/, ''); // dirname + trailing slash
     STORE.currentContentPath = path;
@@ -1023,6 +1024,7 @@
 
   function renderEditor(id, content, hash, cancelPath) {
     var pane = document.getElementById('content');
+    removeStalePickers();
     pane.innerHTML = '';
     var bar = document.createElement('div');
     bar.className = 'content-editbar';
@@ -1044,6 +1046,7 @@
     pane.appendChild(bar);
     pane.appendChild(ta);
     ta.focus();
+    attachPicker(ta);
   }
 
   function enterEditMode(id, path) {
@@ -1051,9 +1054,119 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.editable) return;
+        STORE.editCandidates = d.candidates || [];
         renderEditor(id, d.content, d.hash, path);
       })
       .catch(function (err) { alert('Could not open editor: ' + err.message); });
+  }
+
+  function removeStalePickers() {
+    var els = document.querySelectorAll('.wv-picker');
+    Array.prototype.forEach.call(els, function (el) { el.remove(); });
+  }
+
+  function attachPicker(ta) {
+    var dd = document.createElement('div');
+    dd.className = 'wv-picker';
+    dd.style.display = 'none';
+    document.body.appendChild(dd);
+    var items = [];
+    var active = -1;
+    var queryStart = -1; // index in ta.value just after the "[["
+
+    function close() { dd.style.display = 'none'; active = -1; queryStart = -1; }
+
+    function currentQuery() {
+      var pos = ta.selectionStart;
+      var before = ta.value.slice(0, pos);
+      var open = before.lastIndexOf('[[');
+      if (open < 0) return null;
+      var between = before.slice(open + 2);
+      if (/[\]\n]/.test(between)) return null;
+      queryStart = open + 2;
+      return between;
+    }
+
+    function proximity(token) { return (token.match(/\//g) || []).length; }
+
+    function highlight() {
+      Array.prototype.forEach.call(dd.children, function (ch, i) {
+        ch.className = 'wv-picker-row' + (i === active ? ' active' : '');
+      });
+    }
+
+    function position() {
+      var r = ta.getBoundingClientRect();
+      dd.style.left = (window.scrollX + r.left + 12) + 'px';
+      dd.style.top = (window.scrollY + r.top + 30) + 'px';
+      dd.style.maxWidth = (r.width - 24) + 'px';
+    }
+
+    function choose(i) {
+      var c = items[i];
+      if (!c) return;
+      var pos = ta.selectionStart;
+      var before = ta.value.slice(0, queryStart - 2); // drop the "[["
+      var after = ta.value.slice(pos);
+      var insert = '[[' + c.token + ']]';
+      ta.value = before + insert + after;
+      var caret = before.length + insert.length;
+      ta.selectionStart = ta.selectionEnd = caret;
+      close();
+      ta.focus();
+    }
+
+    function renderList(q) {
+      var ql = q.toLowerCase();
+      items = (STORE.editCandidates || []).filter(function (c) {
+        return c.label.toLowerCase().indexOf(ql) >= 0 ||
+               c.token.toLowerCase().indexOf(ql) >= 0;
+      }).sort(function (a, b) {
+        var d = proximity(a.token) - proximity(b.token);
+        return d !== 0 ? d : a.label.localeCompare(b.label);
+      }).slice(0, 50);
+      if (!items.length) { close(); return; }
+      active = 0;
+      dd.innerHTML = '';
+      items.forEach(function (c, i) {
+        var row = document.createElement('div');
+        row.className = 'wv-picker-row' + (i === 0 ? ' active' : '');
+        row.innerHTML =
+          '<span class="wv-picker-label"></span>' +
+          '<span class="wv-picker-kind"></span>' +
+          '<span class="wv-picker-token"></span>';
+        row.children[0].textContent = c.label;
+        row.children[1].textContent = c.kind;
+        row.children[2].textContent = c.token;
+        row.addEventListener('mousedown', function (ev) {
+          ev.preventDefault(); choose(i);
+        });
+        dd.appendChild(row);
+      });
+      position();
+      dd.style.display = 'block';
+    }
+
+    ta.addEventListener('input', function () {
+      var q = currentQuery();
+      if (q === null) { close(); return; }
+      renderList(q);
+    });
+    ta.addEventListener('keydown', function (ev) {
+      if (dd.style.display === 'none') return;
+      if (ev.key === 'ArrowDown') {
+        ev.preventDefault(); active = Math.min(active + 1, items.length - 1); highlight();
+      } else if (ev.key === 'ArrowUp') {
+        ev.preventDefault(); active = Math.max(active - 1, 0); highlight();
+      } else if (ev.key === 'Enter') {
+        ev.preventDefault(); choose(active);
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault(); close();
+      }
+    });
+    document.addEventListener('mousedown', function (ev) {
+      if (ev.target !== ta && !dd.contains(ev.target)) close();
+    });
   }
 
   function setSaving(btn, saving) {
@@ -1110,6 +1223,7 @@
       return r.json();
     }).then(function (d) {
       refreshFromPayload(d.payload);
+      removeStalePickers();
       var pane = document.getElementById('content');
       pane.innerHTML = renderWikilinks(marked.parse(stripFrontmatter(d.content)));
       maybeAddEditButton(STORE.currentContentPath);
