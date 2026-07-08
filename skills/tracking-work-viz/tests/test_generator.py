@@ -299,3 +299,38 @@ def test_payload_author_null_for_unauthored_kinds(workspaces_root, tmp_path):
     assert by_id["demo-ws/alpha/task/task-a"]["author"] is None
     assert by_id["demo-ws/alpha/"]["author"] is None
     assert by_id["demo-ws/"]["author"] is None
+
+
+from work_viz import generator
+
+
+def test_build_payload_matches_root_page(workspaces_root, tmp_path):
+    world = parse_world(workspaces_root)
+    payload = generator.build_payload(world, "root", "/")
+    assert payload["scope"] == "root"
+    assert payload["scopeId"] == "/"
+    assert payload["rootHref"] == "index.html"
+    assert payload["defaultContentPath"] == "index.md"
+    assert isinstance(payload["tree"], list) and payload["tree"]
+    assert isinstance(payload["nodes"], list) and payload["nodes"]
+    assert isinstance(payload["wikilinks"], dict)
+
+
+def test_build_payload_workspace_scope(workspaces_root):
+    world = parse_world(workspaces_root)
+    payload = generator.build_payload(world, "workspace", "demo-ws/")
+    assert payload["scope"] == "workspace"
+    assert payload["scopeId"] == "demo-ws/"
+    assert payload["rootHref"] == "../../index.html"
+    assert payload["defaultContentPath"] == "workspaces/demo-ws/index.md"
+
+
+def test_build_writes_manifest(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    generator.build(world, out, workspaces_root=workspaces_root)
+    manifest = out / generator.MANIFEST_NAME
+    assert manifest.is_file()
+    data = json.loads(manifest.read_text())
+    assert data["workspacesRoot"] == str(workspaces_root)
+    assert "builtAt" in data

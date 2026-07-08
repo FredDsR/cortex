@@ -69,6 +69,7 @@ Then decide:
 | User says "blocked on X" | Add to SUMMARY.md **Blockers**, set task frontmatter `status: Blocked`. |
 | Blocker resolves | Remove from **Blockers**, unset **Blocked** on dependents. |
 | User asks to move a session between stores | Invoke `tracking-work-migration`. |
+| User wants to capture a durable note, an unresolved `[[knowledge/...]]` / `[[workbench/...]]` ghost link needs a real entry, spec/plan/brainstorm output should be recorded, or a task needs supporting files (especially shared context referenced by more than one task) | Invoke `tracking-work-kb` to author `knowledge/<slug>.md` (workspace-scoped, for context shared across tasks) or `workbench/<slug>.md` (session-scoped). Reference the entry from the relevant task bodies with `[[knowledge/<slug>]]`. |
 | After any write to `tasks/*.md` or `SUMMARY.md` | Run `commit_push.sh "<track: ... message>"`. |
 | `pull.sh` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
 | On session close (after archive move) | Run `commit_push.sh "track: archive session <slug>"`. |

@@ -974,6 +974,7 @@
     var pane = document.getElementById('content');
     var url = resolveContent(path);
     STORE.contentBase = url.replace(/[^/]+$/, ''); // dirname + trailing slash
+    STORE.currentContentPath = path;
     setSelected(idFromContentPath(path));
     fetch(url).then(function (r) {
       if (!r.ok) throw new Error('Could not load ' + url + ': ' + r.status);
@@ -981,9 +982,156 @@
     }).then(function (txt) {
       var body = stripFrontmatter(txt);
       pane.innerHTML = renderWikilinks(marked.parse(body));
+      maybeAddEditButton(path);
     }).catch(function (err) {
       pane.innerHTML = '<p style="color:#a00">' + err.message + '</p>';
     });
+  }
+
+  // ---- Edit mode (live server only) ---------------------------------------
+
+  var EDITABLE_KINDS = { task: 1, knowledge: 1, workbench: 1, session: 1 };
+
+  function kindFromId(id) {
+    if (!id || id === '/') return 'root';
+    if (/\/task\//.test(id)) return 'task';
+    if (/\/knowledge\//.test(id)) return 'knowledge';
+    if (/\/workbench\//.test(id)) return 'workbench';
+    if (/\/$/.test(id)) {
+      // Trailing slash: session ids have a session segment (two slashes),
+      // workspace ids have only one.
+      return (id.match(/\//g) || []).length >= 2 ? 'session' : 'workspace';
+    }
+    return 'workspace';
+  }
+
+  function maybeAddEditButton(path) {
+    if (!STORE.edit || !path) return;
+    var id = idFromContentPath(path);
+    if (!EDITABLE_KINDS[kindFromId(id)]) return;
+    var pane = document.getElementById('content');
+    if (pane.querySelector('.content-editbar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'content-editbar';
+    var btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = 'Edit';
+    btn.addEventListener('click', function () { enterEditMode(id, path); });
+    bar.appendChild(btn);
+    pane.insertBefore(bar, pane.firstChild);
+  }
+
+  function renderEditor(id, content, hash, cancelPath) {
+    var pane = document.getElementById('content');
+    pane.innerHTML = '';
+    var bar = document.createElement('div');
+    bar.className = 'content-editbar';
+    var save = document.createElement('button');
+    save.className = 'chip on';
+    save.textContent = 'Save';
+    var ta = document.createElement('textarea');
+    ta.className = 'content-editor';
+    ta.value = content;
+    save.addEventListener('click', function () { saveEdit(id, ta.value, hash, save); });
+    bar.appendChild(save);
+    if (cancelPath) {
+      var cancel = document.createElement('button');
+      cancel.className = 'chip';
+      cancel.textContent = 'Cancel';
+      cancel.addEventListener('click', function () { loadContent(cancelPath); });
+      bar.appendChild(cancel);
+    }
+    pane.appendChild(bar);
+    pane.appendChild(ta);
+    ta.focus();
+  }
+
+  function enterEditMode(id, path) {
+    fetch(relHref('') + 'api/source?id=' + encodeURIComponent(id))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.editable) return;
+        renderEditor(id, d.content, d.hash, path);
+      })
+      .catch(function (err) { alert('Could not open editor: ' + err.message); });
+  }
+
+  function setSaving(btn, saving) {
+    if (!btn) return;
+    if (saving) {
+      btn.disabled = true;
+      btn.classList.add('is-saving');
+      btn.innerHTML = '<span class="wv-spinner"></span>Saving…';
+    } else {
+      btn.disabled = false;
+      btn.classList.remove('is-saving');
+      btn.textContent = 'Save';
+    }
+  }
+
+  function wvToast(msg) {
+    var t = document.createElement('div');
+    t.className = 'wv-toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    // force reflow so the fade-in transition runs, then schedule removal
+    void t.offsetWidth;
+    t.classList.add('show');
+    setTimeout(function () {
+      t.classList.remove('show');
+      setTimeout(function () { t.remove(); }, 300);
+    }, 1600);
+  }
+
+  function saveEdit(id, content, baseHash, btn) {
+    setSaving(btn, true);
+    var body = JSON.stringify({
+      id: id, content: content, baseHash: baseHash,
+      scope: STORE.payload.scope, scopeId: STORE.payload.scopeId,
+    });
+    fetch(relHref('') + 'api/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Work-Viz-Token': STORE.edit.token,
+      },
+      body: body,
+    }).then(function (r) {
+      if (r.status === 409) {
+        return r.json().then(function (d) {
+          alert('This file changed on disk since you opened it. Reloading the '
+                + 'current version; reapply your edit before saving.');
+          renderEditor(id, d.currentContent, d.currentHash,
+                       STORE.currentContentPath);
+          throw new Error('conflict');
+        });
+      }
+      if (!r.ok) throw new Error('save failed: ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      refreshFromPayload(d.payload);
+      var pane = document.getElementById('content');
+      pane.innerHTML = renderWikilinks(marked.parse(stripFrontmatter(d.content)));
+      maybeAddEditButton(STORE.currentContentPath);
+      wvToast('Saved ✓');
+    }).catch(function (err) {
+      if (err.message !== 'conflict') {
+        setSaving(btn, false);
+        alert(err.message);
+      }
+    });
+  }
+
+  function refreshFromPayload(payload) {
+    STORE.payload = payload;
+    STORE.wikilinkIndex = payload.wikilinks
+      ? new Map(Object.entries(payload.wikilinks))
+      : buildWikilinkIndex(payload.nodes);
+    renderTree(payload.tree, payload.scopeId);
+    if (STORE.cy) STORE.cy.destroy();
+    var cy = buildCy(payload);
+    STORE.cy = cy;
+    applyLayout(cy, payload, STORE.layout);
   }
 
   function isExternalUrl(href) {
@@ -1018,6 +1166,19 @@
   function init() {
     var payload = parsePayload();
     STORE.payload = payload;
+    STORE.edit = null;
+    STORE.currentContentPath = null;
+    // Feature-probe the live edit server. A static build 404s here and stays
+    // read-only. When present, re-offer the Edit button on whatever is shown.
+    fetch(relHref('') + 'api/capabilities')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (c) {
+        if (c && c.edit) {
+          STORE.edit = { token: c.token };
+          if (STORE.currentContentPath) maybeAddEditButton(STORE.currentContentPath);
+        }
+      })
+      .catch(function () {});
     // rootHref is page-relative and ends in "index.html". The prefix (sans
     // filename) is the path back to the site root, which all contentPaths are
     // expressed relative to.

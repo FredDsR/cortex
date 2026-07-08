@@ -1,11 +1,11 @@
 ---
 name: tracking-work-viz
-description: Use when the user wants a visual overview of `~/.work/` sessions and tasks ("show me what's going on", "visualize my work", "open the dashboard"). Builds a static HTML site with three panes (tree, hub-and-spoke graph, rendered markdown) for browsing every workspace, session, and task. Read-only.
+description: Use when the user wants a visual overview of `~/.work/` sessions and tasks ("show me what's going on", "visualize my work", "open the dashboard"). Builds a static HTML site with three panes (tree, hub-and-spoke graph, rendered markdown) for browsing every workspace, session, and task. Read-only by default; opt-in `serve --edit` adds localhost in-browser editing.
 ---
 
 # tracking-work-viz
 
-Static browser-based viewer for `~/.work/workspaces/`. The CLI builds a folder of HTML + copied markdown and serves it locally over plain HTTP. No hot reload, no SSE, no server-side regeneration.
+Static browser-based viewer for `~/.work/workspaces/`. The CLI builds a folder of HTML + copied markdown and serves it locally over plain HTTP. The static build is read-only; an opt-in `serve --edit` mode adds localhost-only in-browser editing.
 
 ## Invocation
 
@@ -16,6 +16,7 @@ The user-facing command is `work-viz`, symlinked by `install.sh` to `~/.work/bin
 | `work-viz` | Default: builds into `~/.cache/work-viz/out/` and serves it on a random local port, opens the browser. |
 | `work-viz build [WORKSPACES_ROOT] [--out OUT]` | Parses `WORKSPACES_ROOT` (default `~/.work/workspaces/`) and writes the static site into `OUT` (default `~/.cache/work-viz/out/`). |
 | `work-viz serve [OUT_DIR] [--host H] [--port P] [--no-open]` | Serves an existing built directory. No build, no watch. |
+| `work-viz serve [OUT_DIR] --edit [--workspaces-root PATH]` | Same, plus localhost-only in-browser editing. See "In-browser editing" below. |
 
 The default action (no subcommand) is `build` then `serve` in sequence, intended to be a one-line "open the dashboard" command.
 
@@ -46,9 +47,29 @@ The viewer's sidebar tree spans every workspace and session, so once a page is o
 
 The `index.md` files at every scope are auto-generated and OpenKB-style, so the folder is also navigable as a plain markdown wiki in Obsidian or any markdown editor.
 
-## Read-only
+## Read-only by default
 
-This skill never edits anything under `~/.work/`. Editing tasks stays in the `tracking-work` flow.
+The static `build` output and plain `work-viz serve` never edit anything under
+`~/.work/`. This keeps a shared or published build (e.g. GitHub Pages) safe.
+
+## In-browser editing (`serve --edit`)
+
+`work-viz serve --edit` turns the local viewer into a read-write surface. It is
+localhost-only and never part of a static build.
+
+- Editable doc kinds: `task`, `knowledge`, `workbench`, and a session's
+  `SUMMARY.md`. Generated index pages are not editable.
+- An **Edit** button appears on those docs; it opens the raw markdown in a
+  textarea. **Save** writes the source file, rebuilds the site, and refreshes
+  the graph, tree, and content in place. New `[[...]]` links resolve from ghost
+  to solid on save.
+- The source root is read from the build manifest (`.work-viz-build.json`);
+  pass `--workspaces-root PATH` to override it.
+- Optimistic concurrency: if the file changed on disk since you opened it (sync
+  pull, `work-kb`, or an external editor), Save is refused and the browser
+  reloads the current version so you can reapply your edit.
+- A successful save runs `tracking-work-sync`'s `commit_push.sh` when sync is
+  configured (no-op otherwise), mirroring `work-kb`.
 
 ## Sync interaction
 

@@ -17,11 +17,28 @@ work-viz                                              # build + serve, opens bro
 work-viz build [WORKSPACES_ROOT] [--out OUT]          # static build only
 work-viz serve [OUT_DIR] [--host H] [--port P]        # serve an existing build
 work-viz serve [OUT_DIR] --no-open                    # skip browser auto-open
+work-viz serve [OUT_DIR] --edit                       # localhost in-browser editing
+work-viz serve [OUT_DIR] --edit --workspaces-root DIR # override the source root
 ```
 
 `WORKSPACES_ROOT` defaults to `~/.work/workspaces/`. `OUT` and `OUT_DIR` default to `~/.cache/work-viz/out/`.
 
 The build is a folder you can browse via the bundled static server, via `python -m http.server`, or as a plain markdown wiki in any markdown viewer (Obsidian, etc.). Opening the HTML directly via `file://` works for navigation but the content pane's marked.js fetch requires a server.
+
+## In-browser editing
+
+`work-viz serve --edit` adds a localhost-only read-write mode on top of the
+static build. An **Edit** button appears on `task`, `knowledge`, `workbench`,
+and session (`SUMMARY.md`) docs; it opens the raw markdown in a textarea. Save
+writes the source file, rebuilds the site, and refreshes the graph, tree, and
+content in place. The source root comes from the build manifest
+(`.work-viz-build.json`); `--workspaces-root PATH` overrides it.
+
+Saves are guarded by an on-disk content hash: if the file changed since you
+opened it, Save is refused and the current version is reloaded so you can
+reapply your edit. A successful save runs `tracking-work-sync`'s
+`commit_push.sh` when sync is configured. The plain `serve` and static `build`
+have no write API and stay Pages-safe.
 
 ## UI panes
 
@@ -82,11 +99,11 @@ cd skills/tracking-work-viz
 uvx --with pyyaml pytest -v
 ```
 
-The suite covers the address grammar, parser (typed-relation extraction, mentions, ghost generation, cross-workspace resolution, code-fence skipping, edge dedup), generator (vendor staging, markdown copy, index.md emission per scope, HTML shell + JSON blob shape, scope filtering), the static server, and the CLI.
+The suite covers the address grammar, parser (typed-relation extraction, mentions, ghost generation, cross-workspace resolution, code-fence skipping, edge dedup), generator (vendor staging, markdown copy, index.md emission per scope, HTML shell + JSON blob shape, scope filtering, `build_payload` parity, build manifest), the static server, the CLI, and the edit backend + live edit server (source mapping, hash-guarded save, atomic write, rebuild, token/traversal rejection).
 
 ## Limitations
 
-- Knowledge and workbench folders are first-class node kinds, but Spec A does not yet emit content into them. References to `knowledge/*` or `workbench/*` render as ghost nodes. Spec B fills in the read/write path.
+- Knowledge and workbench docs are authored via the `tracking-work-kb` CLI (`work-kb`) or, for existing docs, the `serve --edit` mode. Unresolved `knowledge/*` or `workbench/*` references still render as ghost nodes until the target file exists.
 - No search across the world (Spec B).
 - No graph algorithm beyond the built-in hierarchical and `cose` layouts.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).

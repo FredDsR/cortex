@@ -35,3 +35,47 @@ def test_cli_serve_runs(workspaces_root, tmp_path):
         assert resp.status == 200
     finally:
         httpd.shutdown()
+
+
+def test_serve_edit_exposes_capabilities(workspaces_root, tmp_path):
+    import json as _json
+    out = tmp_path / "out"
+    from work_viz.cli import main
+    main(["build", str(workspaces_root), "--out", str(out)])
+    from work_viz import edit_server
+    port = _free_port()
+    httpd = edit_server.make_edit_server(out, workspaces_root, "127.0.0.1", port)
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+    try:
+        resp = urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/api/capabilities", timeout=2)
+        assert _json.loads(resp.read().decode())["edit"] is True
+    finally:
+        httpd.shutdown()
+
+
+def test_plain_serve_has_no_api(workspaces_root, tmp_path):
+    import urllib.error
+    out = tmp_path / "out"
+    from work_viz.cli import main, _start_server_for_test
+    main(["build", str(workspaces_root), "--out", str(out)])
+    port = _free_port()
+    httpd, thread = _start_server_for_test(out, port)
+    try:
+        try:
+            urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/capabilities", timeout=2)
+            assert False, "static server should not serve the API"
+        except urllib.error.HTTPError as e:
+            assert e.code == 404
+    finally:
+        httpd.shutdown()
+
+
+def test_serve_edit_resolves_root_from_manifest(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    from work_viz.cli import main
+    main(["build", str(workspaces_root), "--out", str(out)])
+    from work_viz.serve import _resolve_edit_root
+    assert _resolve_edit_root(out, None) == workspaces_root.resolve()
