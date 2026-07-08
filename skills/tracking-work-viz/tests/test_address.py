@@ -71,3 +71,56 @@ def test_resolve_knowledge_cross_workspace():
     assert r.doc_id.kind == "knowledge"
     assert r.doc_id.workspace == "ws-b"
     assert r.doc_id.slug == "api-notes"
+
+
+from work_viz.address import abbreviate
+
+
+def _task(ws, sess, slug):
+    return DocId(kind="task", workspace=ws, session=sess, slug=slug)
+
+
+def _know(ws, slug):
+    return DocId(kind="knowledge", workspace=ws, slug=slug)
+
+
+def _wb(ws, sess, slug):
+    return DocId(kind="workbench", workspace=ws, session=sess, slug=slug)
+
+
+@pytest.mark.parametrize("target,referencing,expected", [
+    (_task("w", "s", "task-foo"),   _task("w", "s", "src"), "task-foo"),
+    (_task("w", "s2", "task-foo"),  _task("w", "s", "src"), "s2/task-foo"),
+    (_task("w2", "s2", "task-foo"), _task("w", "s", "src"), "w2/s2/task-foo"),
+    (_know("w", "note"),            _task("w", "s", "src"), "knowledge/note"),
+    (_know("w2", "note"),           _task("w", "s", "src"), "w2/knowledge/note"),
+    (_wb("w", "s", "draft"),        _task("w", "s", "src"), "workbench/draft"),
+    (_wb("w", "s2", "draft"),       _task("w", "s", "src"), "s2/workbench/draft"),
+    (_wb("w2", "s2", "draft"),      _task("w", "s", "src"), "w2/s2/workbench/draft"),
+])
+def test_abbreviate_forms(target, referencing, expected):
+    assert abbreviate(target, referencing) == expected
+
+
+@pytest.mark.parametrize("target,referencing", [
+    (_task("w", "s", "task-foo"),   _task("w", "s", "src")),
+    (_task("w", "s2", "task-foo"),  _task("w", "s", "src")),
+    (_task("w2", "s2", "task-foo"), _task("w", "s", "src")),
+    (_know("w", "note"),            _task("w", "s", "src")),
+    (_know("w2", "note"),           _task("w", "s", "src")),
+    (_wb("w", "s", "draft"),        _task("w", "s", "src")),
+    (_wb("w", "s2", "draft"),       _task("w", "s", "src")),
+    (_wb("w2", "s2", "draft"),      _task("w", "s", "src")),
+    (_task("w", "s", "task-foo"),   _know("w", "gloss")),
+    (_wb("w", "s", "draft"),        _know("w", "gloss")),
+])
+def test_abbreviate_roundtrips_through_resolve(target, referencing):
+    token = abbreviate(target, referencing)
+    assert resolve(token, referencing=referencing).doc_id == target
+
+
+def test_abbreviate_rejects_non_linkable():
+    with pytest.raises(ValueError):
+        abbreviate(DocId(kind="workspace", workspace="w"), _task("w", "s", "src"))
+    with pytest.raises(ValueError):
+        abbreviate(DocId(kind="session", workspace="w", session="s"), _task("w", "s", "src"))
