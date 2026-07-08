@@ -363,3 +363,15 @@ li.collapsed > .tree-row > .tree-arrow { transform: rotate(-90deg); }
   text-decoration: line-through dotted;
   cursor: help;
 }
+
+/* In-browser edit mode (serve --edit only) */
+.content-editbar { display: flex; gap: .4rem; margin-bottom: .6rem; }
+.content-editor {
+  width: 100%; min-height: 60vh; box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .85rem; line-height: 1.5; padding: .6rem;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text-primary);
+  resize: vertical;
+}
+.content-editor:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
