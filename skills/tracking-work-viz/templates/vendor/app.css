@@ -394,3 +394,23 @@ li.collapsed > .tree-row > .tree-arrow { transform: rotate(-90deg); }
   opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s;
 }
 .wv-toast.show { opacity: 1; transform: translateY(0); }
+
+/* Wikilink [[ picker */
+.wv-picker {
+  position: absolute; z-index: 1100; min-width: 220px;
+  max-height: 40vh; overflow-y: auto;
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.28); font-size: .82rem;
+}
+.wv-picker-row {
+  display: flex; align-items: baseline; gap: .5rem;
+  padding: .32rem .55rem; cursor: pointer; white-space: nowrap;
+}
+.wv-picker-row.active { background: var(--accent-bg); }
+.wv-picker-label { font-weight: 600; }
+.wv-picker-kind {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-muted);
+}
+.wv-picker-token { margin-left: auto; color: var(--text-muted); font-family: ui-monospace, monospace; }

@@ -149,3 +149,26 @@ def test_save_resolves_ghost_edge(live):
     assert any(e["source"].endswith("task/task-b")
                and e["target"].endswith("task/task-a")
                and e["kind"] == "blocked" for e in edges)
+
+
+def test_source_includes_candidates(live):
+    base, _ = live
+    _, d = _get(base, "/api/source?id=demo-ws/alpha/task/task-a")
+    cands = {c["id"]: c for c in d["candidates"]}
+    assert cands["demo-ws/alpha/task/task-b"]["token"] == "task-b"
+    assert "demo-ws/alpha/task/task-a" not in cands
+    assert all(c["kind"] in ("task", "knowledge", "workbench")
+               for c in d["candidates"])
+
+
+def test_source_cross_session_candidate_token(live):
+    base, _ = live
+    _, d = _get(base, "/api/source?id=demo-ws/alpha/task/task-a")
+    cands = {c["id"]: c for c in d["candidates"]}
+    assert cands["demo-ws/beta/task/task-c"]["token"] == "beta/task-c"
+
+
+def test_non_editable_has_no_candidates(live):
+    base, _ = live
+    _, d = _get(base, "/api/source?id=demo-ws/")
+    assert "candidates" not in d

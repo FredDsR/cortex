@@ -73,3 +73,25 @@ def resolve(raw: str, *, referencing: DocId) -> ResolveResult:
             kind="task", workspace=parts[0], session=parts[1], slug=parts[2]))
 
     return ResolveResult(resolved=False)
+
+
+def abbreviate(target: DocId, referencing: DocId) -> str:
+    """Inverse of resolve: shortest token that resolves to target from
+    referencing's location. Only task/knowledge/workbench are linkable."""
+    if target.kind == "task":
+        if target.workspace == referencing.workspace:
+            if target.session == referencing.session:
+                return target.slug
+            return f"{target.session}/{target.slug}"
+        return f"{target.workspace}/{target.session}/{target.slug}"
+    if target.kind == "knowledge":
+        if target.workspace == referencing.workspace:
+            return f"knowledge/{target.slug}"
+        return f"{target.workspace}/knowledge/{target.slug}"
+    if target.kind == "workbench":
+        if target.workspace == referencing.workspace:
+            if target.session == referencing.session:
+                return f"workbench/{target.slug}"
+            return f"{target.session}/workbench/{target.slug}"
+        return f"{target.workspace}/{target.session}/workbench/{target.slug}"
+    raise ValueError(f"not a linkable target kind: {target.kind!r}")

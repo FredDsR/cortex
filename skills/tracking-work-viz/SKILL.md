@@ -63,6 +63,9 @@ localhost-only and never part of a static build.
   textarea. **Save** writes the source file, rebuilds the site, and refreshes
   the graph, tree, and content in place. New `[[...]]` links resolve from ghost
   to solid on save.
+- Typing `[[` in the editor opens an autocomplete over every task / knowledge /
+  workbench doc and inserts the most-abbreviated valid addressing-grammar token
+  (bare slug for the same session, `session/slug` cross-session, and so on).
 - The source root is read from the build manifest (`.work-viz-build.json`);
   pass `--workspaces-root PATH` to override it.
 - Optimistic concurrency: if the file changed on disk since you opened it (sync
