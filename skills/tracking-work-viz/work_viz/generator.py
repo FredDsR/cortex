@@ -13,6 +13,8 @@ _PACKAGE_DIR = Path(__file__).parent.parent
 _VENDOR_SRC = _PACKAGE_DIR / "templates" / "vendor"
 _SHELL_TEMPLATE = (_PACKAGE_DIR / "templates" / "shell.html").read_text(encoding="utf-8")
 
+MANIFEST_NAME = ".work-viz-build.json"
+
 
 def _stage_vendor(out_dir: Path) -> None:
     vendor_out = out_dir / "vendor"
@@ -434,17 +436,32 @@ def _default_content_path(scope: str) -> str:
     return "index.md"
 
 
-def _emit_html_pages(world: World, out_dir: Path) -> None:
+def build_payload(world: World, scope: str, scope_id: str) -> dict:
+    """Per-scope payload embedded in a page and returned by the save API.
+    Single source of truth for both the static build and live edit refresh."""
     wikilinks = _global_wikilink_index(world)
     tree = _build_tree(world)
-    nodes, edges = _scope_filter(world, "root", "/")
-    payload = {
-        "scope": "root", "scopeId": "/", "rootHref": "index.html",
-        "tree": tree,
-        "nodes": nodes, "edges": edges,
-        "defaultContentPath": "index.md",
-        "wikilinks": wikilinks,
+    nodes, edges = _scope_filter(world, scope, scope_id)
+    if scope == "root":
+        root_href = "index.html"
+        default_cp = "index.md"
+    elif scope == "workspace":
+        ws = scope_id.rstrip("/")
+        root_href = "../../index.html"
+        default_cp = f"workspaces/{ws}/index.md"
+    else:  # session
+        ws, sess = scope_id.rstrip("/").split("/", 1)
+        root_href = "../../../../index.html"
+        default_cp = f"workspaces/{ws}/sessions/{sess}/SUMMARY.md"
+    return {
+        "scope": scope, "scopeId": scope_id, "rootHref": root_href,
+        "tree": tree, "nodes": nodes, "edges": edges,
+        "defaultContentPath": default_cp, "wikilinks": wikilinks,
     }
+
+
+def _emit_html_pages(world: World, out_dir: Path) -> None:
+    payload = build_payload(world, "root", "/")
     (out_dir / "index.html").write_text(
         _render_shell("root", "/", payload, _vendor_rel("root", "/"),
                       "Fred's Work Tracking",
@@ -454,15 +471,7 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
 
     for ws in _children_of(world, "/", "workspace"):
         ws_scope_id = ws.id.canonical()
-        nodes, edges = _scope_filter(world, "workspace", ws_scope_id)
-        payload = {
-            "scope": "workspace", "scopeId": ws_scope_id,
-            "rootHref": "../../index.html",
-            "tree": tree,
-            "nodes": nodes, "edges": edges,
-            "defaultContentPath": f"workspaces/{ws.id.workspace}/index.md",
-            "wikilinks": wikilinks,
-        }
+        payload = build_payload(world, "workspace", ws_scope_id)
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
         ws_html.write_text(
             _render_shell("workspace", ws_scope_id, payload,
@@ -473,17 +482,7 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
             encoding="utf-8")
         for sess in _children_of(world, ws_scope_id, "session"):
             sess_scope_id = sess.id.canonical()
-            nodes, edges = _scope_filter(world, "session", sess_scope_id)
-            payload = {
-                "scope": "session", "scopeId": sess_scope_id,
-                "rootHref": "../../../../index.html",
-                "tree": tree,
-                "nodes": nodes, "edges": edges,
-                "defaultContentPath": (
-                    f"workspaces/{ws.id.workspace}/sessions/{sess.id.session}/SUMMARY.md"
-                ),
-                "wikilinks": wikilinks,
-            }
+            payload = build_payload(world, "session", sess_scope_id)
             sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
             sess_html.write_text(
                 _render_shell("session", sess_scope_id, payload,
@@ -494,7 +493,17 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
                 encoding="utf-8")
 
 
-def build(world: World, out_dir: Path) -> None:
+def _write_manifest(out_dir: Path, workspaces_root: Optional[Path]) -> None:
+    import datetime
+    data = {
+        "workspacesRoot": str(workspaces_root) if workspaces_root else "",
+        "builtAt": datetime.datetime.now().astimezone().isoformat(),
+    }
+    (out_dir / MANIFEST_NAME).write_text(
+        json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
+def build(world: World, out_dir: Path, workspaces_root: Optional[Path] = None) -> None:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     _stage_vendor(out_dir)
@@ -502,3 +511,4 @@ def build(world: World, out_dir: Path) -> None:
     _copy_supplementary_md(world, out_dir)
     _emit_all_indices(world, out_dir)
     _emit_html_pages(world, out_dir)
+    _write_manifest(out_dir, workspaces_root)

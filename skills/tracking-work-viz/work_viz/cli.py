@@ -47,12 +47,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd is None:
         # default: build into the cache dir, then serve
         world = parse_world(DEFAULT_WORKSPACES_ROOT, include_archive=True)
-        build_world(world, DEFAULT_OUT_DIR)
+        build_world(world, DEFAULT_OUT_DIR, workspaces_root=DEFAULT_WORKSPACES_ROOT)
         serve(DEFAULT_OUT_DIR)
         return 0
     if args.cmd == "build":
         world = parse_world(Path(args.workspaces_root), include_archive=True)
-        build_world(world, args.out)
+        build_world(world, args.out, workspaces_root=Path(args.workspaces_root))
         print(f"work-viz build: wrote {args.out}")
         return 0
     if args.cmd == "serve":
