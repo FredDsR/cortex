@@ -93,9 +93,85 @@ def extract_openapi(path, data):
     return recs
 
 
+def _split_top_commas(s):
+    parts, depth, cur = [], 0, ""
+    for c in s:
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        if c == "," and depth == 0:
+            parts.append(cur); cur = ""
+        else:
+            cur += c
+    if cur.strip():
+        parts.append(cur)
+    return parts
+
+
+_CONSTRAINT_KW = {"PRIMARY", "FOREIGN", "CONSTRAINT", "UNIQUE", "CHECK", "KEY", "INDEX"}
+
+
+def _table_concept(path, name, body_sql):
+    cols, links = [], []
+    for part in _split_top_commas(body_sql):
+        p = part.strip()
+        if not p:
+            continue
+        mref = re.search(r"references\s+([`\"\[]?[\w.]+[`\"\]]?)", p, re.IGNORECASE)
+        if mref:
+            ref_name = mref.group(1).strip('`"[]')
+            links.append(f"table-{slugify(ref_name)}")
+        kw = p.split(None, 1)[0].upper().strip('`"[]')
+        if kw in _CONSTRAINT_KW:
+            continue
+        toks = p.split(None, 1)
+        cname = toks[0].strip('`"[]')
+        ctype = _oneline(toks[1]) if len(toks) > 1 else ""
+        cols.append((cname, ctype))
+    lines = [f"# {name}", "", "| column | type |", "|--------|------|"]
+    for c, t in cols:
+        lines.append(f"| `{c}` | `{t}` |")
+    return dict(slug=f"table-{slugify(name)}", type="Reference", title=str(name),
+                description=f"Table {name} ({len(cols)} columns)",
+                links=_dedupe(links), body="\n".join(lines), source=path)
+
+
 def extract_sql(path, text):
-    # Replaced in a later step; stub keeps the OpenAPI task self-contained.
-    return []
+    text = re.sub(r"--[^\n]*", "", text)
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    low = text.lower()
+    recs, idx = [], 0
+    while True:
+        m = re.search(r"create\s+table\s+(if\s+not\s+exists\s+)?", low[idx:])
+        if not m:
+            break
+        start = idx + m.end()
+        nm = re.match(r"\s*([`\"\[]?[\w.]+[`\"\]]?)", text[start:])
+        if not nm:
+            idx = start + 1
+            continue
+        name = nm.group(1).strip('`"[]')
+        popen = text.find("(", start)
+        if popen == -1:
+            break
+        depth, i, matched = 0, popen, False
+        while i < len(text):
+            c = text[i]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    matched = True
+                    break
+            i += 1
+        if not matched:
+            print(f"warn: unbalanced CREATE TABLE {name} in {path}, skipping", file=sys.stderr)
+            break
+        recs.append(_table_concept(path, name, text[popen + 1:i]))
+        idx = i + 1
+    return recs
 
 
 def detect_and_extract(path):

@@ -32,3 +32,21 @@ def test_openapi_operation_and_schema_records():
 def test_slugify():
     assert ie.slugify("GET /Users/{id}") == "get-users-id"
     assert ie.slugify("Account") == "account"
+
+
+def test_sql_table_records():
+    text = (FIX / "schema.sql").read_text()
+    recs = ie.extract_sql(str(FIX / "schema.sql"), text)
+    by = _by_slug(recs)
+    assert set(by) == {"table-accounts", "table-orders"}
+    assert by["table-accounts"]["type"] == "Reference"
+    # columns preserved verbatim (types with parens survive)
+    body = by["table-accounts"]["body"]
+    assert "`balance`" in body and "DECIMAL(10,2)" in body
+    # FK becomes a link to the referenced table
+    assert "table-accounts" in by["table-orders"]["links"]
+
+
+def test_sql_malformed_is_skipped():
+    recs = ie.extract_sql("bad.sql", "CREATE TABLE oops (")
+    assert recs == []
