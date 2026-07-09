@@ -4,6 +4,7 @@
 set -euo pipefail
 
 WORK_KB_AUTHOR_DEFAULT="agent"
+KB_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib"
 
 die() { echo "error: $*" >&2; exit "${2:-1}"; }
 usage() {
@@ -17,6 +18,7 @@ Usage:
   work-kb update knowledge <slug> [same flags as: new knowledge]
   work-kb update workbench <slug> [same flags as: new workbench]
   work-kb index [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
+  work-kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
 
 Flags (new / update): --title <text> --type <text> --description <text>
 EOF
@@ -378,11 +380,105 @@ cmd_index() {
     fi
 }
 
+# True if the configured python can import yaml (deterministic path available).
+_ingest_python_ok() {
+    "${WORK_KB_PYTHON:-python3}" -c 'import yaml' >/dev/null 2>&1
+}
+
+# Print fuzzy artifacts (needing agent judgment) under $1 as worklist lines.
+_ingest_worklist() {
+    local src="$1" f
+    while IFS= read -r f; do printf '%s - Prisma schema\n' "$f"; done \
+        < <(find "$src" \( -name .git -o -name node_modules -o -name .work \) -prune -o -type f -name '*.prisma' -print 2>/dev/null)
+    while IFS= read -r f; do
+        if grep -qE '^##[[:space:]]+(API|Schema)\b' "$f" 2>/dev/null; then
+            printf '%s - has ## API/## Schema section\n' "$f"
+        fi
+    done < <(find "$src" \( -name .git -o -name node_modules -o -name .work \) -prune -o -type f -iname 'readme*.md' -print 2>/dev/null)
+    while IFS= read -r f; do printf '%s - runbook\n' "$f"; done \
+        < <(find "$src" \( -name .git -o -name node_modules -o -name .work \) -prune -o -type f -iname 'runbook*' -print 2>/dev/null)
+}
+
+# Print structured artifact paths (openapi/swagger + *.sql) under $1, honoring --only.
+_ingest_structured() {
+    local src="$1" only="$2"
+    if [[ "$only" != "sql" ]]; then
+        find "$src" \( -name .git -o -name node_modules -o -name .work \) -prune -o -type f \
+            \( -iname 'openapi*.y*ml' -o -iname 'openapi*.json' -o -iname 'swagger*.y*ml' -o -iname 'swagger*.json' \) -print 2>/dev/null
+    fi
+    if [[ "$only" != "openapi" ]]; then
+        find "$src" \( -name .git -o -name node_modules -o -name .work \) -prune -o -type f -name '*.sql' -print 2>/dev/null
+    fi
+}
+
+# Render the create/skipped sections and, when writing, emit docs via emit_doc.
+# Args: kdir write max <record-line>...  (minimal dry-run version; replaced later)
+_ingest_apply() {
+    local kdir="$1" write="$2" max="$3"; shift 3
+    printf '## would create (deterministic)\n'
+    local line slug type title desc
+    for line in "$@"; do
+        IFS=$'\t' read -r slug type title desc _ _ _ <<<"$line"
+        printf '%s [%s] - %s\n' "$slug" "$type" "$desc"
+    done
+}
+
+cmd_ingest() {
+    local src="." ws_flag="" write=0 only="" max=100
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --from)      src="$2"; shift 2 ;;
+            --workspace) ws_flag="$2"; shift 2 ;;
+            --write)     write=1; shift ;;
+            --only)      only="$2"; shift 2 ;;
+            --max)       max="$2"; shift 2 ;;
+            -*) die "unknown flag: $1" 2 ;;
+            *)  die "extra argument: $1" 2 ;;
+        esac
+    done
+    [[ -d "$src" ]] || die "--from path not found: $src"
+    [[ "$max" =~ ^[0-9]+$ ]] || die "--max must be a non-negative integer"
+    [[ -z "$only" || "$only" == "openapi" || "$only" == "sql" ]] || die "--only must be openapi or sql" 2
+
+    local ws_root kdir
+    ws_root="$(resolve_workspace "$ws_flag")"
+    kdir="$ws_root/knowledge"
+
+    # Collect structured files and (if python usable) extract records.
+    local structured=() records=() f
+    while IFS= read -r f; do [[ -n "$f" ]] && structured+=("$f"); done < <(_ingest_structured "$src" "$only")
+
+    local py_ok=0
+    if (( ${#structured[@]} > 0 )) && _ingest_python_ok; then
+        py_ok=1
+        while IFS= read -r f; do [[ -n "$f" ]] && records+=("$f"); done \
+            < <("${WORK_KB_PYTHON:-python3}" "$KB_LIB/ingest_extract.py" "${structured[@]}" 2>/dev/null)
+    fi
+
+    # Sort records by type then slug (fields 2 then 1).
+    if (( ${#records[@]} > 0 )); then
+        local sorted=()
+        while IFS= read -r f; do sorted+=("$f"); done \
+            < <(printf '%s\n' "${records[@]}" | LC_ALL=C sort -t$'\t' -k2,2 -k1,1)
+        records=("${sorted[@]}")
+    fi
+
+    _ingest_apply "$kdir" "$write" "$max" "${records[@]+"${records[@]}"}"
+
+    # Agent worklist: fuzzy artifacts always; structured too if the helper was unusable.
+    printf '\n## agent worklist (needs judgment)\n'
+    _ingest_worklist "$src"
+    if (( py_ok == 0 )) && (( ${#structured[@]} > 0 )); then
+        for f in "${structured[@]}"; do printf '%s - structured (extractor unavailable)\n' "$f"; done
+    fi
+}
+
 [[ $# -ge 1 ]] || usage
 case "$1" in
     new)    shift; [[ $# -ge 1 ]] || usage; cmd_new "$@" ;;
     update) shift; [[ $# -ge 1 ]] || usage; cmd_update "$@" ;;
     index)  shift; cmd_index "$@" ;;
+    ingest) shift; cmd_ingest "$@" ;;
     -h|--help) usage ;;
     *) die "unknown subcommand: $1" 2 ;;
 esac
