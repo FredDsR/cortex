@@ -14,6 +14,11 @@ Usage:
                                 [--open]
   work-kb new workbench <slug> [--session <sess>] [--workspace <ws>] [--author ...]
                                 [--body ...] [--body-from ...] [--open]
+  work-kb update knowledge <slug> [same flags as: new knowledge]
+  work-kb update workbench <slug> [same flags as: new workbench]
+  work-kb index [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
+
+Flags (new / update): --title <text> --type <text> --description <text>
 EOF
     exit 2
 }
@@ -99,6 +104,26 @@ sync_after() {
     if [[ -x "$sync_script" ]]; then
         bash "$sync_script" "track(kb): $verb $kind $slug" >/dev/null 2>&1 || true
     fi
+}
+
+# Split a file into its leading YAML frontmatter block and body.
+# Sets FM_BLOCK (fence-exclusive frontmatter lines) and FM_BODY (body with the
+# single emitter-inserted blank separator stripped). Returns 1 if there is no
+# well-formed leading "---\n...\n---" block.
+split_fm() {
+    local file="$1" close
+    [[ "$(head -n1 "$file")" == "---" ]] || return 1
+    close="$(awk 'NR>1 && $0=="---"{print NR; exit}' "$file")"
+    [[ -n "$close" ]] || return 1
+    FM_BLOCK="$(sed -n "2,$((close-1))p" "$file")"
+    FM_BODY="$(sed -n "$((close+1)),\$p" "$file")"
+    FM_BODY="${FM_BODY#$'\n'}"   # drop the one blank line emit_doc inserts
+}
+
+# Print the scalar value of KEY from FM_BLOCK (empty if absent). Reads only
+# "key: value" lines; structured/unknown keys are ignored, never misparsed.
+fm_field() {
+    printf '%s\n' "$FM_BLOCK" | sed -n "s/^$1: \{0,1\}//p" | head -n1
 }
 
 # Walk up from cwd looking for nearest ancestor with .work/. Only searches
@@ -217,9 +242,55 @@ cmd_new() {
     if (( OPEN_FLAG )); then exec "${EDITOR:-vi}" "$path"; fi
 }
 
+cmd_update() {
+    local kind="$1"; shift
+    [[ "$kind" == "knowledge" || "$kind" == "workbench" ]] || \
+        die "kind must be 'knowledge' or 'workbench'" 2
+    parse_flags "$@"
+    [[ -n "$SLUG" ]] || usage
+    validate_slug "$SLUG"
+
+    local path
+    resolve_path "$kind"; path="$RESOLVED_PATH"
+    [[ -f "$path" ]] || die "$path not found"
+    split_fm "$path" || die "$path has malformed frontmatter"
+
+    local ex_title ex_type ex_desc ex_author ex_created
+    ex_title="$(fm_field title)"; ex_type="$(fm_field type)"
+    ex_desc="$(fm_field description)"; ex_author="$(fm_field author)"
+    ex_created="$(fm_field created)"
+
+    if (( TITLE_SET )); then F_TITLE="$TITLE_FLAG"; else F_TITLE="$ex_title"; fi
+    if (( TYPE_SET )); then F_TYPE="$TYPE_FLAG"; else F_TYPE="$ex_type"; fi
+    if (( DESC_SET )); then F_DESC="$DESC_FLAG"; else F_DESC="$ex_desc"; fi
+    if (( AUTHOR_SET )); then
+        [[ "$AUTHOR_FLAG" == "human" || "$AUTHOR_FLAG" == "agent" ]] || \
+            die "author must be 'human' or 'agent'"
+        F_AUTHOR="$AUTHOR_FLAG"
+    else
+        F_AUTHOR="${ex_author:-$WORK_KB_AUTHOR_DEFAULT}"
+    fi
+    F_CREATED="${ex_created:-$(today)}"
+    F_UPDATED="$(today)"
+
+    # update replaces the body only when a body source is explicitly given;
+    # bare stdin is NOT auto-consumed here (that would break the pure-touch case).
+    if (( BODY_SET )); then
+        F_BODY="$(read_body "$BODY_TEXT" "$BODY_FROM")"
+    else
+        F_BODY="$FM_BODY"
+    fi
+
+    emit_doc "$path"
+    sync_after "update" "$kind" "$SLUG"
+
+    if (( OPEN_FLAG )); then exec "${EDITOR:-vi}" "$path"; fi
+}
+
 [[ $# -ge 1 ]] || usage
 case "$1" in
-    new) shift; [[ $# -ge 1 ]] || usage; cmd_new "$@" ;;
+    new)    shift; [[ $# -ge 1 ]] || usage; cmd_new "$@" ;;
+    update) shift; [[ $# -ge 1 ]] || usage; cmd_update "$@" ;;
     -h|--help) usage ;;
     *) die "unknown subcommand: $1" 2 ;;
 esac
