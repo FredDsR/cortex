@@ -334,3 +334,13 @@ def test_build_writes_manifest(workspaces_root, tmp_path):
     data = json.loads(manifest.read_text())
     assert data["workspacesRoot"] == str(workspaces_root)
     assert "builtAt" in data
+
+
+def test_node_payload_includes_kb_fields(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+    payload = _payload(out / "index.html")
+    node = next(n for n in payload["nodes"] if n["id"] == "authored-ws/knowledge/typed")
+    assert node["type"] == "Runbook"
+    assert node["description"] == "a one-line description"
+    assert node["updated"] == "2026-06-01"

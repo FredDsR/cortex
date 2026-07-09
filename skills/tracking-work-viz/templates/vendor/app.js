@@ -145,6 +145,11 @@
       var rowAbk = authorBadgeKind(n);
       if (rowAbk) el.classList.add('authored-' + rowAbk);
       el.textContent = n.label;
+      var meta = [];
+      if (n.type) meta.push('[' + n.type + ']');
+      if (n.description) meta.push(n.description);
+      if (n.updated) meta.push('updated ' + n.updated);
+      if (meta.length) el.title = meta.join(' · ');
       el.dataset.id = n.id;
       el.dataset.kind = n.kind;
       if (n.contentPath) el.dataset.contentPath = n.contentPath;
