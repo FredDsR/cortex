@@ -412,15 +412,50 @@ _ingest_structured() {
 }
 
 # Render the create/skipped sections and, when writing, emit docs via emit_doc.
-# Args: kdir write max <record-line>...  (minimal dry-run version; replaced later)
+# Args: kdir write max <record-line>...
 _ingest_apply() {
     local kdir="$1" write="$2" max="$3"; shift 3
-    printf '## would create (deterministic)\n'
-    local line slug type title desc
+    local create_lines=() skip_lines=()
+    local line slug type title desc links source body_b64
+    local count=0 overflow=0 target body l larr
+
     for line in "$@"; do
-        IFS=$'\t' read -r slug type title desc _ _ _ <<<"$line"
-        printf '%s [%s] - %s\n' "$slug" "$type" "$desc"
+        IFS=$'\t' read -r slug type title desc links source body_b64 <<<"$line"
+        target="$kdir/$slug.md"
+        if [[ -f "$target" ]]; then
+            skip_lines+=("$slug [$type] - $desc  <- $source")
+            continue
+        fi
+        if (( count >= max )); then
+            overflow=$((overflow + 1))
+            continue
+        fi
+        count=$((count + 1))
+        create_lines+=("$slug [$type] - $desc  <- $source")
+        if (( write )); then
+            body="$(printf '%s' "$body_b64" | base64 -d)"
+            if [[ -n "$links" ]]; then
+                body+=$'\n\n## Related\n'
+                IFS=',' read -ra larr <<<"$links"
+                for l in "${larr[@]}"; do body+=$'\n'"- [[knowledge/$l]]"; done
+            fi
+            F_TITLE="$title"; F_TYPE="$type"; F_DESC="$desc"
+            F_AUTHOR="agent"; F_CREATED="$(today)"; F_UPDATED="$F_CREATED"; F_BODY="$body"
+            emit_doc "$target" >/dev/null
+        fi
     done
+
+    printf '## would create (deterministic)\n'
+    local x
+    for x in "${create_lines[@]+"${create_lines[@]}"}"; do printf '%s\n' "$x"; done
+    if (( overflow > 0 )); then printf '... %d more (raise --max)\n' "$overflow"; fi
+    if (( ${#skip_lines[@]} > 0 )); then
+        printf '\n## skipped (exists)\n'
+        for x in "${skip_lines[@]}"; do printf '%s\n' "$x"; done
+    fi
+    if (( write )) && (( count > 0 )); then
+        sync_after "ingest" "knowledge" "$count docs"
+    fi
 }
 
 cmd_ingest() {
