@@ -420,7 +420,7 @@ _ingest_apply() {
     local count=0 overflow=0 target body l larr
 
     for line in "$@"; do
-        IFS=$'\t' read -r slug type title desc links source body_b64 <<<"$line"
+        IFS=$'\x1f' read -r slug type title desc links source body_b64 <<<"$line"
         target="$kdir/$slug.md"
         if [[ -f "$target" ]]; then
             skip_lines+=("$slug [$type] - $desc  <- $source")
@@ -490,11 +490,12 @@ cmd_ingest() {
             < <("${WORK_KB_PYTHON:-python3}" "$KB_LIB/ingest_extract.py" "${structured[@]}" 2>/dev/null)
     fi
 
-    # Sort records by type then slug (fields 2 then 1).
+    # Sort records by type then slug (fields 2 then 1). Records are US-delimited
+    # (\x1f) so empty fields (e.g. no links) survive; see ingest_extract.py.
     if (( ${#records[@]} > 0 )); then
         local sorted=()
         while IFS= read -r f; do sorted+=("$f"); done \
-            < <(printf '%s\n' "${records[@]}" | LC_ALL=C sort -t$'\t' -k2,2 -k1,1)
+            < <(printf '%s\n' "${records[@]}" | LC_ALL=C sort -t$'\x1f' -k2,2 -k1,1)
         records=("${sorted[@]}")
     fi
 

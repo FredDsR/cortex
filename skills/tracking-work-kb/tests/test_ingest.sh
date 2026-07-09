@@ -36,6 +36,9 @@ ord="$tmp2/.work/workspaces/ws-a/knowledge/table-orders.md"
 assert_file "$acc"; assert_file "$ord"
 assert_contains "$acc" "type: Reference"
 assert_contains "$acc" "title: accounts"
+# accounts has no cross-links; its body (columns) must still survive the
+# record wire format (regression: empty links field must not shift the body out).
+assert_contains "$acc" "DECIMAL(10,2)"
 assert_contains "$ord" "[[knowledge/table-accounts]]"
 assert_contains "$tmp2/.work/workspaces/ws-a/knowledge/op-get-users.md" "type: API"
 

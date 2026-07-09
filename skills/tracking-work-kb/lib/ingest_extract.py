@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""work-kb ingest extractor: OpenAPI + SQL DDL -> TSV concept records.
+"""work-kb ingest extractor: OpenAPI + SQL DDL -> concept records.
 
 Deterministic, dependency-light (stdlib json + PyYAML). Emits one record per
-line to stdout: slug\ttype\ttitle\tdescription\tlinks\tsource\tbody_b64
+line to stdout, fields separated by US (\\x1f, unit separator):
+slug US type US title US description US links US source US body_b64
+US is used instead of TAB because bash `IFS=$'\t' read` treats TAB as
+whitespace-IFS and collapses empty fields (e.g. an empty links column), which
+would shift every later field. US is non-whitespace, so empty fields survive.
 Warnings go to stderr; unparseable inputs are skipped, never fatal.
 """
 from __future__ import annotations
@@ -196,12 +200,15 @@ def detect_and_extract(path):
     return []
 
 
+_US = "\x1f"  # unit separator: field delimiter for the record wire format
+
+
 def emit_record(rec, out):
     body_b64 = base64.b64encode(rec["body"].encode("utf-8")).decode("ascii")
     fields = [rec["slug"], rec["type"], _oneline(rec["title"]),
               _oneline(rec["description"]), ",".join(rec["links"]),
               rec["source"], body_b64]
-    out.write("\t".join(fields) + "\n")
+    out.write(_US.join(fields) + "\n")
 
 
 def main(argv):
