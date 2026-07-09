@@ -23,6 +23,84 @@ validate_slug() {
     [[ "$s" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "invalid slug: '$s' (must match [a-z0-9][a-z0-9-]*)"
 }
 
+today() { date +%Y-%m-%d; }
+
+# Populate flag globals from an argument list. Tracks which optional flags were
+# explicitly passed via *_SET so callers can distinguish "" from "unset".
+parse_flags() {
+    SLUG=""; WS_FLAG=""; SESS_FLAG=""; AUTHOR_FLAG=""
+    TITLE_FLAG=""; TYPE_FLAG=""; DESC_FLAG=""
+    BODY_TEXT=""; BODY_FROM=""; OPEN_FLAG=0
+    TITLE_SET=0; TYPE_SET=0; DESC_SET=0; AUTHOR_SET=0; BODY_SET=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --workspace)   WS_FLAG="$2"; shift 2 ;;
+            --session)     SESS_FLAG="$2"; shift 2 ;;
+            --author)      AUTHOR_FLAG="$2"; AUTHOR_SET=1; shift 2 ;;
+            --title)       TITLE_FLAG="$2"; TITLE_SET=1; shift 2 ;;
+            --type)        TYPE_FLAG="$2"; TYPE_SET=1; shift 2 ;;
+            --description) DESC_FLAG="$2"; DESC_SET=1; shift 2 ;;
+            --body)        BODY_TEXT="$2"; BODY_SET=1; shift 2 ;;
+            --body-from)   BODY_FROM="$2"; BODY_SET=1; shift 2 ;;
+            --open)        OPEN_FLAG=1; shift ;;
+            --) shift; break ;;
+            -*) die "unknown flag: $1" 2 ;;
+            *) [[ -z "$SLUG" ]] && SLUG="$1" || die "extra argument: $1" 2; shift ;;
+        esac
+    done
+}
+
+resolve_author() {
+    local a="$AUTHOR_FLAG"
+    if (( ! AUTHOR_SET )); then
+        if (( OPEN_FLAG )); then a="human"; else a="$WORK_KB_AUTHOR_DEFAULT"; fi
+    fi
+    [[ "$a" == "human" || "$a" == "agent" ]] || die "author must be 'human' or 'agent'"
+    printf '%s' "$a"
+}
+
+# Resolve the target file path into the RESOLVED_PATH global. Called as a plain
+# command (not in a command substitution) so a die() inside resolve_workspace /
+# resolve_session aborts the whole invocation via set -e, rather than being
+# swallowed by an enclosing $(...) subshell.
+resolve_path() {
+    local kind="$1" ws_root sess
+    ws_root="$(resolve_workspace "$WS_FLAG")"
+    if [[ "$kind" == "knowledge" ]]; then
+        RESOLVED_PATH="$ws_root/knowledge/$SLUG.md"
+    else
+        sess="$(resolve_session "$ws_root" "$SESS_FLAG")"
+        RESOLVED_PATH="$ws_root/sessions/$sess/workbench/$SLUG.md"
+    fi
+}
+
+# Writes a doc from F_* globals in deterministic field order; prints the path.
+emit_doc() {
+    local path="$1"
+    mkdir -p "$(dirname "$path")"
+    {
+        printf '%s\n' '---'
+        [[ -n "$F_TITLE" ]] && printf 'title: %s\n' "$F_TITLE"
+        [[ -n "$F_TYPE" ]] && printf 'type: %s\n' "$F_TYPE"
+        printf 'author: %s\n' "$F_AUTHOR"
+        printf 'created: %s\n' "$F_CREATED"
+        printf 'updated: %s\n' "$F_UPDATED"
+        [[ -n "$F_DESC" ]] && printf 'description: %s\n' "$F_DESC"
+        printf '%s\n' '---'
+        printf '\n'
+        printf '%s' "$F_BODY"
+    } > "$path"
+    printf '%s\n' "$path"
+}
+
+sync_after() {
+    local verb="$1" kind="$2" slug="$3"
+    local sync_script="$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh"
+    if [[ -x "$sync_script" ]]; then
+        bash "$sync_script" "track(kb): $verb $kind $slug" >/dev/null 2>&1 || true
+    fi
+}
+
 # Walk up from cwd looking for nearest ancestor with .work/. Only searches
 # within $HOME; refuses to walk outside (e.g., into /var or /tmp) where a
 # stray .work/ would not be the user's intended local store.
@@ -116,74 +194,27 @@ read_body() {
     printf ''
 }
 
-write_file() {
-    local path="$1" author="$2" body="$3"
-    [[ -f "$path" ]] && die "$path already exists"
-    mkdir -p "$(dirname "$path")"
-    {
-        printf '%s\n' '---'
-        printf 'author: %s\n' "$author"
-        printf 'created: %s\n' "$(date +%Y-%m-%d)"
-        printf '%s\n' '---'
-        printf '\n'
-        printf '%s' "$body"
-    } > "$path"
-    printf '%s\n' "$path"
-}
-
 cmd_new() {
     local kind="$1"; shift
     [[ "$kind" == "knowledge" || "$kind" == "workbench" ]] || \
         die "kind must be 'knowledge' or 'workbench'" 2
-    local slug=""
-    local ws_flag="" sess_flag="" author_flag="" body_text="" body_from="" open_flag=0
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --workspace) ws_flag="$2"; shift 2 ;;
-            --session)   sess_flag="$2"; shift 2 ;;
-            --author)    author_flag="$2"; shift 2 ;;
-            --body)      body_text="$2"; shift 2 ;;
-            --body-from) body_from="$2"; shift 2 ;;
-            --open)      open_flag=1; shift ;;
-            --) shift; break ;;
-            -*) die "unknown flag: $1" 2 ;;
-            *) [[ -z "$slug" ]] && slug="$1" || die "extra argument: $1" 2; shift ;;
-        esac
-    done
-    [[ -n "$slug" ]] || usage
-    validate_slug "$slug"
+    parse_flags "$@"
+    [[ -n "$SLUG" ]] || usage
+    validate_slug "$SLUG"
 
-    local author="$author_flag"
-    if [[ -z "$author" ]]; then
-        if (( open_flag )); then author="human"; else author="$WORK_KB_AUTHOR_DEFAULT"; fi
-    fi
-    [[ "$author" == "human" || "$author" == "agent" ]] || \
-        die "author must be 'human' or 'agent'"
+    F_AUTHOR="$(resolve_author)"
+    local path
+    resolve_path "$kind"; path="$RESOLVED_PATH"
+    [[ -f "$path" ]] && die "$path already exists"
 
-    local ws_root path
-    ws_root="$(resolve_workspace "$ws_flag")"
+    F_TITLE="$TITLE_FLAG"; F_TYPE="$TYPE_FLAG"; F_DESC="$DESC_FLAG"
+    F_CREATED="$(today)"; F_UPDATED="$F_CREATED"
+    F_BODY="$(read_body "$BODY_TEXT" "$BODY_FROM")"
 
-    if [[ "$kind" == "knowledge" ]]; then
-        path="$ws_root/knowledge/$slug.md"
-    else
-        local sess
-        sess="$(resolve_session "$ws_root" "$sess_flag")"
-        path="$ws_root/sessions/$sess/workbench/$slug.md"
-    fi
+    emit_doc "$path"
+    sync_after "new" "$kind" "$SLUG"
 
-    local body
-    body="$(read_body "$body_text" "$body_from")"
-    write_file "$path" "$author" "$body"
-
-    # commit_push.sh from tracking-work-sync (no-op if sync disabled/unavailable).
-    local sync_script="$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh"
-    if [[ -x "$sync_script" ]]; then
-        bash "$sync_script" "track(kb): add $kind $slug" >/dev/null 2>&1 || true
-    fi
-
-    if (( open_flag )); then
-        exec "${EDITOR:-vi}" "$path"
-    fi
+    if (( OPEN_FLAG )); then exec "${EDITOR:-vi}" "$path"; fi
 }
 
 [[ $# -ge 1 ]] || usage
