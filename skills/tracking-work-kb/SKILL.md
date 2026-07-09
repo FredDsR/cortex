@@ -23,18 +23,50 @@ tree.
 ## CLI surface
 
 ```
-work-kb new knowledge <slug> [flags]
-work-kb new workbench <slug> [flags]
+work-kb new    knowledge <slug> [flags]
+work-kb new    workbench <slug> [flags]
+work-kb update knowledge <slug> [flags]
+work-kb update workbench <slug> [flags]
+work-kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
 ```
+
+`new` and `update` share the same flags:
 
 | Flag | Default | Notes |
 |------|---------|-------|
 | `--workspace <ws>` | from active session pointer | Required if no active session can be resolved |
 | `--session <sess>` | from active session pointer | Workbench only |
 | `--author <human\|agent>` | `agent` (or `human` if `--open` and `--author` not passed) | Must be one of `human`, `agent` |
+| `--title <text>` | unset | Optional frontmatter title |
+| `--type <text>` | unset | Optional frontmatter type (see vocabulary below) |
+| `--description <text>` | unset | Optional one-line frontmatter description |
 | `--body <text>` | empty | Inline body |
 | `--body-from <file\|->` | unset | File or stdin |
 | `--open` | off | After write, `exec ${EDITOR:-vi}` |
+
+### `new` vs `update`
+
+- **`new`** is create-only. If the target file already exists it errors
+  `already exists` (exit 1).
+- **`update`** is modify-only. If the target file does not exist it errors
+  `not found` (exit 1). It preserves `created`, sets `updated` to today, and
+  merges: `--title`/`--type`/`--description`/`--author` change only when the
+  flag is passed, otherwise the existing value is kept. The body is replaced
+  only when `--body`/`--body-from` is given; bare stdin is NOT auto-consumed by
+  `update` (unlike `new`). So `work-kb update <kind> <slug>` with no other flags
+  is a pure "touch": it bumps `updated` and rewrites nothing else.
+
+### `work-kb index`
+
+Prints a compact, pull-based table of contents (one line per doc,
+`<slug> [<type>] - <description>`) for the resolved workspace's `knowledge/`,
+plus the active (or `--session`) session's `workbench/` when one resolves.
+Ordered by type then slug (untyped last), bounded by `--max` (default 100) per
+section with a `... K more (raise --max)` notice. By default it writes to
+stdout. `--write` (re)generates a derived, banner-marked `knowledge/INDEX.md`
+(the knowledge section only), regenerated like `SUMMARY.md` and never
+hand-maintained or injected into any context. `INDEX.md` is excluded from the
+viz graph.
 
 ## Agent invocation patterns
 
@@ -74,35 +106,56 @@ work-kb new workbench draft-pr-description --body-from /tmp/pr-draft.md
 
 ## Frontmatter
 
-Both kinds emit the same two fields:
+Both kinds emit fields in this deterministic order (only fields with a value
+are written; `author`/`created`/`updated` are always present):
 
 ```yaml
 ---
+title: <optional, from --title>
+type: <optional, from --type>
 author: <human|agent>
 created: <YYYY-MM-DD>
+updated: <YYYY-MM-DD>
+description: <optional, from --description>
 ---
 
 <body>
 ```
 
-The slug is the filename stem; no `slug:` field. Body is written
-verbatim after the frontmatter. No automatic title insertion.
+The slug is the filename stem; no `slug:` field. Body is written verbatim after
+the frontmatter. `updated` equals `created` on `new` and is bumped to today by
+`update`. When no `--title` is given, the viz falls back to the body's first
+`# heading` for the display title.
+
+### `type` vocabulary
+
+`type` is a documented, evolvable convention, not a validated enum. Reuse a
+canonical value where it fits: `Decision`, `Design`, `Reference`, `Runbook`,
+`Investigation`, `Convention`, `Comparison`. Custom values are accepted without
+error, but prefer the canonical set so the index groups sensibly.
+
+`work-kb` reads frontmatter with a scalar-only line reader (only the known keys
+above). It is not a general YAML parser: any structured/unknown key is ignored,
+never misparsed. The viz uses real YAML for its own reads.
 
 ## Exit codes
 
 - 0: success
-- 1: missing context, invalid slug, file already exists
+- 1: missing context, invalid slug, file already exists (`new`), file not found
+  (`update`), malformed frontmatter (`update`)
 - 2: usage error (bad subcommand, bad flag)
 
 ## What this skill does NOT do
 
-- Edit existing files. Use `$EDITOR`, or `work-kb new ... --open` for new
-  files.
+- Rewrite the body of an existing file except via `update` (which also bumps
+  `updated`). Full-body rewrites need an explicit `--body`/`--body-from`.
 - List, show, mv, or rm. Use `ls`, `cat`, `git mv`, `rm`.
 - Validate `[[...]]` references at write time. Broken refs surface in the
   viz as ghost nodes; existing behavior.
 - Open the editor by default. Agent-primary CLI; `$EDITOR` opens only
   when `--open` is passed.
+- Inject the index into any context. `work-kb index` is pull-based (stdout or a
+  derived `INDEX.md`).
 
 ## Sync integration
 
