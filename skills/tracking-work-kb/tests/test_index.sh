@@ -58,6 +58,25 @@ p_ln="$(printf '%s\n' "$body" | grep -n '^plain ' | cut -d: -f1)"
 bounded="$(HOME="$tmp" "$BIN" index --workspace ws-a --max 2)"
 printf '%s\n' "$bounded" | grep -qF "... 2 more (raise --max)" || { echo "FAIL: no truncation notice" >&2; exit 1; }
 
+# No active session (and no --session): knowledge still renders, exit 0.
+# (resolve_session die()s here; index must not abort on it.) Use a pointer-less
+# workspace so no .active.* resolves.
+nk="$tmp/.work/workspaces/ws-noact/knowledge"; mkdir -p "$nk"
+cat > "$nk/lone.md" <<EOF
+---
+type: Reference
+author: agent
+created: 2026-01-01
+updated: 2026-01-01
+description: lonely
+---
+
+body
+EOF
+noact="$(HOME="$tmp" "$BIN" index --workspace ws-noact)"; rc=$?
+assert_eq 0 "$rc" "index exit with no active session"
+printf '%s\n' "$noact" | grep -qF "lone [Reference] - lonely" || { echo "FAIL: no-active knowledge missing" >&2; exit 1; }
+
 # --write produces derived INDEX.md with banner
 HOME="$tmp" "$BIN" index --workspace ws-a --write >/dev/null
 assert_file "$kdir/INDEX.md"

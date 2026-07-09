@@ -153,10 +153,13 @@ render_section() {
     shopt -u nullglob
     (( ${#rows[@]} )) || return 0
 
-    local sorted total
-    sorted="$(printf '%s\n' "${rows[@]}" | LC_ALL=C sort -t$'\t' -k1,1 -k2,2)"
-    total="$(printf '%s\n' "$sorted" | wc -l | tr -d ' ')"
-    printf '%s\n' "$sorted" | head -n "$max" | cut -f3-
+    local total="${#rows[@]}"
+    # awk caps to <max> rows and strips the two sort-key columns (equivalent to
+    # `cut -f3-`). It reads all input rather than closing the pipe early like
+    # `head`, so the upstream printf never takes SIGPIPE (which under
+    # `set -o pipefail` would abort mid-output on a large index).
+    printf '%s\n' "${rows[@]}" | LC_ALL=C sort -t$'\t' -k1,1 -k2,2 \
+        | awk -F'\t' -v m="$max" 'NR<=m { sub(/^[^\t]*\t[^\t]*\t/, ""); print }'
     if (( total > max )); then
         printf '... %d more (raise --max)\n' "$(( total - max ))"
     fi
@@ -361,7 +364,10 @@ cmd_index() {
     if [[ -n "$sess_flag" ]]; then
         sess="$(resolve_session "$ws_root" "$sess_flag")"
     else
-        sess="$(resolve_session "$ws_root" "" 2>/dev/null || true)"
+        # resolve_session die()s (exit) when no session resolves; that exit kills
+        # the $(...) subshell, so the guard must be on the assignment (|| here),
+        # not an inner `|| true` which never runs after exit.
+        sess="$(resolve_session "$ws_root" "" 2>/dev/null)" || sess=""
     fi
     if [[ -n "$sess" ]]; then
         local wdir="$ws_root/sessions/$sess/workbench"
