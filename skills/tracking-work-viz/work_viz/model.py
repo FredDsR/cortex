@@ -60,6 +60,9 @@ class Doc:
     status: Optional[str] = None
     archived: bool = False
     author: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    updated: Optional[str] = None
 
 
 @dataclass

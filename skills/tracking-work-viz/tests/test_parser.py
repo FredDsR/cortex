@@ -132,3 +132,23 @@ def test_parser_ignores_author_on_task(tmp_path):
     task = world.docs.get("tmp-ws/s1/task/task-x")
     assert task is not None
     assert task.author is None
+
+
+def test_knowledge_reads_new_frontmatter_fields(workspaces_root):
+    world = parse_world(workspaces_root)
+    doc = world.docs["authored-ws/knowledge/typed"]
+    assert doc.type == "Runbook"
+    assert doc.description == "a one-line description"
+    assert doc.updated == "2026-06-01"
+
+
+def test_frontmatter_title_beats_body_heading(workspaces_root):
+    world = parse_world(workspaces_root)
+    doc = world.docs["authored-ws/knowledge/typed"]
+    assert doc.title == "Frontmatter Title Wins"
+
+
+def test_uppercase_index_excluded_from_graph(workspaces_root):
+    world = parse_world(workspaces_root)
+    assert "authored-ws/knowledge/INDEX" not in world.docs
+    assert "authored-ws/knowledge/index" not in world.docs

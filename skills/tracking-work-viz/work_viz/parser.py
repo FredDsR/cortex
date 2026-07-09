@@ -106,11 +106,25 @@ def _extract_raw_edges(fm: dict, body: str) -> list[RawEdge]:
 def _read_doc(path: Path, id: DocId) -> tuple[Doc, list[RawEdge]]:
     text = path.read_text(encoding="utf-8")
     fm, body = _split_frontmatter(text)
-    title = _title_from_body(body, id.slug or id.session or id.workspace or "(untitled)")
+    is_kb = id.kind in ("knowledge", "workbench")
+    fallback = id.slug or id.session or id.workspace or "(untitled)"
+    if is_kb and fm.get("title"):
+        title = str(fm["title"])
+    else:
+        title = _title_from_body(body, fallback)
     status = fm.get("status") if id.kind == "task" else None
-    author = fm.get("author") if id.kind in ("knowledge", "workbench") else None
+    author = fm.get("author") if is_kb else None
+    # Stringify: PyYAML coerces bare dates (updated: 2026-06-01) to datetime.date,
+    # and any scalar must be JSON-serializable for the generator payload.
+    def _str_field(key: str) -> Optional[str]:
+        v = fm.get(key) if is_kb else None
+        return None if v is None else str(v)
+    doc_type = _str_field("type")
+    description = _str_field("description")
+    updated = _str_field("updated")
     doc = Doc(id=id, title=title, body=body, frontmatter=fm, rel_path=path,
-              edges_out=[], status=status, author=author)
+              edges_out=[], status=status, author=author,
+              type=doc_type, description=description, updated=updated)
     raw = _extract_raw_edges(fm, body)
     return doc, raw
 
@@ -145,7 +159,7 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
         knowledge_dir = ws_dir / "knowledge"
         if knowledge_dir.is_dir():
             for kfile in sorted(knowledge_dir.glob("*.md")):
-                if kfile.name == "index.md":
+                if kfile.name.lower() == "index.md":
                     continue
                 kid = DocId(kind="knowledge", workspace=ws_slug, slug=kfile.stem)
                 doc, raw = _read_doc(kfile, kid)
@@ -188,7 +202,7 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
             tasks_dir = sess_dir / "tasks"
             if tasks_dir.is_dir():
                 for tfile in sorted(tasks_dir.glob("*.md")):
-                    if tfile.name == "index.md":
+                    if tfile.name.lower() == "index.md":
                         continue
                     tid = DocId(kind="task", workspace=ws_slug,
                                 session=sess_slug, slug=tfile.stem)
@@ -203,7 +217,7 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
             wb_dir = sess_dir / "workbench"
             if wb_dir.is_dir():
                 for wfile in sorted(wb_dir.glob("*.md")):
-                    if wfile.name == "index.md":
+                    if wfile.name.lower() == "index.md":
                         continue
                     wid = DocId(kind="workbench", workspace=ws_slug,
                                 session=sess_slug, slug=wfile.stem)
