@@ -50,3 +50,45 @@ def test_sql_table_records():
 def test_sql_malformed_is_skipped():
     recs = ie.extract_sql("bad.sql", "CREATE TABLE oops (")
     assert recs == []
+
+
+def test_sql_comment_dashes_inside_string_literal_preserved():
+    # '--' inside a string default must not be treated as a comment.
+    sql = "CREATE TABLE c (id INTEGER, note TEXT DEFAULT 'a--b', tail INTEGER);"
+    recs = ie.extract_sql("c.sql", sql)
+    assert len(recs) == 1
+    body = recs[0]["body"]
+    assert "`id`" in body and "`note`" in body and "`tail`" in body
+
+
+def test_sql_unbalanced_table_does_not_drop_later_tables():
+    sql = ("CREATE TABLE good1 (id INTEGER);\n"
+           "CREATE TABLE oops (id INTEGER;\n"
+           "CREATE TABLE good2 (id INTEGER);\n")
+    recs = ie.extract_sql("m.sql", sql)
+    slugs = {r["slug"] for r in recs}
+    assert "table-good1" in slugs and "table-good2" in slugs
+
+
+def test_split_top_commas_ignores_parens_in_string_literal():
+    parts = ie._split_top_commas("status TEXT CHECK (status IN ('a)b','c')), name TEXT")
+    assert len(parts) == 2
+
+
+def test_main_continues_past_a_malformed_file(tmp_path, capsys):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("openapi: 3.0.0\npaths: {}\ncomponents:\n  schemas:\n    W:\n      properties:\n        - id\n")
+    good = tmp_path / "good.sql"
+    good.write_text("CREATE TABLE t1 (id INTEGER);\n")
+    rc = ie.main([str(bad), str(good)])
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "table-t1" in out.out          # good file still extracted
+    assert "warn" in out.err               # bad file reported, not silent
+
+
+def test_json_openapi_parses_without_yaml(tmp_path):
+    j = tmp_path / "openapi.json"
+    j.write_text('{"openapi":"3.0.0","paths":{"/x":{"get":{"summary":"X"}}}}')
+    recs = ie.detect_and_extract(str(j))
+    assert any(r["slug"] == "op-get-x" for r in recs)

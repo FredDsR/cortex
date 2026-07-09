@@ -82,17 +82,32 @@ resolve_path() {
 }
 
 # Writes a doc from F_* globals in deterministic field order; prints the path.
+# Render a value as a safe YAML scalar. Plain when it starts with an
+# alphanumeric and uses only an unambiguous allowlist (keeps human-authored
+# values readable, e.g. `title: A decision`); double-quoted with \ and "
+# escaped otherwise (e.g. an ingested API summary `Create order: v2` ->
+# `"Create order: v2"`). fm_field() is its inverse.
+_yaml_scalar() {
+    local v="$1" safe='^[A-Za-z0-9][A-Za-z0-9_./() -]*$'
+    if [[ -n "$v" && "$v" =~ $safe ]]; then
+        printf '%s' "$v"
+    else
+        v="${v//\\/\\\\}"; v="${v//\"/\\\"}"
+        printf '"%s"' "$v"
+    fi
+}
+
 emit_doc() {
     local path="$1"
     mkdir -p "$(dirname "$path")"
     {
         printf '%s\n' '---'
-        [[ -n "$F_TITLE" ]] && printf 'title: %s\n' "$F_TITLE"
-        [[ -n "$F_TYPE" ]] && printf 'type: %s\n' "$F_TYPE"
+        [[ -n "$F_TITLE" ]] && printf 'title: %s\n' "$(_yaml_scalar "$F_TITLE")"
+        [[ -n "$F_TYPE" ]] && printf 'type: %s\n' "$(_yaml_scalar "$F_TYPE")"
         printf 'author: %s\n' "$F_AUTHOR"
         printf 'created: %s\n' "$F_CREATED"
         printf 'updated: %s\n' "$F_UPDATED"
-        [[ -n "$F_DESC" ]] && printf 'description: %s\n' "$F_DESC"
+        [[ -n "$F_DESC" ]] && printf 'description: %s\n' "$(_yaml_scalar "$F_DESC")"
         printf '%s\n' '---'
         printf '\n'
         printf '%s' "$F_BODY"
@@ -125,7 +140,14 @@ split_fm() {
 # Print the scalar value of KEY from FM_BLOCK (empty if absent). Reads only
 # "key: value" lines; structured/unknown keys are ignored, never misparsed.
 fm_field() {
-    printf '%s\n' "$FM_BLOCK" | sed -n "s/^$1: \{0,1\}//p" | head -n1
+    local raw
+    raw="$(printf '%s\n' "$FM_BLOCK" | sed -n "s/^$1: \{0,1\}//p" | head -n1)"
+    # Inverse of _yaml_scalar: unwrap a double-quoted scalar and unescape.
+    if [[ "$raw" == '"'*'"' && "${#raw}" -ge 2 ]]; then
+        raw="${raw#\"}"; raw="${raw%\"}"
+        raw="${raw//\\\"/\"}"; raw="${raw//\\\\/\\}"
+    fi
+    printf '%s' "$raw"
 }
 
 _lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
@@ -380,9 +402,16 @@ cmd_index() {
     fi
 }
 
-# True if the configured python can import yaml (deterministic path available).
+# True if the configured python interpreter runs at all. The extractor itself
+# degrades per-input (SQL and JSON need no PyYAML; YAML inputs warn+skip when
+# PyYAML is absent), so we do NOT gate on `import yaml` here.
 _ingest_python_ok() {
-    "${WORK_KB_PYTHON:-python3}" -c 'import yaml' >/dev/null 2>&1
+    "${WORK_KB_PYTHON:-python3}" -c '' >/dev/null 2>&1
+}
+
+# Portable base64 decode of $1: GNU uses -d, BSD/macOS uses -D.
+_b64_decode() {
+    printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D
 }
 
 # Print fuzzy artifacts (needing agent judgment) under $1 as worklist lines.
@@ -418,9 +447,17 @@ _ingest_apply() {
     local create_lines=() skip_lines=()
     local line slug type title desc links source body_b64
     local count=0 overflow=0 target body l larr
+    local now; now="$(today)"
 
     for line in "$@"; do
         IFS=$'\x1f' read -r slug type title desc links source body_b64 <<<"$line"
+        # Defense-in-depth: the ingest write path must honor the same slug
+        # contract as new/update (never write outside knowledge/ or clobber via
+        # a crafted slug). Skip, do not abort, on a bad slug.
+        if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            printf 'warn: skipping record with invalid slug: %q\n' "$slug" >&2
+            continue
+        fi
         target="$kdir/$slug.md"
         if [[ -f "$target" ]]; then
             skip_lines+=("$slug [$type] - $desc  <- $source")
@@ -433,14 +470,14 @@ _ingest_apply() {
         count=$((count + 1))
         create_lines+=("$slug [$type] - $desc  <- $source")
         if (( write )); then
-            body="$(printf '%s' "$body_b64" | base64 -d)"
+            body="$(_b64_decode "$body_b64")"
             if [[ -n "$links" ]]; then
                 body+=$'\n\n## Related\n'
                 IFS=',' read -ra larr <<<"$links"
                 for l in "${larr[@]}"; do body+=$'\n'"- [[knowledge/$l]]"; done
             fi
             F_TITLE="$title"; F_TYPE="$type"; F_DESC="$desc"
-            F_AUTHOR="agent"; F_CREATED="$(today)"; F_UPDATED="$F_CREATED"; F_BODY="$body"
+            F_AUTHOR="agent"; F_CREATED="$now"; F_UPDATED="$now"; F_BODY="$body"
             emit_doc "$target" >/dev/null
         fi
     done
@@ -483,11 +520,12 @@ cmd_ingest() {
     local structured=() records=() f
     while IFS= read -r f; do [[ -n "$f" ]] && structured+=("$f"); done < <(_ingest_structured "$src" "$only")
 
-    local py_ok=0
+    local py_ok=0 warnfile=""
     if (( ${#structured[@]} > 0 )) && _ingest_python_ok; then
         py_ok=1
+        warnfile="$(mktemp "${TMPDIR:-/tmp}/work-kb-ingest-XXXXXX")"
         while IFS= read -r f; do [[ -n "$f" ]] && records+=("$f"); done \
-            < <("${WORK_KB_PYTHON:-python3}" "$KB_LIB/ingest_extract.py" "${structured[@]}" 2>/dev/null)
+            < <("${WORK_KB_PYTHON:-python3}" "$KB_LIB/ingest_extract.py" "${structured[@]}" 2>"$warnfile")
     fi
 
     # Sort records by type then slug (fields 2 then 1). Records are US-delimited
@@ -507,6 +545,15 @@ cmd_ingest() {
     if (( py_ok == 0 )) && (( ${#structured[@]} > 0 )); then
         for f in "${structured[@]}"; do printf '%s - structured (extractor unavailable)\n' "$f"; done
     fi
+
+    # Surface extractor diagnostics (parse failures, skipped/unbalanced files,
+    # duplicate-slug drops) instead of swallowing them.
+    if [[ -n "$warnfile" && -s "$warnfile" ]]; then
+        printf '\n## warnings\n'
+        cat "$warnfile"
+    fi
+    [[ -n "$warnfile" ]] && rm -f "$warnfile"
+    return 0
 }
 
 [[ $# -ge 1 ]] || usage

@@ -42,6 +42,23 @@ assert_contains "$acc" "DECIMAL(10,2)"
 assert_contains "$ord" "[[knowledge/table-accounts]]"
 assert_contains "$tmp2/.work/workspaces/ws-a/knowledge/op-get-users.md" "type: API"
 
+# Regression (finding 1): a summary with ':' and '#' must yield VALID YAML
+# frontmatter that round-trips, not a corrupted/truncated block.
+opo="$tmp2/.work/workspaces/ws-a/knowledge/op-post-orders.md"
+assert_file "$opo"
+for d in "$tmp2"/.work/workspaces/ws-a/knowledge/*.md; do
+    "$WORK_KB_PYTHON" - "$d" <<'PYEOF'
+import sys, yaml
+fm = open(sys.argv[1]).read().split("---", 2)[1]
+yaml.safe_load(fm)  # raises if the frontmatter is not valid YAML
+PYEOF
+done
+"$WORK_KB_PYTHON" - "$opo" <<'PYEOF'
+import sys, yaml
+fm = yaml.safe_load(open(sys.argv[1]).read().split("---", 2)[1])
+assert fm["description"] == "Create order: v2 # urgent", fm.get("description")
+PYEOF
+
 # Idempotent: second --write skips all existing.
 again="$(HOME="$tmp2" "$BIN" ingest --from "$REPO" --workspace ws-a --write)"
 printf '%s\n' "$again" | grep -qF "skipped (exists)" || { echo "FAIL: no skipped section" >&2; exit 1; }
@@ -53,5 +70,13 @@ printf '%s\n' "$capped" | grep -qF "more (raise --max)" || { echo "FAIL: no trun
 written="$(find "$tmp3/.work/workspaces/ws-a/knowledge" -name '*.md' | wc -l | tr -d ' ')"
 assert_eq 1 "$written" "max caps writes"
 cleanup_test_home "$tmp2"; cleanup_test_home "$tmp3"
+
+# Regression (finding 5): extractor diagnostics must be surfaced, not swallowed.
+badrepo="$(mktemp -d "${TMPDIR:-/tmp}/ingest-bad-XXXXXX")"
+printf 'openapi: 3.0.0\npaths: {\n' > "$badrepo/openapi.yaml"   # malformed YAML
+warned="$(HOME="$tmp" "$BIN" ingest --from "$badrepo" --workspace ws-a)"
+printf '%s\n' "$warned" | grep -qF "## warnings" || { echo "FAIL: parse failure not surfaced" >&2; exit 1; }
+printf '%s\n' "$warned" | grep -qiF "cannot parse" || { echo "FAIL: no parse diagnostic" >&2; exit 1; }
+rm -rf "$badrepo"
 
 echo "test_ingest: PASS"

@@ -12,6 +12,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+  /orders:
+    post:
+      summary: "Create order: v2 # urgent"
 components:
   schemas:
     User:

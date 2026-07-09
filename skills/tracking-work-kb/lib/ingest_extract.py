@@ -10,7 +10,7 @@ would shift every later field. US is non-whitespace, so empty fields survive.
 Warnings go to stderr; unparseable inputs are skipped, never fatal.
 """
 from __future__ import annotations
-import sys, re, base64
+import sys, re, base64, json
 
 try:
     import yaml  # noqa
@@ -97,9 +97,49 @@ def extract_openapi(path, data):
     return recs
 
 
+def _strip_sql_comments(text):
+    """Remove -- line and /* */ block comments, respecting single-quoted string
+    literals (SQL '' escaping) so a '--' or '/*' inside a literal is preserved."""
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "'":
+                if i + 1 < n and text[i + 1] == "'":
+                    out.append("'"); i += 2; continue
+                in_str = False
+            i += 1; continue
+        if c == "'":
+            in_str = True; out.append(c); i += 1; continue
+        if c == "-" and i + 1 < n and text[i + 1] == "-":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2; continue
+        out.append(c); i += 1
+    return "".join(out)
+
+
 def _split_top_commas(s):
-    parts, depth, cur = [], 0, ""
-    for c in s:
+    """Split on top-level commas, ignoring commas inside parens or '..' literals."""
+    parts, depth, cur, in_str = [], 0, "", False
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        if in_str:
+            cur += c
+            if c == "'":
+                if i + 1 < n and s[i + 1] == "'":
+                    cur += "'"; i += 2; continue
+                in_str = False
+            i += 1; continue
+        if c == "'":
+            in_str = True; cur += c; i += 1; continue
         if c == "(":
             depth += 1
         elif c == ")":
@@ -108,6 +148,7 @@ def _split_top_commas(s):
             parts.append(cur); cur = ""
         else:
             cur += c
+        i += 1
     if cur.strip():
         parts.append(cur)
     return parts
@@ -141,9 +182,32 @@ def _table_concept(path, name, body_sql):
                 links=_dedupe(links), body="\n".join(lines), source=path)
 
 
+def _match_paren(text, popen):
+    """Return the index of the ')' matching the '(' at popen, respecting
+    single-quoted literals, or -1 if unbalanced."""
+    depth, i, n, in_str = 0, popen, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            if c == "'":
+                if i + 1 < n and text[i + 1] == "'":
+                    i += 2; continue
+                in_str = False
+            i += 1; continue
+        if c == "'":
+            in_str = True
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return -1
+
+
 def extract_sql(path, text):
-    text = re.sub(r"--[^\n]*", "", text)
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    text = _strip_sql_comments(text)
     low = text.lower()
     recs, idx = [], 0
     while True:
@@ -159,22 +223,14 @@ def extract_sql(path, text):
         popen = text.find("(", start)
         if popen == -1:
             break
-        depth, i, matched = 0, popen, False
-        while i < len(text):
-            c = text[i]
-            if c == "(":
-                depth += 1
-            elif c == ")":
-                depth -= 1
-                if depth == 0:
-                    matched = True
-                    break
-            i += 1
-        if not matched:
+        close = _match_paren(text, popen)
+        if close == -1:
+            # Unbalanced: skip this statement but keep scanning for later ones.
             print(f"warn: unbalanced CREATE TABLE {name} in {path}, skipping", file=sys.stderr)
-            break
-        recs.append(_table_concept(path, name, text[popen + 1:i]))
-        idx = i + 1
+            idx = start
+            continue
+        recs.append(_table_concept(path, name, text[popen + 1:close]))
+        idx = close + 1
     return recs
 
 
@@ -187,14 +243,22 @@ def detect_and_extract(path):
         return []
     if ext == "sql":
         return extract_sql(path, text)
-    if not _HAVE_YAML:
+    if ext == "json":
+        # OpenAPI/Swagger JSON parses with stdlib; no PyYAML needed.
+        try:
+            data = json.loads(text)
+        except Exception as e:
+            print(f"warn: cannot parse {path}: {e}", file=sys.stderr)
+            return []
+    elif not _HAVE_YAML:
         print(f"warn: PyYAML unavailable, skipping {path}", file=sys.stderr)
         return []
-    try:
-        data = yaml.safe_load(text)
-    except Exception as e:
-        print(f"warn: cannot parse {path}: {e}", file=sys.stderr)
-        return []
+    else:
+        try:
+            data = yaml.safe_load(text)
+        except Exception as e:
+            print(f"warn: cannot parse {path}: {e}", file=sys.stderr)
+            return []
     if isinstance(data, dict) and ("openapi" in data or "swagger" in data or "paths" in data):
         return extract_openapi(path, data)
     return []
@@ -214,7 +278,13 @@ def emit_record(rec, out):
 def main(argv):
     seen = set()
     for path in argv:
-        for rec in detect_and_extract(path):
+        # One malformed artifact must not abort extraction of the rest.
+        try:
+            recs = detect_and_extract(path)
+        except Exception as e:
+            print(f"warn: failed to extract {path}: {e}", file=sys.stderr)
+            continue
+        for rec in recs:
             if rec["slug"] in seen:
                 print(f"warn: duplicate slug {rec['slug']} from {path}, skipping", file=sys.stderr)
                 continue
