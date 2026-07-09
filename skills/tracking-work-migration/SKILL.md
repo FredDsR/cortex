@@ -7,6 +7,8 @@ description: Use only when invoked by tracking-work to move a session between th
 
 Invoked by the core `tracking-work` skill when the user asks to move a session between stores. Never moves data on its own.
 
+Not to be confused with `work-kb ingest` (tracking-work-kb), which imports knowledge from a codebase into a workspace. This skill moves a whole session between the global and local stores; it does not read codebases or write knowledge docs.
+
 ## When to Invoke
 
 - User says "move this session to git" / "track this locally" → migrate global → local

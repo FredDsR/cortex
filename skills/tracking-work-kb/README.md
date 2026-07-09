@@ -29,9 +29,19 @@ work-kb update knowledge api-versioning
 work-kb index                 # stdout
 work-kb index --write         # (re)generate derived knowledge/INDEX.md
 
+# Bulk-ingest a codebase into the KB. --from reads the codebase, --workspace
+# writes the KB. Dry-run first (plans, writes nothing), then --write.
+work-kb ingest --from ./my-service --workspace my-ws          # dry-run plan
+work-kb ingest --from ./my-service --workspace my-ws --write  # create docs
+
 # Explicit workspace when ambiguous.
 work-kb new knowledge cross-project-note --workspace personal
 ```
+
+`ingest` deterministically documents OpenAPI and SQL DDL; fuzzier sources
+(Prisma, README `## API`/`## Schema`, runbooks) come back as an agent worklist.
+It never overwrites existing docs. This is unrelated to `tracking-work-migration`
+(which moves a session between stores).
 
 Frontmatter fields: `title`, `type`, `author`, `created`, `updated`,
 `description` (only `author`/`created`/`updated` are always present). `type` is

@@ -11,6 +11,45 @@ Portable bundle of file-based work-tracking skills for AI coding agents. Designe
 | `tracking-work-migration` | Move a session between the global store (`~/.work/`) and a repo-local store. |
 | `tracking-work-sync` | Optional cross-device sync of `~/.work/` via a private GitHub repo. See `skills/tracking-work-sync/docs/` for design. |
 | `tracking-work-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `work-viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
+| `tracking-work-kb` | Author and bulk-ingest knowledge/workbench docs (`work-kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `tracking-work-viz`, replicated by `tracking-work-sync`. |
+
+## Knowledge base
+
+Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb`
+(the `work-kb` CLI) owns writing them:
+
+- **Two document classes.** `knowledge/<slug>.md` is workspace-scoped (context
+  shared across tasks); `workbench/<slug>.md` is session-scoped (drafts, spec /
+  plan / brainstorm output).
+- **Structured frontmatter.** Optional `title`, `type`, `description`, plus
+  auto-maintained `author` / `created` / `updated`. `type` is a documented,
+  evolvable convention (`Decision`, `Design`, `Reference`, `Runbook`,
+  `Investigation`, `Convention`, `Comparison`; custom values allowed).
+- **`work-kb new` / `work-kb update`.** Create-only vs modify-only (field merge
+  and a pure `updated`-bump touch).
+- **`work-kb index`.** A compact, pull-based table of contents so agents can see
+  what already exists before authoring a duplicate. Prints to stdout, or
+  `--write` regenerates a derived `knowledge/INDEX.md` (like `SUMMARY.md`, never
+  hand-maintained, never injected).
+- **`work-kb ingest`.** Bulk-ingest a codebase into a workspace's `knowledge/`:
+  a deterministic path documents OpenAPI/Swagger and SQL DDL, and everything
+  fuzzier (Prisma, README `## API` / `## Schema` sections, runbooks, model dirs)
+  is surfaced as an agent worklist. Dry-run by default; `--write` is the gate;
+  existing docs are never overwritten. `--from <src>` names the codebase to read,
+  `--workspace <dest>` the KB to write.
+
+### How the skills connect
+
+- `work-kb` **writes** knowledge/workbench docs; `tracking-work-viz` **renders**
+  them (tree, graph, content, with the frontmatter fields above); and
+  `tracking-work-sync` **replicates** the whole `~/.work/` store. All three
+  share one file layout and the same `commit_push.sh` sync hook.
+- The main `tracking-work` skill invokes `tracking-work-kb` at its knowledge
+  checkpoints (capturing durable notes, resolving `[[knowledge/...]]` ghost
+  links, recording spec/plan output).
+- `work-kb ingest` reads a codebase and writes into a KB workspace. It is
+  unrelated to `tracking-work-migration`, which **moves a session** between the
+  global and local stores. Different verbs, opposite direction, different data.
 
 ## Install
 
@@ -91,7 +130,7 @@ Remove the symlinks in each harness's skills directory:
 
 ```bash
 for h in ~/.claude ~/.codex ~/.copilot ~/.gemini; do
-    rm -f "$h/skills/tracking-work"{,-github,-migration,-sync}
+    rm -f "$h/skills/tracking-work"{,-github,-migration,-sync,-viz,-kb}
 done
 ```
 

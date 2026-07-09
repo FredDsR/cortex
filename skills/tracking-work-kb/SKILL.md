@@ -28,6 +28,7 @@ work-kb new    workbench <slug> [flags]
 work-kb update knowledge <slug> [flags]
 work-kb update workbench <slug> [flags]
 work-kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
+work-kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
 ```
 
 `new` and `update` share the same flags:
@@ -67,6 +68,43 @@ stdout. `--write` (re)generates a derived, banner-marked `knowledge/INDEX.md`
 (the knowledge section only), regenerated like `SUMMARY.md` and never
 hand-maintained or injected into any context. `INDEX.md` is excluded from the
 viz graph.
+
+### Bulk ingestion (`work-kb ingest`)
+
+Bulk-ingest documentable artifacts from a codebase into a workspace's
+`knowledge/`. **Direction:** `--from <src>` reads a codebase (default `.`);
+`--workspace <dest>` writes the KB (default: the active workspace), same as
+`new`/`update`/`index`. Not to be confused with `tracking-work-migration`
+(which moves a session between stores).
+
+- **Dry-run by default**; `--write` is the confirmation gate. Existing
+  `knowledge/<slug>.md` is never overwritten (reported under `## skipped`).
+- **Hybrid extraction.** A deterministic path documents **OpenAPI/Swagger**
+  (one doc per operation + per schema) and **SQL DDL** (one doc per table,
+  columns verbatim, `REFERENCES` -> `[[...]]` links). Everything fuzzier
+  (Prisma, README `## API`/`## Schema` sections, runbooks, model/entity dirs)
+  is printed as an **agent worklist** (`## agent worklist`); the CLI never
+  fabricates prose docs.
+- **Agent workflow for the worklist:** for each entry, read the artifact,
+  classify it to a `type`, and run
+  `work-kb new knowledge <slug> --type ... --title ... --description ... --body ...`
+  preserving exact field names/types and using `[[knowledge/<slug>]]`
+  cross-links.
+- `--only openapi|sql` restricts the deterministic scan; `--max <N>` caps writes
+  (default 100) with a `... K more (raise --max)` notice.
+- **Dependency / fallback.** The deterministic path uses a Python helper
+  (stdlib + PyYAML, no new pip deps), selected via `${WORK_KB_PYTHON:-python3}`.
+  If Python/PyYAML is unavailable, structured files fall into the agent worklist
+  and the run still exits 0 (plain-shell harness-agnosticism preserved).
+
+## Related skills
+
+- `tracking-work-viz` renders these docs (graph/tree/content) including the
+  `type`/`title`/`description`/`updated` fields.
+- `tracking-work-sync` replicates the store; both write paths call its
+  `commit_push.sh`.
+- `tracking-work-migration` is a different thing entirely (session store moves),
+  despite the surface similarity to `ingest`.
 
 ## Agent invocation patterns
 
