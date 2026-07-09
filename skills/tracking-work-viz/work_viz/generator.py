@@ -273,6 +273,9 @@ def _node_dict(world: World, doc: Doc) -> dict:
         "ghost": doc.ghost,
         "archived": doc.archived,
         "author": doc.author,
+        "type": doc.type,
+        "description": doc.description,
+        "updated": doc.updated,
         "contentPath": content_path,
     }
 
@@ -394,6 +397,9 @@ def _build_tree(world: World) -> list[dict]:
                     "contentPath": _content_path(wb.id),
                     "archived": wb.archived,
                     "author": wb.author,
+                    "type": wb.type,
+                    "description": wb.description,
+                    "updated": wb.updated,
                     "children": [],
                 })
             ws_node["children"].append(sess_node)
@@ -405,6 +411,9 @@ def _build_tree(world: World) -> list[dict]:
                 "contentPath": _content_path(k.id),
                 "archived": False,
                 "author": k.author,
+                "type": k.type,
+                "description": k.description,
+                "updated": k.updated,
                 "children": [],
             })
         root_node["children"].append(ws_node)

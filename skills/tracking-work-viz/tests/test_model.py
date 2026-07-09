@@ -69,3 +69,11 @@ def test_world_empty():
     w = World(root=root, docs={"/": root}, edges=[], ghosts=set())
     assert w.docs["/"] is root
     assert w.edges == []
+
+
+def test_doc_has_kb_fields_default_none():
+    doc = Doc(id=DocId(kind="knowledge", workspace="w", slug="x"),
+              title="x", body="", frontmatter={}, rel_path=None)
+    assert doc.type is None
+    assert doc.description is None
+    assert doc.updated is None
