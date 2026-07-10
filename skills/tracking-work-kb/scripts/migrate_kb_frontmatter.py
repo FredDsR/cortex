@@ -16,9 +16,9 @@ try:
 except Exception:
     yaml = None
 
-# Canonical frontmatter field order. This MUST mirror the order emit_doc writes
-# in skills/tracking-work-kb/bin/work-kb (the authoritative writer); keep the two
-# in sync if a field is ever added or reordered there.
+# Canonical frontmatter field order. This MUST mirror cortex.frontmatter.CANON /
+# emit() (the authoritative writer in the cortex engine); keep the two in sync
+# if a field is ever added or reordered there.
 CANON = ["title", "type", "author", "created", "updated", "description"]
 STALE = re.compile(r"\bwork-(kb|viz)\b")
 _KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):")

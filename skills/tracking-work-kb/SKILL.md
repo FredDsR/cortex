@@ -11,6 +11,11 @@ Authors `knowledge/<slug>.md` (workspace-scoped) and `workbench/<slug>.md`
 `tracking-work-viz`, which renders the resulting files in the graph and
 tree.
 
+> The CLI is `cortex kb` (`cortex kb new|update|index|ingest`), implemented in
+> the `cortex` Python engine (top-level `cortex/` package). This skill dir is
+> now docs + the one-shot `scripts/migrate_kb_frontmatter.py`; there is no bash
+> `work-kb` bin anymore.
+
 ## When to use
 
 - The user (or you, the agent) wants to record a durable note that other
@@ -203,10 +208,13 @@ present and executable. No-op if sync is not installed or disabled.
 
 ## Tests
 
+The kb commands are tested in the engine package:
+
 ```bash
-bash skills/tracking-work-kb/tests/run_all.sh
+.venv/bin/python -m pytest cortex/tests -q
 ```
 
-Each test sets up a temp `.work/`, invokes the binary with `HOME`
-overridden, asserts file contents and exit codes, tears down. No
-external dependencies.
+`cortex/tests/test_kb_*.py` set up a temp `HOME`, drive `cortex.cli.main(["kb", ...])`,
+and assert file contents / exit codes (parity ports of the former bash suites).
+The one-shot migration keeps its own test at
+`skills/tracking-work-kb/tests/test_migrate_kb_frontmatter.py`.
