@@ -8,7 +8,7 @@
     {
       "name": "tracking-work",
       "source": ".",
-      "description": "Main tracking-work skill plus sub-skills (github, migration, sync, kb, viz).",
+      "description": "cortex: main tracking-work skill plus sub-skills (github, migration, sync, kb, viz), fronted by the `cortex` CLI.",
       "version": "1.0.0"
     }
   ]

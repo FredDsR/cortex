@@ -2,5 +2,5 @@
 .active.*
 .meta
 
-# tracking-work-viz output (regenerable via work-viz + install.sh)
+# tracking-work-viz output (regenerable via cortex viz + install.sh)
 viz/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""work-kb ingest extractor: OpenAPI + SQL DDL -> concept records.
+"""cortex kb ingest extractor: OpenAPI + SQL DDL -> concept records.
 
 Deterministic, dependency-light (stdlib json + PyYAML). Emits one record per
 line to stdout, fields separated by US (\\x1f, unit separator):

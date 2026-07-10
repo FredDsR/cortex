@@ -23,12 +23,12 @@ tree.
 ## CLI surface
 
 ```
-work-kb new    knowledge <slug> [flags]
-work-kb new    workbench <slug> [flags]
-work-kb update knowledge <slug> [flags]
-work-kb update workbench <slug> [flags]
-work-kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
-work-kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
+cortex kb new    knowledge <slug> [flags]
+cortex kb new    workbench <slug> [flags]
+cortex kb update knowledge <slug> [flags]
+cortex kb update workbench <slug> [flags]
+cortex kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
+cortex kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
 ```
 
 `new` and `update` share the same flags:
@@ -54,10 +54,10 @@ work-kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql
   merges: `--title`/`--type`/`--description`/`--author` change only when the
   flag is passed, otherwise the existing value is kept. The body is replaced
   only when `--body`/`--body-from` is given; bare stdin is NOT auto-consumed by
-  `update` (unlike `new`). So `work-kb update <kind> <slug>` with no other flags
+  `update` (unlike `new`). So `cortex kb update <kind> <slug>` with no other flags
   is a pure "touch": it bumps `updated` and rewrites nothing else.
 
-### `work-kb index`
+### `cortex kb index`
 
 Prints a compact, pull-based table of contents (one line per doc,
 `<slug> [<type>] - <description>`) for the resolved workspace's `knowledge/`,
@@ -69,7 +69,7 @@ stdout. `--write` (re)generates a derived, banner-marked `knowledge/INDEX.md`
 hand-maintained or injected into any context. `INDEX.md` is excluded from the
 viz graph.
 
-### Bulk ingestion (`work-kb ingest`)
+### Bulk ingestion (`cortex kb ingest`)
 
 Bulk-ingest documentable artifacts from a codebase into a workspace's
 `knowledge/`. **Direction:** `--from <src>` reads a codebase (default `.`);
@@ -87,7 +87,7 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
   fabricates prose docs.
 - **Agent workflow for the worklist:** for each entry, read the artifact,
   classify it to a `type`, and run
-  `work-kb new knowledge <slug> --type ... --title ... --description ... --body ...`
+  `cortex kb new knowledge <slug> --type ... --title ... --description ... --body ...`
   preserving exact field names/types and using `[[knowledge/<slug>]]`
   cross-links.
 - `--only openapi|sql` restricts the deterministic scan; `--max <N>` caps writes
@@ -111,7 +111,7 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
 Capture an agent-generated note with the body inline:
 
 ```bash
-work-kb new knowledge api-versioning-decision --body "$(cat <<'END'
+cortex kb new knowledge api-versioning-decision --body "$(cat <<'END'
 ## Decision
 
 We will use header-based versioning for the public API.
@@ -122,13 +122,13 @@ END
 Pipe a longer body from stdin:
 
 ```bash
-some-pipeline | work-kb new knowledge daily-summary --body-from -
+some-pipeline | cortex kb new knowledge daily-summary --body-from -
 ```
 
 Workbench note tied to the current session:
 
 ```bash
-work-kb new workbench draft-pr-description --body-from /tmp/pr-draft.md
+cortex kb new workbench draft-pr-description --body-from /tmp/pr-draft.md
 ```
 
 ## Resolution rules
@@ -172,7 +172,7 @@ canonical value where it fits: `Decision`, `Design`, `Reference`, `Runbook`,
 `Investigation`, `Convention`, `Comparison`. Custom values are accepted without
 error, but prefer the canonical set so the index groups sensibly.
 
-`work-kb` reads frontmatter with a scalar-only line reader (only the known keys
+`cortex kb` reads frontmatter with a scalar-only line reader (only the known keys
 above). It is not a general YAML parser: any structured/unknown key is ignored,
 never misparsed. The viz uses real YAML for its own reads.
 
@@ -192,7 +192,7 @@ never misparsed. The viz uses real YAML for its own reads.
   viz as ghost nodes; existing behavior.
 - Open the editor by default. Agent-primary CLI; `$EDITOR` opens only
   when `--open` is passed.
-- Inject the index into any context. `work-kb index` is pull-based (stdout or a
+- Inject the index into any context. `cortex kb index` is pull-based (stdout or a
   derived `INDEX.md`).
 
 ## Sync integration

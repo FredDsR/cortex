@@ -9,14 +9,14 @@ Static browser-based viewer for `~/.work/workspaces/`. The CLI builds a folder o
 
 ## Invocation
 
-The user-facing command is `work-viz`, symlinked by `install.sh` to `~/.work/bin/work-viz`. The user must have `~/.work/bin/` on their `PATH` (or invoke via the absolute path).
+The user-facing command is `cortex viz` (the unified `cortex` bin, which `install.sh` symlinks to `~/.work/bin/cortex` and routes to this skill's `work-viz` script). The user must have `~/.work/bin/` on their `PATH` (or invoke via the absolute path).
 
 | Command | What happens |
 |---|---|
-| `work-viz` | Default: builds into `~/.cache/work-viz/out/` and serves it on a random local port, opens the browser. |
-| `work-viz build [WORKSPACES_ROOT] [--out OUT]` | Parses `WORKSPACES_ROOT` (default `~/.work/workspaces/`) and writes the static site into `OUT` (default `~/.cache/work-viz/out/`). |
-| `work-viz serve [OUT_DIR] [--host H] [--port P] [--no-open]` | Serves an existing built directory. No build, no watch. |
-| `work-viz serve [OUT_DIR] --edit [--workspaces-root PATH]` | Same, plus localhost-only in-browser editing. See "In-browser editing" below. |
+| `cortex viz` | Default: builds into `~/.cache/work-viz/out/` and serves it on a random local port, opens the browser. |
+| `cortex viz build [WORKSPACES_ROOT] [--out OUT]` | Parses `WORKSPACES_ROOT` (default `~/.work/workspaces/`) and writes the static site into `OUT` (default `~/.cache/work-viz/out/`). |
+| `cortex viz serve [OUT_DIR] [--host H] [--port P] [--no-open]` | Serves an existing built directory. No build, no watch. |
+| `cortex viz serve [OUT_DIR] --edit [--workspaces-root PATH]` | Same, plus localhost-only in-browser editing. See "In-browser editing" below. |
 
 The default action (no subcommand) is `build` then `serve` in sequence, intended to be a one-line "open the dashboard" command.
 
@@ -24,10 +24,10 @@ The default action (no subcommand) is `build` then `serve` in sequence, intended
 
 Heuristics:
 
-- "show me what's going on" / "where are we" / "visualize my work" -> run `work-viz` (default).
-- "open the dashboard" -> `work-viz`.
-- "rebuild after I edited some tasks" -> `work-viz build` (then refresh the existing browser tab if a server is already running).
-- "I want a snapshot folder I can share" -> `work-viz build --out /path/to/share`.
+- "show me what's going on" / "where are we" / "visualize my work" -> run `cortex viz` (default).
+- "open the dashboard" -> `cortex viz`.
+- "rebuild after I edited some tasks" -> `cortex viz build` (then refresh the existing browser tab if a server is already running).
+- "I want a snapshot folder I can share" -> `cortex viz build --out /path/to/share`.
 
 The viewer's sidebar tree spans every workspace and session, so once a page is open the user navigates by clicking nodes; no per-workspace invocation is needed.
 
@@ -49,12 +49,12 @@ The `index.md` files at every scope are auto-generated and OpenKB-style, so the 
 
 ## Read-only by default
 
-The static `build` output and plain `work-viz serve` never edit anything under
+The static `build` output and plain `cortex viz serve` never edit anything under
 `~/.work/`. This keeps a shared or published build (e.g. GitHub Pages) safe.
 
 ## In-browser editing (`serve --edit`)
 
-`work-viz serve --edit` turns the local viewer into a read-write surface. It is
+`cortex viz serve --edit` turns the local viewer into a read-write surface. It is
 localhost-only and never part of a static build.
 
 - Editable doc kinds: `task`, `knowledge`, `workbench`, and a session's
@@ -66,13 +66,13 @@ localhost-only and never part of a static build.
 - Typing `[[` in the editor opens an autocomplete over every task / knowledge /
   workbench doc and inserts the most-abbreviated valid addressing-grammar token
   (bare slug for the same session, `session/slug` cross-session, and so on).
-- The source root is read from the build manifest (`.work-viz-build.json`);
+- The source root is read from the build manifest (`.cortex viz-build.json`);
   pass `--workspaces-root PATH` to override it.
 - Optimistic concurrency: if the file changed on disk since you opened it (sync
-  pull, `work-kb`, or an external editor), Save is refused and the browser
+  pull, `cortex kb`, or an external editor), Save is refused and the browser
   reloads the current version so you can reapply your edit.
 - A successful save runs `tracking-work-sync`'s `commit_push.sh` when sync is
-  configured (no-op otherwise), mirroring `work-kb`.
+  configured (no-op otherwise), mirroring `cortex kb`.
 
 ## Sync interaction
 
