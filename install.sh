@@ -108,8 +108,12 @@ VIZ_VENDOR="$REPO_DIR/skills/tracking-work-viz/templates/vendor"
 
 mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
 
-# Symlink work-viz onto ~/.work/bin
-ln -sf "$REPO_DIR/skills/tracking-work-viz/bin/work-viz" "$VIZ_BIN_DIR/work-viz"
+# Unified cortex bin (replaces the former work-viz / work-kb bins).
+ln -sf "$REPO_DIR/skills/tracking-work/bin/cortex" "$VIZ_BIN_DIR/cortex"
+# Remove superseded bins from prior installs (symlinks only).
+for old in work-viz work-kb; do
+    [ -L "$VIZ_BIN_DIR/$old" ] && rm -f "$VIZ_BIN_DIR/$old"
+done
 
 # Vendored JS (only fetched if missing). The generator stages templates/vendor/
 # into out/vendor/ at build time, so populating templates/vendor/ is the only
@@ -168,7 +172,7 @@ if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "tracking-work-viz: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: work-viz"
+echo "cortex: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: cortex kb ... / cortex viz ..."
 # --- end tracking-work-viz install ---
 
 # --- slash command install (Claude Code symlink path) ---
@@ -183,8 +187,6 @@ fi
 # --- end slash command install ---
 
 # --- tracking-work-kb install ---
-KB_BIN_DIR="$HOME/.work/bin"
-mkdir -p "$KB_BIN_DIR"
-ln -sf "$REPO_DIR/skills/tracking-work-kb/bin/work-kb" "$KB_BIN_DIR/work-kb"
-echo "tracking-work-kb: installed. Add $KB_BIN_DIR to PATH if not already, then run: work-kb"
+# The kb CLI is now reached via `cortex kb ...`; no separate bin is installed.
+# (cortex symlink is handled in the viz block above; both live in ~/.work/bin.)
 # --- end tracking-work-kb install ---
