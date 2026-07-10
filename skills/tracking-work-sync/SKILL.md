@@ -51,7 +51,7 @@ Rationale:
 
 - `.active.<session-id>` is per-agent/shell and has no cross-device meaning.
 - `.meta` holds a machine-specific `cwd:` path.
-- `viz/` is `tracking-work-viz` output (per-workspace HTML and `vendor/` JS+CSS). Fully regenerable from `work-viz` + `install.sh`, so syncing it just bloats the repo.
+- `viz/` is `tracking-work-viz` output (per-workspace HTML and `vendor/` JS+CSS). Fully regenerable from `cortex viz` + `install.sh`, so syncing it just bloats the repo.
 
 **Retrofitting an existing sync repo** (one already initialised before `viz/` was ignored):
 

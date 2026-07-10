@@ -2,7 +2,7 @@
 
 Static browser-based viewer for `~/.work/workspaces/`. Three panes (collapsible tree, hub-and-spoke Cytoscape graph, rendered markdown content) over a copied markdown tree. Read-only.
 
-It surfaces the knowledge/workbench frontmatter authored by `tracking-work-kb` (the `work-kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `INDEX.md` files (from `work-kb index`) are excluded from the graph.
+It surfaces the knowledge/workbench frontmatter authored by `tracking-work-kb` (the `cortex kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `INDEX.md` files (from `cortex kb index`) are excluded from the graph.
 
 ## Install
 
@@ -10,17 +10,17 @@ From the repo root:
 
     bash install.sh
 
-This symlinks `bin/work-viz` to `~/.work/bin/work-viz` and fetches two third-party JS files (Cytoscape, marked) into `skills/tracking-work-viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
+This symlinks the unified `cortex` bin to `~/.work/bin/cortex` (reach the viewer via `cortex viz ...`) and fetches two third-party JS files (Cytoscape, marked) into `skills/tracking-work-viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
 
 ## Usage
 
 ```text
-work-viz                                              # build + serve, opens browser
-work-viz build [WORKSPACES_ROOT] [--out OUT]          # static build only
-work-viz serve [OUT_DIR] [--host H] [--port P]        # serve an existing build
-work-viz serve [OUT_DIR] --no-open                    # skip browser auto-open
-work-viz serve [OUT_DIR] --edit                       # localhost in-browser editing
-work-viz serve [OUT_DIR] --edit --workspaces-root DIR # override the source root
+cortex viz                                              # build + serve, opens browser
+cortex viz build [WORKSPACES_ROOT] [--out OUT]          # static build only
+cortex viz serve [OUT_DIR] [--host H] [--port P]        # serve an existing build
+cortex viz serve [OUT_DIR] --no-open                    # skip browser auto-open
+cortex viz serve [OUT_DIR] --edit                       # localhost in-browser editing
+cortex viz serve [OUT_DIR] --edit --workspaces-root DIR # override the source root
 ```
 
 `WORKSPACES_ROOT` defaults to `~/.work/workspaces/`. `OUT` and `OUT_DIR` default to `~/.cache/work-viz/out/`.
@@ -29,7 +29,7 @@ The build is a folder you can browse via the bundled static server, via `python 
 
 ## In-browser editing
 
-`work-viz serve --edit` adds a localhost-only read-write mode on top of the
+`cortex viz serve --edit` adds a localhost-only read-write mode on top of the
 static build. An **Edit** button appears on `task`, `knowledge`, `workbench`,
 and session (`SUMMARY.md`) docs; it opens the raw markdown in a textarea. Save
 writes the source file, rebuilds the site, and refreshes the graph, tree, and
@@ -107,8 +107,8 @@ The suite covers the address grammar, parser (typed-relation extraction, mention
 
 ## Limitations
 
-- Knowledge and workbench docs are authored via the `tracking-work-kb` CLI (`work-kb`) or, for existing docs, the `serve --edit` mode. Unresolved `knowledge/*` or `workbench/*` references still render as ghost nodes until the target file exists.
+- Knowledge and workbench docs are authored via the `tracking-work-kb` CLI (`cortex kb`) or, for existing docs, the `serve --edit` mode. Unresolved `knowledge/*` or `workbench/*` references still render as ghost nodes until the target file exists.
 - No search across the world (Spec B).
 - No graph algorithm beyond the built-in hierarchical and `cose` layouts.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).
-- Opening `out/index.html` via `file://` works for graph + tree but the content pane needs a server because browsers block `fetch` on `file://`. Use `work-viz serve` or `python -m http.server` from inside `out/`.
+- Opening `out/index.html` via `file://` works for graph + tree but the content pane needs a server because browsers block `fetch` on `file://`. Use `cortex viz serve` or `python -m http.server` from inside `out/`.

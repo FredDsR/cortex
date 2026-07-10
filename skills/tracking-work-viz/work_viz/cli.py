@@ -16,7 +16,7 @@ DEFAULT_OUT_DIR = Path.home() / ".cache" / "work-viz" / "out"
 
 
 def _build_argparser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="work-viz",
+    p = argparse.ArgumentParser(prog="cortex viz",
                                  description="Static browser-based viewer for ~/.work/.")
     sub = p.add_subparsers(dest="cmd")
 
@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "build":
         world = parse_world(Path(args.workspaces_root), include_archive=True)
         build_world(world, args.out, workspaces_root=Path(args.workspaces_root))
-        print(f"work-viz build: wrote {args.out}")
+        print(f"cortex viz build: wrote {args.out}")
         return 0
     if args.cmd == "serve":
         serve(args.out_dir, host=args.host, port=args.port,

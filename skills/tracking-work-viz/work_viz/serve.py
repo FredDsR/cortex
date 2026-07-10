@@ -20,7 +20,7 @@ def _resolve_edit_root(out_dir: Path, override):
         root = Path(override).resolve()
         if not root.is_dir():
             raise SystemExit(
-                f"work-viz serve --edit: --workspaces-root not found: {root}")
+                f"cortex viz serve --edit: --workspaces-root not found: {root}")
         return root
     manifest = Path(out_dir) / MANIFEST_NAME
     if manifest.is_file():
@@ -29,7 +29,7 @@ def _resolve_edit_root(out_dir: Path, override):
         if wr and Path(wr).is_dir():
             return Path(wr).resolve()
     raise SystemExit(
-        "work-viz serve --edit: cannot locate source root; pass --workspaces-root")
+        "cortex viz serve --edit: cannot locate source root; pass --workspaces-root")
 
 
 def serve(out_dir: Path, host: str = "127.0.0.1", port: int = 0,
@@ -45,7 +45,7 @@ def serve(out_dir: Path, host: str = "127.0.0.1", port: int = 0,
     actual_port = httpd.server_address[1]
     url = f"http://{host}:{actual_port}/index.html"
     mode = " (edit mode)" if edit else ""
-    print(f"work-viz serve{mode}: {url}")
+    print(f"cortex viz serve{mode}: {url}")
     if open_browser:
         try:
             webbrowser.open(url)

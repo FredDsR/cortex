@@ -19,7 +19,7 @@ Sub-skills handle optional concerns:
 - `tracking-work-github` — PR/commit sync when a session has a `github:` field.
 - `tracking-work-migration` — per-session moves between local and global stores.
 - `tracking-work-sync` — cross-device sync of `~/.work/` via a private GitHub repo (opt-in).
-- `tracking-work-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `work-kb` CLI.
+- `tracking-work-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `cortex kb` CLI.
 
 ## When to Use
 
@@ -100,11 +100,11 @@ Routine:
    - Task status / Notes updates inferred from `COMMITS`, `UNCOMMITTED`, and the
      conversation.
    - Candidate knowledge notes worth capturing — author via `tracking-work-kb`
-     (`work-kb`).
+     (`cortex kb`).
    - Whether sync will run (configured vs. not).
 3. Present the batch and get a SINGLE confirmation.
 4. On confirm: write `tasks/*.md` and update `SUMMARY.md` (bump `last_updated`);
-   create/update knowledge notes via `work-kb`; then run
+   create/update knowledge notes via `cortex kb`; then run
    `bash "$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh" "track: close day — <session-slug>"`
    (this is the commit+push path; it no-ops when sync is unavailable).
 5. Sign off using `NEXT_DAY`: "Saved and synced. See you tomorrow." / "… See you
@@ -157,3 +157,4 @@ See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 - `templates/` — starter SUMMARY.md and task.md
 - `scripts/manifest.sh`: one-row-per-task TSV; cheap snapshot for status questions.
 - `scripts/migrate_to_frontmatter.py`: one-shot legacy bold-pair to YAML frontmatter migrator.
+- `../tracking-work-kb/scripts/migrate_kb_frontmatter.py`: one-shot migrator for existing knowledge/workbench docs (backfills `updated`, canonical field order, regenerates `INDEX.md` banners, reports stale `work-kb`/`work-viz` references). Dry-run by default; `--write` to apply. The family's unified CLI is `cortex` (`cortex kb ...`, `cortex viz ...`).

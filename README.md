@@ -1,6 +1,10 @@
-# tracking-work skills
+# cortex
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Gemini CLI.
+
+One CLI fronts the whole family: **`cortex`** (`cortex kb ...` to author/query knowledge, `cortex viz ...` to visualize). Internally the skills are still named `tracking-work-*`.
+
+> **Migration:** the former `work-kb` / `work-viz` bins are replaced by `cortex kb` / `cortex viz`. Re-run `install.sh` to pick up the `cortex` bin (the old bins are removed). To bring an existing `~/.work/` store up to the current knowledge frontmatter, run `skills/tracking-work-kb/scripts/migrate_kb_frontmatter.py` (dry-run by default; `--write` to apply).
 
 ## Skills in this repo
 
@@ -10,13 +14,13 @@ Portable bundle of file-based work-tracking skills for AI coding agents. Designe
 | `tracking-work-github` | Optional PR/commit drift detection via the `gh` CLI, invoked by the main skill when a session has `github:` frontmatter. |
 | `tracking-work-migration` | Move a session between the global store (`~/.work/`) and a repo-local store. |
 | `tracking-work-sync` | Optional cross-device sync of `~/.work/` via a private GitHub repo. See `skills/tracking-work-sync/docs/` for design. |
-| `tracking-work-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `work-viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
-| `tracking-work-kb` | Author and bulk-ingest knowledge/workbench docs (`work-kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `tracking-work-viz`, replicated by `tracking-work-sync`. |
+| `tracking-work-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
+| `tracking-work-kb` | Author and bulk-ingest knowledge/workbench docs (`cortex kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `tracking-work-viz`, replicated by `tracking-work-sync`. |
 
 ## Knowledge base
 
 Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb`
-(the `work-kb` CLI) owns writing them:
+(the `cortex kb` CLI) owns writing them:
 
 - **Two document classes.** `knowledge/<slug>.md` is workspace-scoped (context
   shared across tasks); `workbench/<slug>.md` is session-scoped (drafts, spec /
@@ -25,13 +29,13 @@ Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb
   auto-maintained `author` / `created` / `updated`. `type` is a documented,
   evolvable convention (`Decision`, `Design`, `Reference`, `Runbook`,
   `Investigation`, `Convention`, `Comparison`; custom values allowed).
-- **`work-kb new` / `work-kb update`.** Create-only vs modify-only (field merge
+- **`cortex kb new` / `cortex kb update`.** Create-only vs modify-only (field merge
   and a pure `updated`-bump touch).
-- **`work-kb index`.** A compact, pull-based table of contents so agents can see
+- **`cortex kb index`.** A compact, pull-based table of contents so agents can see
   what already exists before authoring a duplicate. Prints to stdout, or
   `--write` regenerates a derived `knowledge/INDEX.md` (like `SUMMARY.md`, never
   hand-maintained, never injected).
-- **`work-kb ingest`.** Bulk-ingest a codebase into a workspace's `knowledge/`:
+- **`cortex kb ingest`.** Bulk-ingest a codebase into a workspace's `knowledge/`:
   a deterministic path documents OpenAPI/Swagger and SQL DDL, and everything
   fuzzier (Prisma, README `## API` / `## Schema` sections, runbooks, model dirs)
   is surfaced as an agent worklist. Dry-run by default; `--write` is the gate;
@@ -40,14 +44,14 @@ Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb
 
 ### How the skills connect
 
-- `work-kb` **writes** knowledge/workbench docs; `tracking-work-viz` **renders**
+- `cortex kb` **writes** knowledge/workbench docs; `tracking-work-viz` **renders**
   them (tree, graph, content, with the frontmatter fields above); and
   `tracking-work-sync` **replicates** the whole `~/.work/` store. All three
   share one file layout and the same `commit_push.sh` sync hook.
 - The main `tracking-work` skill invokes `tracking-work-kb` at its knowledge
   checkpoints (capturing durable notes, resolving `[[knowledge/...]]` ghost
   links, recording spec/plan output).
-- `work-kb ingest` reads a codebase and writes into a KB workspace. It is
+- `cortex kb ingest` reads a codebase and writes into a KB workspace. It is
   unrelated to `tracking-work-migration`, which **moves a session** between the
   global and local stores. Different verbs, opposite direction, different data.
 
