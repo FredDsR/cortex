@@ -1,16 +1,19 @@
-#!/usr/bin/env python3
-"""cortex kb ingest extractor: OpenAPI + SQL DDL -> concept records.
-
-Deterministic, dependency-light (stdlib json + PyYAML). Emits one record per
-line to stdout, fields separated by US (\\x1f, unit separator):
-slug US type US title US description US links US source US body_b64
-US is used instead of TAB because bash `IFS=$'\t' read` treats TAB as
-whitespace-IFS and collapses empty fields (e.g. an empty links column), which
-would shift every later field. US is non-whitespace, so empty fields survive.
-Warnings go to stderr; unparseable inputs are skipped, never fatal.
+"""cortex kb ingest: extract documentable artifacts from a codebase into
+knowledge docs. Deterministic OpenAPI + SQL DDL extraction; fuzzy sources go to
+an agent worklist. Moved from the former lib/ingest_extract.py; the extractor is
+now called in-process (concept dicts, no wire format), collecting diagnostics
+into a warnings list instead of stderr.
 """
 from __future__ import annotations
-import sys, re, base64, json
+import json
+import os
+import re
+from pathlib import Path
+
+from cortex import frontmatter as fm
+from cortex import store
+from cortex.errors import CortexError, UsageError
+from cortex.kb import _home, sync_after, today, parse_max, _SLUG
 
 try:
     import yaml  # noqa
@@ -19,7 +22,10 @@ except Exception:
     _HAVE_YAML = False
 
 _HTTP_METHODS = ("get", "post", "put", "patch", "delete", "head", "options")
+_PRUNE = {".git", "node_modules", ".work"}
 
+
+# ---- extractor (pure) ----
 
 def slugify(s: str) -> str:
     s = str(s).strip().lower()
@@ -98,8 +104,6 @@ def extract_openapi(path, data):
 
 
 def _strip_sql_comments(text):
-    """Remove -- line and /* */ block comments, respecting single-quoted string
-    literals (SQL '' escaping) so a '--' or '/*' inside a literal is preserved."""
     out, i, n, in_str = [], 0, len(text), False
     while i < n:
         c = text[i]
@@ -126,7 +130,6 @@ def _strip_sql_comments(text):
 
 
 def _split_top_commas(s):
-    """Split on top-level commas, ignoring commas inside parens or '..' literals."""
     parts, depth, cur, in_str = [], 0, "", False
     i, n = 0, len(s)
     while i < n:
@@ -183,8 +186,6 @@ def _table_concept(path, name, body_sql):
 
 
 def _match_paren(text, popen):
-    """Return the index of the ')' matching the '(' at popen, respecting
-    single-quoted literals, or -1 if unbalanced."""
     depth, i, n, in_str = 0, popen, len(text), False
     while i < n:
         c = text[i]
@@ -206,7 +207,7 @@ def _match_paren(text, popen):
     return -1
 
 
-def extract_sql(path, text):
+def extract_sql(path, text, warnings=None):
     text = _strip_sql_comments(text)
     low = text.lower()
     recs, idx = [], 0
@@ -225,8 +226,8 @@ def extract_sql(path, text):
             break
         close = _match_paren(text, popen)
         if close == -1:
-            # Unbalanced: skip this statement but keep scanning for later ones.
-            print(f"warn: unbalanced CREATE TABLE {name} in {path}, skipping", file=sys.stderr)
+            if warnings is not None:
+                warnings.append(f"unbalanced CREATE TABLE {name} in {path}, skipping")
             idx = start
             continue
         recs.append(_table_concept(path, name, text[popen + 1:close]))
@@ -234,64 +235,163 @@ def extract_sql(path, text):
     return recs
 
 
-def detect_and_extract(path):
+def detect_and_extract(path, warnings=None):
     ext = path.lower().rsplit(".", 1)[-1] if "." in path else ""
     try:
-        text = open(path, encoding="utf-8", errors="replace").read()
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError as e:
-        print(f"warn: cannot read {path}: {e}", file=sys.stderr)
+        if warnings is not None:
+            warnings.append(f"cannot read {path}: {e}")
         return []
     if ext == "sql":
-        return extract_sql(path, text)
+        return extract_sql(path, text, warnings)
     if ext == "json":
-        # OpenAPI/Swagger JSON parses with stdlib; no PyYAML needed.
         try:
             data = json.loads(text)
         except Exception as e:
-            print(f"warn: cannot parse {path}: {e}", file=sys.stderr)
+            if warnings is not None:
+                warnings.append(f"cannot parse {path}: {e}")
             return []
     elif not _HAVE_YAML:
-        print(f"warn: PyYAML unavailable, skipping {path}", file=sys.stderr)
+        if warnings is not None:
+            warnings.append(f"PyYAML unavailable, skipping {path}")
         return []
     else:
         try:
             data = yaml.safe_load(text)
         except Exception as e:
-            print(f"warn: cannot parse {path}: {e}", file=sys.stderr)
+            if warnings is not None:
+                warnings.append(f"cannot parse {path}: {e}")
             return []
     if isinstance(data, dict) and ("openapi" in data or "swagger" in data or "paths" in data):
         return extract_openapi(path, data)
     return []
 
 
-_US = "\x1f"  # unit separator: field delimiter for the record wire format
-
-
-def emit_record(rec, out):
-    body_b64 = base64.b64encode(rec["body"].encode("utf-8")).decode("ascii")
-    fields = [rec["slug"], rec["type"], _oneline(rec["title"]),
-              _oneline(rec["description"]), ",".join(rec["links"]),
-              rec["source"], body_b64]
-    out.write(_US.join(fields) + "\n")
-
-
-def main(argv):
-    seen = set()
-    for path in argv:
-        # One malformed artifact must not abort extraction of the rest.
+def extract_all(paths):
+    """Extract concept dicts from all paths; returns (records, warnings).
+    Dedupes by slug (first wins) and never aborts on one bad file."""
+    records, warnings, seen = [], [], set()
+    for path in paths:
         try:
-            recs = detect_and_extract(path)
+            recs = detect_and_extract(path, warnings)
         except Exception as e:
-            print(f"warn: failed to extract {path}: {e}", file=sys.stderr)
+            warnings.append(f"failed to extract {path}: {e}")
             continue
         for rec in recs:
             if rec["slug"] in seen:
-                print(f"warn: duplicate slug {rec['slug']} from {path}, skipping", file=sys.stderr)
+                warnings.append(f"duplicate slug {rec['slug']} from {path}, skipping")
                 continue
             seen.add(rec["slug"])
-            emit_record(rec, sys.stdout)
+            records.append(rec)
+    return records, warnings
+
+
+# ---- orchestration ----
+
+def _walk_files(src: Path):
+    for root, dirs, files in os.walk(src):
+        dirs[:] = [d for d in dirs if d not in _PRUNE]
+        for fn in files:
+            yield Path(root) / fn
+
+
+_API_HDR = re.compile(r"^##[ \t]+(API|Schema)\b", re.MULTILINE)
+
+
+def _scan(src: Path, only) -> tuple[list[Path], list[str]]:
+    """One walk of the tree: returns (structured files sorted, worklist lines).
+    Structured (deterministic) = OpenAPI/Swagger yaml/json + *.sql, honoring
+    --only. Worklist (agent judgment) = *.prisma (case-sensitive, like bash
+    -name), README*.md with a ## API/## Schema header, runbook* (case-insensitive,
+    like bash -iname); always collected regardless of --only."""
+    structured, prisma, readme, runbook = [], [], [], []
+    for f in _walk_files(src):
+        name = f.name
+        low = name.lower()
+        ext = low.rsplit(".", 1)[-1] if "." in low else ""
+        is_api = (low.startswith("openapi") or low.startswith("swagger")) and ext in ("yml", "yaml", "json")
+        if only != "sql" and is_api:
+            structured.append(f)
+        elif only != "openapi" and low.endswith(".sql"):
+            structured.append(f)
+        if name.endswith(".prisma"):                       # bash -name (case-sensitive)
+            prisma.append(f"{f} - Prisma schema")
+        elif low.startswith("readme") and low.endswith(".md"):
+            try:
+                if _API_HDR.search(f.read_text(encoding="utf-8", errors="replace")):
+                    readme.append(f"{f} - has ## API/## Schema section")
+            except OSError:
+                pass
+        elif low.startswith("runbook"):
+            runbook.append(f"{f} - runbook")
+    worklist = sorted(prisma) + sorted(readme) + sorted(runbook)
+    return sorted(structured, key=str), worklist
+
+
+def cmd_ingest(args) -> int:
+    src = Path(args.src)
+    if not src.is_dir():
+        raise CortexError(f"--from path not found: {src}")
+    max_n = parse_max(args.max)
+    only = args.only or None
+    if only and only not in ("openapi", "sql"):
+        raise UsageError("--only must be openapi or sql")
+
+    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
+    kdir = ws_root / "knowledge"
+
+    structured, worklist = _scan(src, only)
+    records, warnings = extract_all([str(f) for f in structured])
+    records.sort(key=lambda r: (r["type"], r["slug"]))   # type then slug (C order)
+
+    now = today()
+    create_lines, skip_lines = [], []
+    count = overflow = 0
+    for r in records:
+        slug = r["slug"]
+        if not _SLUG.match(slug):
+            warnings.append(f"skipping record with invalid slug: {slug}")
+            continue
+        target = kdir / f"{slug}.md"
+        line = f"{slug} [{r['type']}] - {r['description']}  <- {r['source']}"
+        if target.exists():
+            skip_lines.append(line)
+            continue
+        if count >= max_n:
+            overflow += 1
+            continue
+        count += 1
+        create_lines.append(line)
+        if args.write:
+            body = r["body"]
+            if r["links"]:
+                body += "\n\n## Related\n"
+                for l in r["links"]:
+                    body += f"\n- [[knowledge/{l}]]"
+            fields = {"title": r["title"], "type": r["type"], "author": "agent",
+                      "created": now, "updated": now, "description": r["description"]}
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(fm.emit(fields, body), encoding="utf-8")
+
+    print("## would create (deterministic)")
+    for x in create_lines:
+        print(x)
+    if overflow:
+        print(f"... {overflow} more (raise --max)")
+    if skip_lines:
+        print("\n## skipped (exists)")
+        for x in skip_lines:
+            print(x)
+    if args.write and count > 0:
+        sync_after("ingest", "knowledge", f"{count} docs")
+
+    print("\n## agent worklist (needs judgment)")
+    for x in worklist:
+        print(x)
+
+    if warnings:
+        print("\n## warnings")
+        for w in warnings:
+            print(w)
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))

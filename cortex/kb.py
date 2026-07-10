@@ -1,0 +1,211 @@
+"""kb commands (new / update / index / ingest) for the cortex engine.
+
+Ports skills/tracking-work-kb/bin/work-kb onto the shared core
+(cortex.frontmatter + cortex.store). Behavior-preserving: same frontmatter
+bytes, exit codes, and messages.
+"""
+from __future__ import annotations
+import datetime
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+from cortex import frontmatter as fm
+from cortex import store
+from cortex.errors import CortexError
+
+AUTHOR_DEFAULT = "agent"
+_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def today() -> str:
+    return datetime.date.today().isoformat()
+
+
+def _home() -> Path:
+    return Path(os.environ.get("HOME") or str(Path.home()))
+
+
+def _validate_slug(slug: str) -> None:
+    if not _SLUG.match(slug):
+        raise CortexError(f"invalid slug: '{slug}' (must match [a-z0-9][a-z0-9-]*)")
+
+
+def parse_max(value) -> int:
+    """Validate --max like bash did (^[0-9]+$ or die, exit 1)."""
+    if not re.fullmatch(r"[0-9]+", str(value)):
+        raise CortexError("--max must be a non-negative integer")
+    return int(value)
+
+
+def _resolve_author(args) -> str:
+    if args.author is not None:
+        a = args.author
+    else:
+        a = "human" if args.open else AUTHOR_DEFAULT
+    if a not in ("human", "agent"):
+        raise CortexError("author must be 'human' or 'agent'")
+    return a
+
+
+def _resolve_path(args, kind: str) -> Path:
+    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
+    if kind == "knowledge":
+        return ws_root / "knowledge" / f"{args.slug}.md"
+    sess = store.resolve_session(ws_root, args.session)
+    return ws_root / "sessions" / sess / "workbench" / f"{args.slug}.md"
+
+
+def _body_set(args) -> bool:
+    return args.body is not None or args.body_from is not None
+
+
+def _read_body(args, *, allow_stdin: bool) -> str:
+    if args.body:                       # non-empty --body wins (bash: [[ -n ]])
+        return args.body
+    if args.body_from:
+        if args.body_from == "-":
+            return sys.stdin.read()
+        try:
+            return Path(args.body_from).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            raise CortexError(f"cannot read --body-from {args.body_from}: {e}")
+    if allow_stdin and not sys.stdin.isatty():
+        return sys.stdin.read()
+    return ""
+
+
+def sync_after(verb: str, kind: str, slug: str) -> None:
+    hook = _home() / ".claude/skills/tracking-work-sync/scripts/commit_push.sh"
+    if os.access(hook, os.X_OK):
+        subprocess.run(["bash", str(hook), f"track(kb): {verb} {kind} {slug}"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+
+def _maybe_open(args, path: Path) -> None:
+    # bash exec's $EDITOR; we spawn+wait so an in-process caller survives.
+    if args.open:
+        editor = os.environ.get("EDITOR", "vi")
+        try:
+            subprocess.run([editor, str(path)], check=False)
+        except OSError as e:
+            raise CortexError(f"cannot launch editor '{editor}': {e}")
+
+
+def cmd_new(args) -> int:
+    _validate_slug(args.slug)
+    author = _resolve_author(args)
+    path = _resolve_path(args, args.kind)
+    if path.exists():
+        raise CortexError(f"{path} already exists")
+    body = _read_body(args, allow_stdin=True)
+    d = today()
+    fields = {"title": args.title or "", "type": args.type or "", "author": author,
+              "created": d, "updated": d, "description": args.description or ""}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(fm.emit(fields, body), encoding="utf-8")
+    print(path)
+    sync_after("new", args.kind, args.slug)
+    _maybe_open(args, path)
+    return 0
+
+
+def _render_section(dir_path: Path, max_n: int) -> list[str]:
+    """One line per doc `<slug> [<type>] - <desc>`, ordered by lowercased type
+    (untyped last) then slug, capped at max_n with a `... K more` notice."""
+    if not dir_path.is_dir():
+        return []
+    rows = []
+    for f in sorted(dir_path.glob("*.md")):
+        if f.name.lower() == "index.md":
+            continue
+        block, _ = fm.split(f.read_text(encoding="utf-8"))
+        block = block or ""
+        ty = fm.read_field(block, "type")
+        desc = fm.read_field(block, "description") or fm.read_field(block, "title") \
+            or "(no description)"
+        render = f.stem + (f" [{ty}]" if ty else "") + f" - {desc}"
+        rows.append((ty.lower() if ty else "~~~", f.stem, render))
+    if not rows:
+        return []
+    total = len(rows)
+    rows.sort(key=lambda r: (r[0], r[1]))
+    out = [r[2] for r in rows[:max_n]]
+    if total > max_n:
+        out.append(f"... {total - max_n} more (raise --max)")
+    return out
+
+
+def cmd_index(args) -> int:
+    max_n = parse_max(args.max)
+    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
+    kdir = ws_root / "knowledge"
+
+    if args.write:
+        kdir.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "<!-- generated by cortex kb index; do not edit. regenerate with: cortex kb index --write -->",
+            "# Knowledge index", "", "## knowledge",
+        ]
+        lines += _render_section(kdir, max_n)
+        (kdir / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(kdir / "INDEX.md")
+        sync_after("index", "knowledge", "INDEX")
+        return 0
+
+    print("## knowledge")
+    for ln in _render_section(kdir, max_n):
+        print(ln)
+
+    if args.session:
+        sess = store.resolve_session(ws_root, args.session)
+    else:
+        try:
+            sess = store.resolve_session(ws_root, "")
+        except store.StoreError:
+            sess = ""
+    if sess:
+        wdir = ws_root / "sessions" / sess / "workbench"
+        if wdir.is_dir():
+            print(f"\n## workbench ({sess})")
+            for ln in _render_section(wdir, max_n):
+                print(ln)
+    return 0
+
+
+def cmd_update(args) -> int:
+    _validate_slug(args.slug)
+    path = _resolve_path(args, args.kind)
+    if not path.exists():
+        raise CortexError(f"{path} not found")
+    block, ex_body = fm.split(path.read_text(encoding="utf-8"))
+    if block is None:
+        raise CortexError(f"{path} has malformed frontmatter")
+
+    ex = {k: fm.read_field(block, k) for k in
+          ("title", "type", "description", "author", "created")}
+
+    title = args.title if args.title is not None else ex["title"]
+    typ = args.type if args.type is not None else ex["type"]
+    desc = args.description if args.description is not None else ex["description"]
+    if args.author is not None:
+        if args.author not in ("human", "agent"):
+            raise CortexError("author must be 'human' or 'agent'")
+        author = args.author
+    else:
+        author = ex["author"] or AUTHOR_DEFAULT
+    created = ex["created"] or today()
+
+    # When a body flag is given, bash read_body still falls back to stdin (so
+    # `--body '' | ...` takes stdin); the pure-touch path (no body flag) never
+    # reads stdin and keeps the existing body.
+    body = _read_body(args, allow_stdin=True) if _body_set(args) else ex_body
+    fields = {"title": title, "type": typ, "author": author,
+              "created": created, "updated": today(), "description": desc}
+    path.write_text(fm.emit(fields, body), encoding="utf-8")
+    print(path)
+    sync_after("update", args.kind, args.slug)
+    _maybe_open(args, path)
+    return 0

@@ -52,6 +52,8 @@ See `SKILL.md` for the agent-facing contract and full resolution rules.
 
 ## Tests
 
+The kb commands live in the `cortex` engine and are tested there:
+
 ```bash
-bash tests/run_all.sh
+.venv/bin/python -m pytest cortex/tests -q
 ```
