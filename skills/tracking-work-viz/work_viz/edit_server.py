@@ -1,5 +1,5 @@
 """Localhost live-edit HTTP server. Serves built files for GET and a small
-JSON API for reading/writing source. Enabled by `work-viz serve --edit`.
+JSON API for reading/writing source. Enabled by `cortex viz serve --edit`.
 
 Editing never exists in a static build; this server is the only place the
 write API lives, and it binds localhost only."""
