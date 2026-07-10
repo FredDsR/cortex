@@ -7,6 +7,7 @@ import argparse
 import sys
 
 from cortex import kb
+from cortex import ingest
 from cortex.errors import CortexError
 from cortex.store import StoreError
 
@@ -39,6 +40,13 @@ def build_parser() -> argparse.ArgumentParser:
     idx.add_argument("--session", default="")
     idx.add_argument("--max", type=int, default=100)
     idx.add_argument("--write", action="store_true")
+
+    ing = kbcmds.add_parser("ingest")
+    ing.add_argument("--from", dest="src", default=".")
+    ing.add_argument("--workspace", default="")
+    ing.add_argument("--write", action="store_true")
+    ing.add_argument("--only", choices=["openapi", "sql"], default=None)
+    ing.add_argument("--max", type=int, default=100)
     return p
 
 
@@ -46,6 +54,7 @@ _KB_DISPATCH = {
     "new": kb.cmd_new,
     "update": kb.cmd_update,
     "index": kb.cmd_index,
+    "ingest": ingest.cmd_ingest,
 }
 
 
