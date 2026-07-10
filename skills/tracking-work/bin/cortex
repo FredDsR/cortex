@@ -35,8 +35,9 @@ case "$self" in
 esac
 self="$(_resolve "$self")"
 # bin/ -> tracking-work/ -> skills/ -> repo root
-REPO_ROOT="$(cd "$(dirname "$self")/../../.." && pwd)"
-KB_BIN="$REPO_ROOT/skills/tracking-work-kb/bin/work-kb"
+# Physical resolution (-P) so an invocation through a symlinked skill dir still
+# lands at the real repo root, where the top-level `cortex/` package lives.
+REPO_ROOT="$(cd -P "$(dirname "$self")/../../.." && pwd -P)"
 VIZ_BIN="$REPO_ROOT/skills/tracking-work-viz/bin/work-viz"
 
 _run() {  # $1 = target script, rest = args. Clear error if the script is missing.
@@ -48,7 +49,8 @@ _run() {  # $1 = target script, rest = args. Clear error if the script is missin
 [[ $# -ge 1 ]] || usage
 group="$1"; shift
 case "$group" in
-    kb)        _run "$KB_BIN" "$@" ;;
+    kb)        exec env PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
+                    "${WORK_KB_PYTHON:-python3}" -m cortex.cli kb "$@" ;;
     viz)       _run "$VIZ_BIN" "$@" ;;
     -h|--help) usage 0 ;;
     *) echo "cortex: unknown command '$group'" >&2; usage ;;
