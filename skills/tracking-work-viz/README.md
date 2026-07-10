@@ -34,7 +34,7 @@ static build. An **Edit** button appears on `task`, `knowledge`, `workbench`,
 and session (`SUMMARY.md`) docs; it opens the raw markdown in a textarea. Save
 writes the source file, rebuilds the site, and refreshes the graph, tree, and
 content in place. The source root comes from the build manifest
-(`.cortex viz-build.json`); `--workspaces-root PATH` overrides it. Typing `[[` in
+(`.work-viz-build.json`); `--workspaces-root PATH` overrides it. Typing `[[` in
 the editor opens an autocomplete over task / knowledge / workbench docs and
 inserts the most-abbreviated valid addressing-grammar token.
 

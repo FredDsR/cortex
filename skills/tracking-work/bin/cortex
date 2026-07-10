@@ -39,11 +39,17 @@ REPO_ROOT="$(cd "$(dirname "$self")/../../.." && pwd)"
 KB_BIN="$REPO_ROOT/skills/tracking-work-kb/bin/work-kb"
 VIZ_BIN="$REPO_ROOT/skills/tracking-work-viz/bin/work-viz"
 
+_run() {  # $1 = target script, rest = args. Clear error if the script is missing.
+    local bin="$1"; shift
+    [[ -f "$bin" ]] || { echo "cortex: cannot find $(basename "$bin") at $bin (broken install?)" >&2; exit 1; }
+    exec "$bin" "$@"
+}
+
 [[ $# -ge 1 ]] || usage
 group="$1"; shift
 case "$group" in
-    kb)        exec "$KB_BIN" "$@" ;;
-    viz)       exec "$VIZ_BIN" "$@" ;;
+    kb)        _run "$KB_BIN" "$@" ;;
+    viz)       _run "$VIZ_BIN" "$@" ;;
     -h|--help) usage 0 ;;
     *) echo "cortex: unknown command '$group'" >&2; usage ;;
 esac

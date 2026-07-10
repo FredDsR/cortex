@@ -66,7 +66,7 @@ localhost-only and never part of a static build.
 - Typing `[[` in the editor opens an autocomplete over every task / knowledge /
   workbench doc and inserts the most-abbreviated valid addressing-grammar token
   (bare slug for the same session, `session/slug` cross-session, and so on).
-- The source root is read from the build manifest (`.cortex viz-build.json`);
+- The source root is read from the build manifest (`.work-viz-build.json`);
   pass `--workspaces-root PATH` to override it.
 - Optimistic concurrency: if the file changed on disk since you opened it (sync
   pull, `cortex kb`, or an external editor), Save is refused and the browser

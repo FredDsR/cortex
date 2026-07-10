@@ -157,4 +157,4 @@ See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 - `templates/` — starter SUMMARY.md and task.md
 - `scripts/manifest.sh`: one-row-per-task TSV; cheap snapshot for status questions.
 - `scripts/migrate_to_frontmatter.py`: one-shot legacy bold-pair to YAML frontmatter migrator.
-- `../tracking-work-kb/scripts/migrate_kb_frontmatter.py`: one-shot migrator for existing knowledge/workbench docs (backfills `updated`, canonical field order, regenerates `INDEX.md` banners, reports stale `cortex kb`/`cortex viz` references). Dry-run by default; `--write` to apply. The family's unified CLI is `cortex` (`cortex kb ...`, `cortex viz ...`).
+- `../tracking-work-kb/scripts/migrate_kb_frontmatter.py`: one-shot migrator for existing knowledge/workbench docs (backfills `updated`, canonical field order, regenerates `INDEX.md` banners, reports stale `work-kb`/`work-viz` references). Dry-run by default; `--write` to apply. The family's unified CLI is `cortex` (`cortex kb ...`, `cortex viz ...`).
