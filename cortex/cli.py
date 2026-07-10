@@ -33,12 +33,19 @@ def build_parser() -> argparse.ArgumentParser:
     kbcmds = kbp.add_subparsers(dest="cmd", required=True)
     _add_write_flags(kbcmds.add_parser("new"))
     _add_write_flags(kbcmds.add_parser("update"))
+
+    idx = kbcmds.add_parser("index")
+    idx.add_argument("--workspace", default="")
+    idx.add_argument("--session", default="")
+    idx.add_argument("--max", type=int, default=100)
+    idx.add_argument("--write", action="store_true")
     return p
 
 
 _KB_DISPATCH = {
     "new": kb.cmd_new,
     "update": kb.cmd_update,
+    "index": kb.cmd_index,
 }
 
 
