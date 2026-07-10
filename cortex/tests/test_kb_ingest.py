@@ -59,3 +59,9 @@ def test_max_caps_writes(kbhome, repo, capsys):
     assert "more (raise --max)" in out
     n = len(list((kbhome / ".work/workspaces/ws-a/knowledge").glob("*.md")))
     assert n == 1
+
+
+def test_only_empty_string_runs_full_ingest(kbhome, repo, capsys):
+    assert cli.main(["kb", "ingest", "--from", str(repo), "--workspace", "ws-a", "--only", ""]) == 0
+    out = capsys.readouterr().out
+    assert "table-accounts" in out and "op-get-users" in out

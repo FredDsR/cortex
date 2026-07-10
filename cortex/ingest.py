@@ -12,8 +12,8 @@ from pathlib import Path
 
 from cortex import frontmatter as fm
 from cortex import store
-from cortex.errors import CortexError
-from cortex.kb import _home, sync_after, today
+from cortex.errors import CortexError, UsageError
+from cortex.kb import _home, sync_after, today, parse_max, _SLUG
 
 try:
     import yaml  # noqa
@@ -22,7 +22,6 @@ except Exception:
     _HAVE_YAML = False
 
 _HTTP_METHODS = ("get", "post", "put", "patch", "delete", "head", "options")
-_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PRUNE = {".git", "node_modules", ".work"}
 
 
@@ -239,7 +238,7 @@ def extract_sql(path, text, warnings=None):
 def detect_and_extract(path, warnings=None):
     ext = path.lower().rsplit(".", 1)[-1] if "." in path else ""
     try:
-        text = open(path, encoding="utf-8", errors="replace").read()
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError as e:
         if warnings is not None:
             warnings.append(f"cannot read {path}: {e}")
@@ -297,49 +296,52 @@ def _walk_files(src: Path):
             yield Path(root) / fn
 
 
-def _discover_structured(src: Path, only) -> list[Path]:
-    out = []
+_API_HDR = re.compile(r"^##[ \t]+(API|Schema)\b", re.MULTILINE)
+
+
+def _scan(src: Path, only) -> tuple[list[Path], list[str]]:
+    """One walk of the tree: returns (structured files sorted, worklist lines).
+    Structured (deterministic) = OpenAPI/Swagger yaml/json + *.sql, honoring
+    --only. Worklist (agent judgment) = *.prisma (case-sensitive, like bash
+    -name), README*.md with a ## API/## Schema header, runbook* (case-insensitive,
+    like bash -iname); always collected regardless of --only."""
+    structured, prisma, readme, runbook = [], [], [], []
     for f in _walk_files(src):
-        n = f.name.lower()
-        ext = n.rsplit(".", 1)[-1] if "." in n else ""
-        is_api = (n.startswith("openapi") or n.startswith("swagger")) and ext in ("yml", "yaml", "json")
-        is_sql = n.endswith(".sql")
+        name = f.name
+        low = name.lower()
+        ext = low.rsplit(".", 1)[-1] if "." in low else ""
+        is_api = (low.startswith("openapi") or low.startswith("swagger")) and ext in ("yml", "yaml", "json")
         if only != "sql" and is_api:
-            out.append(f)
-        elif only != "openapi" and is_sql:
-            out.append(f)
-    return sorted(out, key=str)
-
-
-def _worklist(src: Path) -> list[str]:
-    prisma, readme, runbook = [], [], []
-    api_hdr = re.compile(r"^##[ \t]+(API|Schema)\b", re.MULTILINE)
-    for f in _walk_files(src):
-        n = f.name.lower()
-        if n.endswith(".prisma"):
+            structured.append(f)
+        elif only != "openapi" and low.endswith(".sql"):
+            structured.append(f)
+        if name.endswith(".prisma"):                       # bash -name (case-sensitive)
             prisma.append(f"{f} - Prisma schema")
-        elif n.startswith("readme") and n.endswith(".md"):
+        elif low.startswith("readme") and low.endswith(".md"):
             try:
-                if api_hdr.search(f.read_text(encoding="utf-8", errors="replace")):
+                if _API_HDR.search(f.read_text(encoding="utf-8", errors="replace")):
                     readme.append(f"{f} - has ## API/## Schema section")
             except OSError:
                 pass
-        elif n.startswith("runbook"):
+        elif low.startswith("runbook"):
             runbook.append(f"{f} - runbook")
-    return sorted(prisma) + sorted(readme) + sorted(runbook)
+    worklist = sorted(prisma) + sorted(readme) + sorted(runbook)
+    return sorted(structured, key=str), worklist
 
 
 def cmd_ingest(args) -> int:
     src = Path(args.src)
     if not src.is_dir():
         raise CortexError(f"--from path not found: {src}")
-    if args.max < 0:
-        raise CortexError("--max must be a non-negative integer")
+    max_n = parse_max(args.max)
+    only = args.only or None
+    if only and only not in ("openapi", "sql"):
+        raise UsageError("--only must be openapi or sql")
 
     ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
     kdir = ws_root / "knowledge"
 
-    structured = _discover_structured(src, args.only)
+    structured, worklist = _scan(src, only)
     records, warnings = extract_all([str(f) for f in structured])
     records.sort(key=lambda r: (r["type"], r["slug"]))   # type then slug (C order)
 
@@ -356,7 +358,7 @@ def cmd_ingest(args) -> int:
         if target.exists():
             skip_lines.append(line)
             continue
-        if count >= args.max:
+        if count >= max_n:
             overflow += 1
             continue
         count += 1
@@ -385,7 +387,7 @@ def cmd_ingest(args) -> int:
         sync_after("ingest", "knowledge", f"{count} docs")
 
     print("\n## agent worklist (needs judgment)")
-    for x in _worklist(src):
+    for x in worklist:
         print(x)
 
     if warnings:

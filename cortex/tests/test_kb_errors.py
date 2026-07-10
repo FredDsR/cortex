@@ -66,3 +66,30 @@ def test_workbench_no_active_no_session_exit_1(tmp_path, monkeypatch):
 
 def test_bad_flag_exit_2(kbhome):
     assert cli.main(["kb", "new", "knowledge", "x", "--bogus"]) == 2
+
+
+def test_body_from_missing_file_clean_error(kbhome, capsys):
+    # Was: uncaught traceback. Now: clean CortexError -> exit 1.
+    rc = cli.main(["kb", "new", "knowledge", "x", "--body-from", "/no/such/file"])
+    assert rc == 1
+    assert "Traceback" not in capsys.readouterr().err
+
+
+def test_max_non_numeric_exit_1(kbhome):
+    assert cli.main(["kb", "index", "--workspace", "ws-a", "--max", "abc"]) == 1
+
+
+def test_dash_leading_flag_value_accepted(kbhome):
+    rc = cli.main(["kb", "new", "knowledge", "changelog",
+                   "--description", "-> migration notes", "--body", "b"])
+    assert rc == 0
+    assert "-> migration notes" in (
+        kbhome / ".work/workspaces/ws-a/knowledge/changelog.md").read_text()
+
+
+def test_open_missing_editor_clean_error(kbhome, monkeypatch, capsys):
+    monkeypatch.setenv("EDITOR", "definitely-not-a-real-editor-xyz")
+    rc = cli.main(["kb", "new", "knowledge", "ed", "--body", "x", "--open"])
+    assert rc == 1
+    assert "Traceback" not in capsys.readouterr().err
+    assert (kbhome / ".work/workspaces/ws-a/knowledge/ed.md").is_file()  # written before open

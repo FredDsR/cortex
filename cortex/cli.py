@@ -38,16 +38,37 @@ def build_parser() -> argparse.ArgumentParser:
     idx = kbcmds.add_parser("index")
     idx.add_argument("--workspace", default="")
     idx.add_argument("--session", default="")
-    idx.add_argument("--max", type=int, default=100)
+    idx.add_argument("--max", default="100")          # validated in cmd (exit 1, bash parity)
     idx.add_argument("--write", action="store_true")
 
     ing = kbcmds.add_parser("ingest")
     ing.add_argument("--from", dest="src", default=".")
     ing.add_argument("--workspace", default="")
     ing.add_argument("--write", action="store_true")
-    ing.add_argument("--only", choices=["openapi", "sql"], default=None)
-    ing.add_argument("--max", type=int, default=100)
+    ing.add_argument("--only", default="")            # "" = no filter; validated in cmd
+    ing.add_argument("--max", default="100")
     return p
+
+
+# Value-taking flags whose argument may legitimately start with "-" (e.g. a
+# description like "-> notes"). argparse rejects `--flag -x` in space form, so we
+# rewrite `--flag value` -> `--flag=value` (the "=" form accepts leading dashes),
+# matching the bash parser which stored $2 verbatim.
+_VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
+                "--description", "--body", "--body-from", "--from", "--only", "--max"}
+
+
+def _glue_flag_values(argv):
+    out, i, n = [], 0, len(argv)
+    while i < n:
+        a = argv[i]
+        if a in _VALUE_FLAGS and i + 1 < n:
+            out.append(f"{a}={argv[i + 1]}")
+            i += 2
+        else:
+            out.append(a)
+            i += 1
+    return out
 
 
 _KB_DISPATCH = {
@@ -62,7 +83,7 @@ def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
     try:
-        args = parser.parse_args(argv)
+        args = parser.parse_args(_glue_flag_values(argv))
     except SystemExit as e:               # argparse usage error -> exit 2
         return int(e.code) if e.code is not None else 0
     try:
