@@ -57,3 +57,10 @@ def test_find_local_store_walks_up_within_home(tmp_path):
     deep.mkdir(parents=True)
     assert store.find_local_store(deep, home=tmp_path) == repo / ".work"
     assert store.find_local_store(tmp_path, home=tmp_path) is None
+
+
+def test_resolve_session_multiline_pointer_is_ambiguous(tmp_path):
+    ws = _mk_ws(tmp_path, "ws-a", sessions=["s1", "s2"])
+    (ws / ".active.testid").write_text("s1\ns2\n")   # one pointer, two lines
+    with pytest.raises(store.StoreError):
+        store.resolve_session(ws, "")

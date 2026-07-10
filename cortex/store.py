@@ -29,10 +29,12 @@ def find_local_store(cwd: Path, home: Path) -> Path | None:
 
 
 def _active_targets(ws_root: Path) -> list[str]:
+    # `$(cat)` in bash strips only trailing newlines (not surrounding spaces,
+    # and does not split embedded newlines into separate entries).
     out = []
     for f in sorted(ws_root.glob(".active.*")):
         try:
-            out.append(f.read_text().strip())
+            out.append(f.read_text().rstrip("\n"))
         except OSError:
             pass
     return out
@@ -72,7 +74,10 @@ def resolve_session(ws_root: Path, explicit_sess: str) -> str:
     targets = _active_targets(ws_root)
     if not targets:
         raise StoreError(f"no active session in '{ws_root.name}'; pass --session <sess>")
-    unique = sorted(set(targets))
+    # Bash counts UNIQUE LINES across all pointer contents (printf '%s\n' ... |
+    # sort -u | wc -l), so a multi-line pointer is treated as multiple sessions.
+    lines = [ln for t in targets for ln in t.split("\n")]
+    unique = sorted(set(lines))
     if len(unique) != 1:
         raise StoreError(f"multiple sessions active in '{ws_root.name}'; pass --session <sess>")
     return unique[0]

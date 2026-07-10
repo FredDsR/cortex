@@ -40,7 +40,7 @@ def test_split_extracts_block_and_body():
     text = "---\nauthor: agent\ncreated: 2026-07-09\n---\n\nline one\nline two\n"
     block, body = fm.split(text)
     assert block == "author: agent\ncreated: 2026-07-09"
-    assert body == "line one\nline two\n"          # one leading blank stripped
+    assert body == "line one\nline two"    # leading blank + trailing newlines stripped (bash parity)
     assert fm.split("no frontmatter\n") == (None, None)
 
 
@@ -57,3 +57,15 @@ def test_emit_read_roundtrip_through_split():
     block, body = fm.split(doc)
     assert fm.read_field(block, "description") == "Use X: because #y"
     assert body == "b"
+
+
+def test_scalar_quotes_trailing_newline_value():
+    # Python `$` would wrongly treat this as safe; bash quotes it. Parity: quote.
+    assert fm.scalar("why we chose X\n").startswith('"')
+
+
+def test_split_strips_trailing_newlines_from_body():
+    # bash captures FM_BODY via $(...), which strips all trailing newlines.
+    text = "---\nauthor: agent\ncreated: 2026-07-09\n---\n\nbody text\n\n"
+    _, body = fm.split(text)
+    assert body == "body text"

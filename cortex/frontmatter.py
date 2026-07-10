@@ -10,7 +10,9 @@ import re
 # Canonical frontmatter field order (authoritative here for the engine).
 CANON = ["title", "type", "author", "created", "updated", "description"]
 
-_SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./() -]*$")
+# `\Z` (not `$`) so a trailing newline does NOT count as "safe": Python's `$`
+# matches just before a final newline, but bash ERE `$` is true end-of-string.
+_SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./() -]*\Z")
 
 
 def scalar(v: str) -> str:
@@ -52,6 +54,9 @@ def split(text: str):
         return None, None
     block = "\n".join(lines[1:close])
     body = "\n".join(lines[close + 1:])
+    # Match bash split_fm: FM_BODY is captured via `$(...)`, which strips ALL
+    # trailing newlines; then one leading blank (emit()'s separator) is dropped.
+    body = body.rstrip("\n")
     if body.startswith("\n"):
         body = body[1:]
     return block, body
