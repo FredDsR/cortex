@@ -6,7 +6,7 @@ import sys
 import threading
 from pathlib import Path
 
-from .parser import parse_world
+from cortex.parser import parse_world
 from .generator import build as build_world
 from .serve import serve, _make_server
 

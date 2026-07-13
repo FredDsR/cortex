@@ -1,8 +1,8 @@
 """Tests for edit_backend: source-path mapping + hashing."""
 import hashlib
 import pytest
-from work_viz.parser import parse_world
-from work_viz import edit_backend as eb
+from cortex.parser import parse_world
+from cortex.viz import edit_backend as eb
 
 
 def test_source_path_for_task(workspaces_root):

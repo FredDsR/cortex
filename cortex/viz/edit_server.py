@@ -15,9 +15,9 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
-from .parser import parse_world
+from cortex.parser import parse_world
 from .generator import build, build_payload
-from .address import abbreviate
+from cortex.address import abbreviate
 from . import edit_backend
 
 

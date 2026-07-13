@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .model import World, Doc, DocId, Edge
+from cortex.model import World, Doc, DocId, Edge
 
-_PACKAGE_DIR = Path(__file__).parent.parent
+_PACKAGE_DIR = Path(__file__).parent
 _VENDOR_SRC = _PACKAGE_DIR / "templates" / "vendor"
 _SHELL_TEMPLATE = (_PACKAGE_DIR / "templates" / "shell.html").read_text(encoding="utf-8")
 

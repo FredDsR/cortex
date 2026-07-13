@@ -4,9 +4,9 @@ import urllib.request
 import socket
 from pathlib import Path
 import pytest
-from work_viz.parser import parse_world
-from work_viz.generator import build
-from work_viz.serve import _make_server
+from cortex.parser import parse_world
+from cortex.viz.generator import build
+from cortex.viz.serve import _make_server
 
 
 def _free_port() -> int:
