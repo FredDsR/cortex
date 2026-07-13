@@ -1,8 +1,8 @@
 """The single frontmatter reader/writer for the cortex engine.
 
-Ports the exact behavior of skills/tracking-work-kb/bin/work-kb's emit_doc,
-_yaml_scalar, split_fm, and fm_field, so later phases can replace that bash
-with no observable change. Pure (stdlib only).
+Ported from the retired bash work-kb (emit_doc, _yaml_scalar, split_fm,
+fm_field) with byte-identical output; it is now the sole frontmatter
+reader/writer/splitter in the family. Pure (stdlib only).
 """
 from __future__ import annotations
 import re

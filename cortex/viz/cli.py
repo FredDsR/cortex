@@ -1,4 +1,4 @@
-"""Command-line entry point for work-viz."""
+"""Command-line entry point for `cortex viz` (build / serve)."""
 from __future__ import annotations
 import argparse
 import socketserver
