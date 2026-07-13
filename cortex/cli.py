@@ -8,6 +8,7 @@ import sys
 
 from cortex import kb
 from cortex import ingest
+from cortex import query
 from cortex.errors import CortexError
 from cortex.store import StoreError
 
@@ -56,6 +57,16 @@ def build_parser() -> argparse.ArgumentParser:
     vp = groups.add_parser("viz", add_help=False,
                            help="Visualize the work tree (build, serve)")
     vp.add_argument("args", nargs=argparse.REMAINDER)
+
+    qp = groups.add_parser("query", help="Query the work graph (neighbors)")
+    qcmds = qp.add_subparsers(dest="cmd", required=True)
+    nb = qcmds.add_parser("neighbors",
+                          help="Show a doc's links, backlinks, and ghost refs")
+    nb.add_argument("slug")
+    nb.add_argument("--workspace", default="")
+    nb.add_argument("--session", default="")
+    nb.add_argument("--kind", choices=["task", "knowledge", "workbench"], default="")
+    nb.add_argument("--max", default="20")
     return p
 
 
@@ -87,6 +98,15 @@ _KB_DISPATCH = {
     "ingest": ingest.cmd_ingest,
 }
 
+_QUERY_DISPATCH = {
+    "neighbors": query.cmd_neighbors,
+}
+
+_GROUP_DISPATCH = {
+    "kb": _KB_DISPATCH,
+    "query": _QUERY_DISPATCH,
+}
+
 
 def _exit_code(e: SystemExit) -> int:
     """Normalize a SystemExit to a process exit code, mirroring CPython: None -> 0,
@@ -115,8 +135,9 @@ def main(argv=None) -> int:
     except SystemExit as e:               # argparse usage error -> exit 2
         return _exit_code(e)
     try:
-        if args.group == "kb":
-            return _KB_DISPATCH[args.cmd](args)
+        dispatch = _GROUP_DISPATCH.get(args.group)
+        if dispatch is not None:
+            return dispatch[args.cmd](args)
         parser.error(f"unknown group: {args.group}")
     except (CortexError, StoreError) as e:
         print(f"error: {e}", file=sys.stderr)

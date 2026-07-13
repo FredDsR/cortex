@@ -19,6 +19,10 @@ _FM_KEY_TO_KIND = {"blocked_by": "blocked", "related_to": "related", "follows": 
 _LABEL_TO_KIND = {"blocked by": "blocked", "related to": "related", "follows": "follows"}
 _MENTION_BRACKET_RE = re.compile(r"\[([a-z0-9][a-z0-9/_\-]*)\]")
 _MENTION_BARE_RE = re.compile(r"\btask-[a-z0-9\-]+\b")
+# GFM task-list checkbox at the start of a list item ("- [x] ", "* [ ] ").
+# Stripped before mention scanning so a checked box's `[x]` marker is not
+# mistaken for a `[slug]` reference.
+_CHECKBOX_RE = re.compile(r"^\s*[-*+]\s+\[[ xX]\]\s?")
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
@@ -95,12 +99,21 @@ def _extract_raw_edges(fm: dict, body: str) -> list[RawEdge]:
             continue
         if in_fence or i in typed_lines:
             continue
+        line = _CHECKBOX_RE.sub("", line)
         for tok in _MENTION_BRACKET_RE.findall(line):
             _add("mentions", tok)
         for tok in _MENTION_BARE_RE.findall(line):
             _add("mentions", tok)
 
     return raw
+
+
+def raw_refs(doc: Doc) -> list[RawEdge]:
+    """Public: all authored references in a doc (frontmatter relations, typed
+    body lines, and mentions), deduped, BEFORE address resolution. parse_world
+    discards references that do not resolve to an on-disk doc, so ghost/unresolved
+    detection (cortex.query) re-derives them from the doc here."""
+    return _extract_raw_edges(doc.frontmatter, doc.body)
 
 
 def _read_doc(path: Path, id: DocId) -> tuple[Doc, list[RawEdge]]:
