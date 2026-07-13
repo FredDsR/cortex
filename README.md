@@ -2,7 +2,7 @@
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Gemini CLI.
 
-One CLI fronts the whole family: **`cortex`** (`cortex kb ...` to author knowledge, `cortex viz ...` to visualize, `cortex query neighbors <slug>` to explore a doc's links). Internally the skills are still named `tracking-work-*`.
+One CLI fronts the whole family: **`cortex`** (`cortex kb ...` to author knowledge, `cortex viz ...` to visualize, `cortex query neighbors <slug>` to explore a doc's links). All three verbs run through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired. Internally the skills are still named `tracking-work-*`.
 
 > **Migration:** the former `work-kb` / `work-viz` bins are replaced by `cortex kb` / `cortex viz`. Re-run `install.sh` to pick up the `cortex` bin (the old bins are removed). To bring an existing `~/.work/` store up to the current knowledge frontmatter, run `skills/tracking-work-kb/scripts/migrate_kb_frontmatter.py` (dry-run by default; `--write` to apply).
 

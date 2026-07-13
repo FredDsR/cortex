@@ -1,8 +1,8 @@
 """The single frontmatter reader/writer for the cortex engine.
 
-Ports the exact behavior of skills/tracking-work-kb/bin/work-kb's emit_doc,
-_yaml_scalar, split_fm, and fm_field, so later phases can replace that bash
-with no observable change. Pure (stdlib only).
+Ported from the retired bash work-kb (emit_doc, _yaml_scalar, split_fm,
+fm_field) with byte-identical output; it is now the sole frontmatter
+reader/writer/splitter in the family. Pure (stdlib only).
 """
 from __future__ import annotations
 import re
@@ -43,17 +43,36 @@ def emit(fields: dict, body: str) -> str:
     return "\n".join(lines) + "\n\n" + body
 
 
+def split_lines(text: str, *, tolerant: bool = False):
+    """Locate leading `---`...`---` frontmatter. Return (fm_lines, body_lines,
+    close_idx) using the raw `text.split("\\n")` slices (no trailing-newline or
+    separator normalization), or (None, None, None) when absent. The single
+    boundary splitter for the family: `split()` (emit-cycle) and the one-shot kb
+    migrator both build on it.
+
+    Default fence match is exact `---` (what emit() writes, and what the engine
+    relies on for byte parity). `tolerant=True` also accepts a whitespace-padded
+    fence (`--- `); the migrator opts in for legacy hand-edited docs."""
+    def _is_fence(s: str) -> bool:
+        return s.strip() == "---" if tolerant else s == "---"
+
+    lines = text.split("\n")
+    if not lines or not _is_fence(lines[0]):
+        return None, None, None
+    close = next((i for i in range(1, len(lines)) if _is_fence(lines[i])), None)
+    if close is None:
+        return None, None, None
+    return lines[1:close], lines[close + 1:], close
+
+
 def split(text: str):
     """Return (fm_block, body) or (None, None) if there is no leading
     `---`...`---` frontmatter. Strips the single blank line emit() inserts."""
-    lines = text.split("\n")
-    if not lines or lines[0] != "---":
+    fm_lines, body_lines, _ = split_lines(text)
+    if fm_lines is None:
         return None, None
-    close = next((i for i in range(1, len(lines)) if lines[i] == "---"), None)
-    if close is None:
-        return None, None
-    block = "\n".join(lines[1:close])
-    body = "\n".join(lines[close + 1:])
+    block = "\n".join(fm_lines)
+    body = "\n".join(body_lines)
     # Match bash split_fm: FM_BODY is captured via `$(...)`, which strips ALL
     # trailing newlines; then one leading blank (emit()'s separator) is dropped.
     body = body.rstrip("\n")
