@@ -11,6 +11,11 @@
       <h1><a id="appbar-home" href="__ROOT_HREF__">__TITLE_LINE__</a></h1>
       <div class="subtitle">__SUBTITLE_LINE__</div>
     </div>
+    <div class="appbar-search">
+      <input id="appbar-search" type="search" placeholder="Search all docs..."
+             autocomplete="off" spellcheck="false" aria-label="Search all docs" disabled>
+      <div id="search-results" class="search-results" hidden></div>
+    </div>
     <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
       <span class="theme-icon theme-sun">☀</span>
       <span class="theme-icon theme-moon">☾</span>
@@ -45,6 +50,7 @@
   <script id="__SCOPE__" type="application/json">__SCOPE_JSON__</script>
   <script src="__VENDOR__/cytoscape.min.js"></script>
   <script src="__VENDOR__/marked.min.js"></script>
+  <script src="__VENDOR__/minisearch.min.js"></script>
   <script src="__VENDOR__/app.js"></script>
 </body>
 </html>

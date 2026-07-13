@@ -137,6 +137,7 @@ fetch_if_missing() {
 REQUIRED_VENDOR=(
   "cytoscape.min.js|https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"
   "marked.min.js|https://unpkg.com/marked@12.0.2/marked.min.js"
+  "minisearch.min.js|https://unpkg.com/minisearch@7.1.0/dist/umd/index.js"
 )
 
 VIZ_FETCH_FAILED=()

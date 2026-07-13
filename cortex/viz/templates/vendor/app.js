@@ -1282,6 +1282,109 @@
 
   // ---- Boot ----------------------------------------------------------------
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function pulseSelected() {
+    var row = document.querySelector('#tree .tree-node.current');
+    if (!row) return;
+    row.classList.remove('search-pulse');
+    void row.offsetWidth;            // restart the animation
+    row.classList.add('search-pulse');
+  }
+
+  function setupSearch() {
+    var input = document.getElementById('appbar-search');
+    var box = document.getElementById('search-results');
+    if (!input || !box || typeof MiniSearch === 'undefined') return;
+
+    var index = null;
+    var results = [];
+    var active = -1;
+
+    fetch(relHref('') + 'search-docs.json')
+      .then(function (r) { if (!r.ok) throw new Error('no index'); return r.json(); })
+      .then(function (docs) {
+        index = new MiniSearch({
+          idField: 'id',
+          fields: ['slug', 'title', 'type', 'description', 'text'],
+          storeFields: ['kind', 'title', 'ws', 'sess', 'pageHref', 'contentPath'],
+          searchOptions: { fuzzy: 0.2, prefix: true,
+                           boost: { slug: 3, title: 3, description: 2 } }
+        });
+        index.addAll(docs);
+        input.disabled = false;
+      })
+      .catch(function () { /* served-only feature; leave disabled */ });
+
+    function render() {
+      if (!results.length) {
+        box.innerHTML = '<div class="search-empty">No matches</div>';
+      } else {
+        box.innerHTML = results.map(function (r, i) {
+          var path = [r.ws, r.sess].filter(Boolean).join(' / ');
+          return '<div class="search-result' + (i === active ? ' active' : '') +
+                 '" data-i="' + i + '">' +
+                 '<span class="search-kind">' + r.kind + '</span>' +
+                 '<span class="search-title">' + escapeHtml(r.title || '(untitled)') + '</span>' +
+                 '<span class="search-path">' + escapeHtml(path) + '</span></div>';
+        }).join('');
+      }
+      box.hidden = false;
+    }
+
+    function close() { box.hidden = true; active = -1; }
+
+    function openResult(r) {
+      if (!r) return;
+      close();
+      input.blur();
+      // In-scope means the doc is in this page's graph (payload.nodes is the
+      // scoped node set: the workspace/session subgraph plus its neighbours).
+      // The tree is global so it can't distinguish scope; the graph can. In
+      // scope -> load + highlight in place; otherwise navigate to its home page.
+      var id = idFromContentPath(r.contentPath);
+      var inScope = id && STORE.payload && STORE.payload.nodes &&
+                    STORE.payload.nodes.some(function (n) { return n.id === id; });
+      if (r.contentPath && inScope) {
+        loadContent(r.contentPath);
+        pulseSelected();
+      } else {
+        var target = relHref('') + r.pageHref;
+        if (r.contentPath) target += '#doc=' + encodeURIComponent(r.contentPath);
+        window.location.href = target;
+      }
+    }
+
+    input.addEventListener('input', function () {
+      var q = input.value.trim();
+      if (!index || !q) { close(); return; }
+      results = index.search(q).slice(0, 8);
+      active = results.length ? 0 : -1;
+      render();
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (box.hidden) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, results.length - 1); render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); openResult(results[active]); }
+      else if (e.key === 'Escape') { close(); }
+    });
+
+    box.addEventListener('mousedown', function (e) {
+      var row = e.target.closest ? e.target.closest('.search-result') : null;
+      if (row) { e.preventDefault(); openResult(results[parseInt(row.dataset.i, 10)]); }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!input.contains(e.target) && !box.contains(e.target)) close();
+    });
+  }
+
   function init() {
     var payload = parsePayload();
     STORE.payload = payload;
@@ -1322,7 +1425,9 @@
     applyLayout(cy, payload, STORE.layout);
     if (params.graph === 'hidden') setGraphHidden(true);
     setShowArchived(params.archived === '1');
-    if (payload.defaultContentPath) loadContent(payload.defaultContentPath);
+    var landing = params.doc ? decodeURIComponent(params.doc) : payload.defaultContentPath;
+    if (landing) loadContent(landing);
+    setupSearch();
   }
 
   document.addEventListener('DOMContentLoaded', init);
