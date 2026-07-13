@@ -382,3 +382,11 @@ def test_build_writes_search_docs(workspaces_root, tmp_path):
     assert rec["pageHref"] == "workspaces/demo-ws/sessions/alpha/index.html"
     assert rec["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
     assert all(not r["id"].endswith("/task/does-not-exist") for r in data)
+
+
+def test_build_stages_minisearch_vendor(workspaces_root, tmp_path):
+    from cortex import parser
+    from cortex.viz.generator import build
+    out = tmp_path / "out"
+    build(parser.parse_world(workspaces_root), out, workspaces_root=workspaces_root)
+    assert (out / "vendor" / "minisearch.min.js").is_file()
