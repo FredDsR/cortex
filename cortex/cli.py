@@ -81,6 +81,15 @@ _KB_DISPATCH = {
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "viz":
+        # Delegate to viz's own parser (keeps its flags + `cortex viz` help verbatim).
+        # Its argparse raises SystemExit on usage errors; normalize to a return code
+        # so main() is uniformly int-returning (matches the kb path below).
+        from cortex.viz.cli import main as viz_main
+        try:
+            return viz_main(argv[1:])
+        except SystemExit as e:
+            return int(e.code) if e.code is not None else 0
     parser = build_parser()
     try:
         args = parser.parse_args(_glue_flag_values(argv))
