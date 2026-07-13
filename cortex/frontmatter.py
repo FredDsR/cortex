@@ -43,17 +43,29 @@ def emit(fields: dict, body: str) -> str:
     return "\n".join(lines) + "\n\n" + body
 
 
+def split_lines(text: str):
+    """Locate leading `---`...`---` frontmatter. Return (fm_lines, body_lines,
+    close_idx) using the raw `text.split("\\n")` slices (no trailing-newline or
+    separator normalization), or (None, None, None) when absent. The single
+    boundary splitter for the family: `split()` (emit-cycle) and the one-shot kb
+    migrator both build on it. Boundary match is exact `---`."""
+    lines = text.split("\n")
+    if not lines or lines[0] != "---":
+        return None, None, None
+    close = next((i for i in range(1, len(lines)) if lines[i] == "---"), None)
+    if close is None:
+        return None, None, None
+    return lines[1:close], lines[close + 1:], close
+
+
 def split(text: str):
     """Return (fm_block, body) or (None, None) if there is no leading
     `---`...`---` frontmatter. Strips the single blank line emit() inserts."""
-    lines = text.split("\n")
-    if not lines or lines[0] != "---":
+    fm_lines, body_lines, _ = split_lines(text)
+    if fm_lines is None:
         return None, None
-    close = next((i for i in range(1, len(lines)) if lines[i] == "---"), None)
-    if close is None:
-        return None, None
-    block = "\n".join(lines[1:close])
-    body = "\n".join(lines[close + 1:])
+    block = "\n".join(fm_lines)
+    body = "\n".join(body_lines)
     # Match bash split_fm: FM_BODY is captured via `$(...)`, which strips ALL
     # trailing newlines; then one leading blank (emit()'s separator) is dropped.
     body = body.rstrip("\n")

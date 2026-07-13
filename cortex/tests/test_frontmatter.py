@@ -69,3 +69,26 @@ def test_split_strips_trailing_newlines_from_body():
     text = "---\nauthor: agent\ncreated: 2026-07-09\n---\n\nbody text\n\n"
     _, body = fm.split(text)
     assert body == "body text"
+
+
+def test_split_lines_returns_raw_slices():
+    from cortex import frontmatter as fm
+    text = "---\ntitle: T\nauthor: agent\n---\n\nbody line\n"
+    fm_lines, body_lines, close = fm.split_lines(text)
+    assert fm_lines == ["title: T", "author: agent"]
+    # body_lines are raw (separator blank + trailing "" from the final newline preserved)
+    assert body_lines == ["", "body line", ""]
+    assert close == 3
+
+
+def test_split_lines_none_without_frontmatter():
+    from cortex import frontmatter as fm
+    assert fm.split_lines("no frontmatter here\n") == (None, None, None)
+
+
+def test_split_delegates_to_split_lines_unchanged():
+    from cortex import frontmatter as fm
+    text = "---\ntitle: T\nauthor: agent\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nbody\n"
+    block, body = fm.split(text)
+    assert block == "title: T\nauthor: agent\ncreated: 2026-01-01\nupdated: 2026-01-01"
+    assert body == "body"
