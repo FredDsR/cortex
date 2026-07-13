@@ -36,6 +36,19 @@ cortex kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
 cortex kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
 ```
 
+## Querying the graph
+
+`cortex query neighbors <slug>` prints a doc's forward links and backlinks
+(grouped by edge kind, each with a one-line summary) plus its ghost/unresolved
+`[[...]]` references, so an agent can expand context on demand without opening
+the viewer. Narrow an ambiguous slug with `--workspace` / `--session`; bound the
+listing with `--max` (default 20). Works for `task`, `knowledge`, and
+`workbench` docs.
+
+```
+cortex query neighbors <slug> [--workspace <ws>] [--session <sess>] [--max <N>]
+```
+
 `new` and `update` share the same flags:
 
 | Flag | Default | Notes |
