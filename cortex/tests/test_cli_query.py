@@ -67,6 +67,26 @@ def test_bad_max_exits_1(tmp_path, monkeypatch, capsys):
     assert rc == 1
 
 
+def test_kind_disambiguates_cross_kind_collision(tmp_path, monkeypatch, capsys):
+    # A task and a knowledge doc share slug "dup" in the same workspace.
+    ws = tmp_path / ".work" / "workspaces" / "wsz"
+    (ws / "knowledge").mkdir(parents=True)
+    (ws / "sessions" / "s1" / "tasks").mkdir(parents=True)
+    (ws / "sessions" / "s1" / "SUMMARY.md").write_text(
+        "---\nslug: s1\nstatus: Active\n---\n\n# s1\n")
+    (ws / "knowledge" / "dup.md").write_text("---\nslug: dup\n---\n\n# K\n")
+    (ws / "sessions" / "s1" / "tasks" / "dup.md").write_text(
+        "---\nslug: dup\nstatus: Open\n---\n\n# T\n")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Ambiguous without --kind (workspace alone cannot separate kinds).
+    assert cortex_cli.main(["query", "neighbors", "dup", "--workspace", "wsz"]) == 1
+    assert "ambiguous" in capsys.readouterr().err
+    # --kind resolves it.
+    rc = cortex_cli.main(["query", "neighbors", "dup", "--workspace", "wsz", "--kind", "task"])
+    assert rc == 0
+    assert "wsz/s1/task/dup" in capsys.readouterr().out
+
+
 def test_query_registered_in_top_level_help(capsys):
     rc = cortex_cli.main(["--help"])
     assert rc == 0

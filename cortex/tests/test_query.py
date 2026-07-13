@@ -66,6 +66,49 @@ def test_find_by_slug_narrowing_and_ambiguity(workspaces_root):
     assert len(query.find_by_slug(world, "task-z", workspace="other-ws")) == 1
 
 
+def test_checkbox_marker_is_not_a_ghost(tmp_path):
+    # A GFM checked checkbox `- [x]` must not surface as a `mentions x` ghost.
+    ws = tmp_path / "workspaces" / "wsz" / "sessions" / "s1" / "tasks"
+    ws.mkdir(parents=True)
+    (ws.parent / "SUMMARY.md").write_text("---\nslug: s1\nstatus: Active\n---\n\n# s1\n")
+    (ws / "cb.md").write_text(
+        "---\nslug: cb\nstatus: Open\n---\n\n# Cb\n\n- [x] done\n- [ ] todo\n")
+    world = parser.parse_world(tmp_path / "workspaces", include_archive=True)
+    target = DocId(kind="task", workspace="wsz", session="s1", slug="cb")
+    res = query.neighbors(world, target)
+    assert "x" not in {g.raw_target for g in res.ghosts}
+
+
+def test_self_reference_not_listed_as_neighbor(tmp_path):
+    ws = tmp_path / "workspaces" / "wsz" / "sessions" / "s1" / "tasks"
+    ws.mkdir(parents=True)
+    (ws.parent / "SUMMARY.md").write_text("---\nslug: s1\nstatus: Active\n---\n\n# s1\n")
+    # body mentions its own bare slug -> a self-edge would otherwise form
+    (ws / "task-loop.md").write_text(
+        "---\nslug: task-loop\nstatus: Open\n---\n\n# Loop\n\nsee task-loop again\n")
+    world = parser.parse_world(tmp_path / "workspaces", include_archive=True)
+    target = DocId(kind="task", workspace="wsz", session="s1", slug="task-loop")
+    res = query.neighbors(world, target)
+    canon = target.canonical()
+    assert canon not in {n.doc_id.canonical() for n in res.outgoing}
+    assert canon not in {n.doc_id.canonical() for n in res.backlinks}
+
+
+def test_find_by_slug_kind_narrowing(tmp_path):
+    ws = tmp_path / "workspaces" / "wsz"
+    (ws / "knowledge").mkdir(parents=True)
+    (ws / "sessions" / "s1" / "tasks").mkdir(parents=True)
+    (ws / "sessions" / "s1" / "SUMMARY.md").write_text(
+        "---\nslug: s1\nstatus: Active\n---\n\n# s1\n")
+    (ws / "knowledge" / "dup.md").write_text("---\nslug: dup\n---\n\n# K\n")
+    (ws / "sessions" / "s1" / "tasks" / "dup.md").write_text(
+        "---\nslug: dup\nstatus: Open\n---\n\n# T\n")
+    world = parser.parse_world(tmp_path / "workspaces", include_archive=True)
+    assert len(query.find_by_slug(world, "dup")) == 2                      # ambiguous
+    assert len(query.find_by_slug(world, "dup", kind="task")) == 1         # kind narrows
+    assert query.find_by_slug(world, "dup", kind="knowledge")[0].id.kind == "knowledge"
+
+
 def test_max_caps_and_reports_total(workspaces_root):
     world = _world(workspaces_root)
     target = DocId(kind="task", workspace="demo-ws", session="alpha", slug="task-a")

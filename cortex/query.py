@@ -75,12 +75,14 @@ def neighbors(world: World, target_id: DocId, max: int = 20) -> NeighborResult:
     outgoing, backlinks = [], []
     for e in world.edges:
         s, t = e.source.canonical(), e.target.canonical()
-        if s == tcanon:
+        # `and t/s != tcanon` excludes self-edges (a doc that references its own
+        # slug) so it is never listed as its own neighbor in both directions.
+        if s == tcanon and t != tcanon:
             tgt = world.docs.get(t)
             if tgt is not None:
                 outgoing.append(Neighbor(e.kind, e.target,
                                          _addr(e.target, target_id), _summary(tgt)))
-        if t == tcanon:
+        if t == tcanon and s != tcanon:
             src = world.docs.get(s)
             if src is not None:
                 backlinks.append(Neighbor(e.kind, e.source,
@@ -98,11 +100,13 @@ def neighbors(world: World, target_id: DocId, max: int = 20) -> NeighborResult:
 
 
 def find_by_slug(world: World, slug: str, *, workspace: str | None = None,
-                 session: str | None = None) -> list:
+                 session: str | None = None, kind: str | None = None) -> list:
     matches = []
     for doc in world.docs.values():
         did = doc.id
         if did.kind not in LINKABLE_KINDS or did.slug != slug:
+            continue
+        if kind and did.kind != kind:
             continue
         if workspace and did.workspace != workspace:
             continue
@@ -160,9 +164,12 @@ def cmd_neighbors(args) -> int:
     world = parse_world(root, include_archive=True)
     matches = find_by_slug(world, args.slug,
                            workspace=args.workspace or None,
-                           session=args.session or None)
+                           session=args.session or None,
+                           kind=args.kind or None)
     if not matches:
         scope = ""
+        if args.kind:
+            scope += f" of kind {args.kind!r}"
         if args.workspace:
             scope += f" in workspace {args.workspace!r}"
         if args.session:
@@ -172,7 +179,7 @@ def cmd_neighbors(args) -> int:
     if len(matches) > 1:
         lines = "\n".join(f"  - {d.id.canonical()}" for d in matches)
         raise CortexError(
-            f"{args.slug!r} is ambiguous; narrow with --workspace/--session:\n{lines}")
+            f"{args.slug!r} is ambiguous; narrow with --workspace/--session/--kind:\n{lines}")
     res = neighbors(world, matches[0].id, max=_parse_max(args.max))
     _print_result(res)
     return 0

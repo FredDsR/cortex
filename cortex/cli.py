@@ -65,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     nb.add_argument("slug")
     nb.add_argument("--workspace", default="")
     nb.add_argument("--session", default="")
+    nb.add_argument("--kind", choices=["task", "knowledge", "workbench"], default="")
     nb.add_argument("--max", default="20")
     return p
 
@@ -97,6 +98,15 @@ _KB_DISPATCH = {
     "ingest": ingest.cmd_ingest,
 }
 
+_QUERY_DISPATCH = {
+    "neighbors": query.cmd_neighbors,
+}
+
+_GROUP_DISPATCH = {
+    "kb": _KB_DISPATCH,
+    "query": _QUERY_DISPATCH,
+}
+
 
 def _exit_code(e: SystemExit) -> int:
     """Normalize a SystemExit to a process exit code, mirroring CPython: None -> 0,
@@ -125,11 +135,9 @@ def main(argv=None) -> int:
     except SystemExit as e:               # argparse usage error -> exit 2
         return _exit_code(e)
     try:
-        if args.group == "kb":
-            return _KB_DISPATCH[args.cmd](args)
-        if args.group == "query":
-            if args.cmd == "neighbors":
-                return query.cmd_neighbors(args)
+        dispatch = _GROUP_DISPATCH.get(args.group)
+        if dispatch is not None:
+            return dispatch[args.cmd](args)
         parser.error(f"unknown group: {args.group}")
     except (CortexError, StoreError) as e:
         print(f"error: {e}", file=sys.stderr)
