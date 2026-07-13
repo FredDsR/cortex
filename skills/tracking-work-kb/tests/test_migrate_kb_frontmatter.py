@@ -50,3 +50,12 @@ def test_body_and_trailing_newline_preserved_on_reorder():
 def test_uses_engine_canon():
     from cortex.frontmatter import CANON as ENGINE_CANON
     assert m.CANON is ENGINE_CANON
+
+
+def test_padded_fence_still_normalized():
+    # A legacy hand-edited doc with a whitespace-padded fence is still migrated
+    # (tolerant fence match preserved via split_lines(tolerant=True)).
+    text = "--- \nauthor: agent\ncreated: 2026-05-23\n--- \n\nbody\n"
+    new, changed = m.normalize_frontmatter(text)
+    assert changed
+    assert "updated: 2026-05-23" in new

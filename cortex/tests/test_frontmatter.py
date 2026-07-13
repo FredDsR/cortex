@@ -92,3 +92,14 @@ def test_split_delegates_to_split_lines_unchanged():
     block, body = fm.split(text)
     assert block == "title: T\nauthor: agent\ncreated: 2026-01-01\nupdated: 2026-01-01"
     assert body == "body"
+
+
+def test_split_lines_exact_by_default_tolerant_on_opt_in():
+    from cortex import frontmatter as fm
+    padded = "--- \ntitle: T\nauthor: agent\n --- \n\nbody\n"
+    # default (engine): a padded fence is NOT frontmatter
+    assert fm.split_lines(padded) == (None, None, None)
+    # tolerant (migrator opt-in): padded fence recognized
+    fm_lines, body_lines, close = fm.split_lines(padded, tolerant=True)
+    assert fm_lines == ["title: T", "author: agent"]
+    assert close == 3

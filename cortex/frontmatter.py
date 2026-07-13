@@ -43,16 +43,23 @@ def emit(fields: dict, body: str) -> str:
     return "\n".join(lines) + "\n\n" + body
 
 
-def split_lines(text: str):
+def split_lines(text: str, *, tolerant: bool = False):
     """Locate leading `---`...`---` frontmatter. Return (fm_lines, body_lines,
     close_idx) using the raw `text.split("\\n")` slices (no trailing-newline or
     separator normalization), or (None, None, None) when absent. The single
     boundary splitter for the family: `split()` (emit-cycle) and the one-shot kb
-    migrator both build on it. Boundary match is exact `---`."""
+    migrator both build on it.
+
+    Default fence match is exact `---` (what emit() writes, and what the engine
+    relies on for byte parity). `tolerant=True` also accepts a whitespace-padded
+    fence (`--- `); the migrator opts in for legacy hand-edited docs."""
+    def _is_fence(s: str) -> bool:
+        return s.strip() == "---" if tolerant else s == "---"
+
     lines = text.split("\n")
-    if not lines or lines[0] != "---":
+    if not lines or not _is_fence(lines[0]):
         return None, None, None
-    close = next((i for i in range(1, len(lines)) if lines[i] == "---"), None)
+    close = next((i for i in range(1, len(lines)) if _is_fence(lines[i])), None)
     if close is None:
         return None, None, None
     return lines[1:close], lines[close + 1:], close
