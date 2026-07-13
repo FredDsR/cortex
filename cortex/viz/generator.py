@@ -245,6 +245,65 @@ def _content_path(cid: DocId) -> Optional[str]:
     return None
 
 
+def _first_paragraph(body: str, limit: int = 300) -> str:
+    """First prose paragraph of a body: skip leading blank lines and a single
+    leading `# ` H1, then take consecutive non-blank lines up to the next blank.
+    Joined with spaces and capped. Empty when there is no prose."""
+    lines = (body or "").split("\n")
+    n = len(lines)
+    i = 0
+    while i < n and not lines[i].strip():
+        i += 1
+    if i < n and lines[i].lstrip().startswith("# "):
+        i += 1
+        while i < n and not lines[i].strip():
+            i += 1
+    para = []
+    while i < n and lines[i].strip():
+        para.append(lines[i].strip())
+        i += 1
+    return " ".join(para).strip()[:limit]
+
+
+def _search_page_href(cid: DocId) -> str:
+    """Root-relative href of the page whose scope shows this doc (its home)."""
+    if cid.kind == "root":
+        return "index.html"
+    if cid.kind in ("workspace", "knowledge"):
+        return f"workspaces/{cid.workspace}/index.html"
+    # task, workbench, session render on the session page
+    return f"workspaces/{cid.workspace}/sessions/{cid.session}/index.html"
+
+
+def _search_docs(world: World) -> list:
+    """One search record per non-ghost doc, sorted by id for deterministic output."""
+    out = []
+    for doc in world.docs.values():
+        if doc.ghost:
+            continue
+        cid = doc.id
+        out.append({
+            "id": cid.canonical(),
+            "kind": cid.kind,
+            "slug": cid.slug or cid.session or cid.workspace or "root",
+            "title": doc.title or "",
+            "type": doc.type or "",
+            "description": doc.description or "",
+            "text": _first_paragraph(doc.body or ""),
+            "ws": cid.workspace or "",
+            "sess": cid.session or "",
+            "pageHref": _search_page_href(cid),
+            "contentPath": _content_path(cid),
+        })
+    out.sort(key=lambda r: r["id"])
+    return out
+
+
+def _write_search_index(world: World, out_dir: Path) -> None:
+    (out_dir / "search-docs.json").write_text(
+        json.dumps(_search_docs(world), ensure_ascii=False), encoding="utf-8")
+
+
 def _node_dict(world: World, doc: Doc) -> dict:
     cid = doc.id
     if cid.kind == "workspace":
@@ -520,4 +579,5 @@ def build(world: World, out_dir: Path, workspaces_root: Optional[Path] = None) -
     _copy_supplementary_md(world, out_dir)
     _emit_all_indices(world, out_dir)
     _emit_html_pages(world, out_dir)
+    _write_search_index(world, out_dir)
     _write_manifest(out_dir, workspaces_root)

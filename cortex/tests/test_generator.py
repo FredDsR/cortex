@@ -344,3 +344,41 @@ def test_node_payload_includes_kb_fields(workspaces_root, tmp_path):
     assert node["type"] == "Runbook"
     assert node["description"] == "a one-line description"
     assert node["updated"] == "2026-06-01"
+
+
+def test_first_paragraph_skips_h1_and_blanks():
+    from cortex.viz import generator as g
+    body = "\n\n# Title Heading\n\nFirst real paragraph here.\nSecond line of it.\n\nLater section.\n"
+    assert g._first_paragraph(body) == "First real paragraph here. Second line of it."
+    assert g._first_paragraph("") == ""
+    assert g._first_paragraph("# Only a heading\n") == ""
+    assert g._first_paragraph("x" * 500) == "x" * 300  # capped
+
+
+def test_search_page_href_per_kind():
+    from cortex.viz import generator as g
+    from cortex.model import DocId
+    assert g._search_page_href(DocId(kind="root")) == "index.html"
+    assert g._search_page_href(DocId(kind="workspace", workspace="w")) == "workspaces/w/index.html"
+    assert g._search_page_href(DocId(kind="knowledge", workspace="w", slug="k")) == "workspaces/w/index.html"
+    assert g._search_page_href(DocId(kind="session", workspace="w", session="s")) == "workspaces/w/sessions/s/index.html"
+    assert g._search_page_href(DocId(kind="task", workspace="w", session="s", slug="t")) == "workspaces/w/sessions/s/index.html"
+    assert g._search_page_href(DocId(kind="workbench", workspace="w", session="s", slug="b")) == "workspaces/w/sessions/s/index.html"
+
+
+def test_build_writes_search_docs(workspaces_root, tmp_path):
+    import json
+    from cortex import parser
+    from cortex.viz.generator import build
+    out = tmp_path / "out"
+    world = parser.parse_world(workspaces_root, include_archive=True)
+    build(world, out, workspaces_root=workspaces_root)
+    data = json.loads((out / "search-docs.json").read_text())
+    assert isinstance(data, list) and data
+    rec = next(r for r in data if r["id"] == "demo-ws/alpha/task/task-a")
+    assert rec["kind"] == "task"
+    assert rec["slug"] == "task-a"
+    assert rec["title"] == "Task a"
+    assert rec["pageHref"] == "workspaces/demo-ws/sessions/alpha/index.html"
+    assert rec["contentPath"] == "workspaces/demo-ws/sessions/alpha/tasks/task-a.md"
+    assert all(not r["id"].endswith("/task/does-not-exist") for r in data)
