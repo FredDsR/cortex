@@ -1,5 +1,5 @@
 """Tests for the multi-typed graph model."""
-from work_viz.model import Doc, DocId, Edge, RawEdge, World, STATUS_OPEN
+from cortex.model import Doc, DocId, Edge, RawEdge, World, STATUS_OPEN
 
 
 def test_docid_root_canonical():

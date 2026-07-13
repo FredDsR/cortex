@@ -1,7 +1,7 @@
 """Pure-grammar tests for address.resolve."""
 import pytest
-from work_viz.address import resolve, ResolveResult, RESERVED_WORDS
-from work_viz.model import DocId
+from cortex.address import resolve, ResolveResult, RESERVED_WORDS
+from cortex.model import DocId
 
 
 def _src(workspace="w", session="s"):
@@ -73,7 +73,7 @@ def test_resolve_knowledge_cross_workspace():
     assert r.doc_id.slug == "api-notes"
 
 
-from work_viz.address import abbreviate
+from cortex.address import abbreviate
 
 
 def _task(ws, sess, slug):

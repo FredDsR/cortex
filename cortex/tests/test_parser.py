@@ -1,8 +1,8 @@
 """Tests for the multi-typed parser."""
 from pathlib import Path
 import pytest
-from work_viz.parser import parse_world
-from work_viz.model import DocId
+from cortex.parser import parse_world
+from cortex.model import DocId
 
 
 def test_parse_world_discovers_root(workspaces_root):

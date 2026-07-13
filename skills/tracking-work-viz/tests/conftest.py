@@ -1,6 +1,11 @@
 """Shared fixtures for work_viz tests."""
+import sys
 from pathlib import Path
 import pytest
+
+# tests/ -> tracking-work-viz/ -> skills/ -> repo root, so the transitional
+# work_viz re-export shims can `import cortex.*` while this suite runs in place.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
