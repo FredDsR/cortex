@@ -110,3 +110,69 @@ def find_by_slug(world: World, slug: str, *, workspace: str | None = None,
             continue
         matches.append(doc)
     return sorted(matches, key=lambda d: d.id.canonical())
+
+
+# --- CLI (the only IO in this module) ---
+import sys
+from pathlib import Path
+
+from cortex.errors import CortexError
+from cortex.parser import parse_world
+
+
+def _parse_max(raw: str) -> int:
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        raise CortexError(f"--max must be an integer, got {raw!r}")
+    if n < 1:
+        raise CortexError("--max must be >= 1")
+    return n
+
+
+def _print_group(title: str, items: list, total: int) -> None:
+    print(f"\n{title}:")
+    if not items:
+        print("  (none)")
+        return
+    width = max(len(n.kind) for n in items)
+    for n in items:
+        print(f"  {n.kind:<{width}}  {n.address}  -  {n.summary}")
+    if total > len(items):
+        print(f"  (+{total - len(items)} more; raise --max)")
+
+
+def _print_result(res: NeighborResult) -> None:
+    print(res.target.canonical())
+    _print_group("Outgoing", res.outgoing, res.outgoing_total)
+    _print_group("Backlinks", res.backlinks, res.backlinks_total)
+    print("\nGhost references:")
+    if not res.ghosts:
+        print("  (none)")
+    else:
+        width = max(len(g.kind) for g in res.ghosts)
+        for g in res.ghosts:
+            print(f"  {g.kind:<{width}}  {g.raw_target}")
+
+
+def cmd_neighbors(args) -> int:
+    root = Path.home() / ".work" / "workspaces"
+    world = parse_world(root, include_archive=True)
+    matches = find_by_slug(world, args.slug,
+                           workspace=args.workspace or None,
+                           session=args.session or None)
+    if not matches:
+        scope = ""
+        if args.workspace:
+            scope += f" in workspace {args.workspace!r}"
+        if args.session:
+            scope += f" session {args.session!r}"
+        raise CortexError(
+            f"no task/knowledge/workbench doc with slug {args.slug!r}{scope}")
+    if len(matches) > 1:
+        lines = "\n".join(f"  - {d.id.canonical()}" for d in matches)
+        raise CortexError(
+            f"{args.slug!r} is ambiguous; narrow with --workspace/--session:\n{lines}")
+    res = neighbors(world, matches[0].id, max=_parse_max(args.max))
+    _print_result(res)
+    return 0

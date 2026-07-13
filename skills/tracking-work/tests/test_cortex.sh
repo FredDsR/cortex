@@ -20,10 +20,17 @@ HOME="$home" "$bindir/cortex" kb new knowledge foo --workspace ws-a --body b >/d
 vout="$(HOME="$home" "$bindir/cortex" viz --help 2>&1)" || fail "cortex viz --help nonzero"
 printf '%s\n' "$vout" | grep -qi "build" || fail "cortex viz --help not routed to the viz engine"
 
-# top-level help lists both groups, exit 0
+# query routing: neighbors of a known doc exits 0 and prints sections
+HOME="$home" "$bindir/cortex" kb new knowledge qn --workspace ws-a --body b >/dev/null
+qout="$(HOME="$home" "$bindir/cortex" query neighbors qn --workspace ws-a 2>&1)" \
+    || fail "cortex query neighbors nonzero"
+printf '%s\n' "$qout" | grep -qi "Ghost references" || fail "query neighbors output missing sections"
+
+# top-level help lists all groups, exit 0
 hout="$(HOME="$home" "$bindir/cortex" --help 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] || fail "cortex --help exit $rc"
-printf '%s\n' "$hout" | grep -q "kb" && printf '%s\n' "$hout" | grep -q "viz" || fail "help missing groups"
+printf '%s\n' "$hout" | grep -q "kb" && printf '%s\n' "$hout" | grep -q "viz" \
+    && printf '%s\n' "$hout" | grep -q "query" || fail "help missing groups"
 
 # unknown group exits 2
 set +e; HOME="$home" "$bindir/cortex" bogus >/dev/null 2>&1; rc=$?; set -e

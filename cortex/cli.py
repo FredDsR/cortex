@@ -8,6 +8,7 @@ import sys
 
 from cortex import kb
 from cortex import ingest
+from cortex import query
 from cortex.errors import CortexError
 from cortex.store import StoreError
 
@@ -56,6 +57,15 @@ def build_parser() -> argparse.ArgumentParser:
     vp = groups.add_parser("viz", add_help=False,
                            help="Visualize the work tree (build, serve)")
     vp.add_argument("args", nargs=argparse.REMAINDER)
+
+    qp = groups.add_parser("query", help="Query the work graph (neighbors)")
+    qcmds = qp.add_subparsers(dest="cmd", required=True)
+    nb = qcmds.add_parser("neighbors",
+                          help="Show a doc's links, backlinks, and ghost refs")
+    nb.add_argument("slug")
+    nb.add_argument("--workspace", default="")
+    nb.add_argument("--session", default="")
+    nb.add_argument("--max", default="20")
     return p
 
 
@@ -117,6 +127,9 @@ def main(argv=None) -> int:
     try:
         if args.group == "kb":
             return _KB_DISPATCH[args.cmd](args)
+        if args.group == "query":
+            if args.cmd == "neighbors":
+                return query.cmd_neighbors(args)
         parser.error(f"unknown group: {args.group}")
     except (CortexError, StoreError) as e:
         print(f"error: {e}", file=sys.stderr)
