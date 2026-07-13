@@ -47,6 +47,15 @@ def build_parser() -> argparse.ArgumentParser:
     ing.add_argument("--write", action="store_true")
     ing.add_argument("--only", default="")            # "" = no filter; validated in cmd
     ing.add_argument("--max", default="100")
+
+    # viz owns its own parser in cortex.viz.cli (build/serve + their flags).
+    # Registered here only so `cortex --help` and invalid-group errors list it;
+    # main() intercepts the `viz` group before argparse and forwards the rest to
+    # viz_main verbatim (argparse REMAINDER can't reliably carry a leading option
+    # like `--help`, so delegation, not parsing, is how viz args are handled).
+    vp = groups.add_parser("viz", add_help=False,
+                           help="Visualize the work tree (build, serve)")
+    vp.add_argument("args", nargs=argparse.REMAINDER)
     return p
 
 
@@ -79,22 +88,32 @@ _KB_DISPATCH = {
 }
 
 
+def _exit_code(e: SystemExit) -> int:
+    """Normalize a SystemExit to a process exit code, mirroring CPython: None -> 0,
+    an int passes through, anything else prints to stderr and yields 1. Keeps
+    main() uniformly int-returning even if a delegate raises SystemExit("msg")."""
+    if e.code is None:
+        return 0
+    if isinstance(e.code, int):
+        return e.code
+    print(e.code, file=sys.stderr)
+    return 1
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "viz":
         # Delegate to viz's own parser (keeps its flags + `cortex viz` help verbatim).
-        # Its argparse raises SystemExit on usage errors; normalize to a return code
-        # so main() is uniformly int-returning (matches the kb path below).
         from cortex.viz.cli import main as viz_main
         try:
             return viz_main(argv[1:])
         except SystemExit as e:
-            return int(e.code) if e.code is not None else 0
+            return _exit_code(e)
     parser = build_parser()
     try:
         args = parser.parse_args(_glue_flag_values(argv))
     except SystemExit as e:               # argparse usage error -> exit 2
-        return int(e.code) if e.code is not None else 0
+        return _exit_code(e)
     try:
         if args.group == "kb":
             return _KB_DISPATCH[args.cmd](args)
