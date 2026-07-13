@@ -38,20 +38,16 @@ self="$(_resolve "$self")"
 # Physical resolution (-P) so an invocation through a symlinked skill dir still
 # lands at the real repo root, where the top-level `cortex/` package lives.
 REPO_ROOT="$(cd -P "$(dirname "$self")/../../.." && pwd -P)"
-VIZ_BIN="$REPO_ROOT/skills/tracking-work-viz/bin/work-viz"
-
-_run() {  # $1 = target script, rest = args. Clear error if the script is missing.
-    local bin="$1"; shift
-    [[ -f "$bin" ]] || { echo "cortex: cannot find $(basename "$bin") at $bin (broken install?)" >&2; exit 1; }
-    exec "$bin" "$@"
-}
 
 [[ $# -ge 1 ]] || usage
 group="$1"; shift
 case "$group" in
-    kb)        exec env PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
-                    "${WORK_KB_PYTHON:-python3}" -m cortex.cli kb "$@" ;;
-    viz)       _run "$VIZ_BIN" "$@" ;;
+    kb|viz)    [[ -f "$REPO_ROOT/cortex/cli.py" ]] || {
+                   echo "cortex: cannot find the cortex engine at $REPO_ROOT/cortex (broken install?)" >&2
+                   exit 1
+               }
+               exec env PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
+                    "${WORK_KB_PYTHON:-python3}" -m cortex.cli "$group" "$@" ;;
     -h|--help) usage 0 ;;
     *) echo "cortex: unknown command '$group'" >&2; usage ;;
 esac

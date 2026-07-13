@@ -5,9 +5,9 @@ import threading
 import urllib.request
 import urllib.error
 import pytest
-from work_viz.parser import parse_world
-from work_viz.generator import build
-from work_viz import edit_server
+from cortex.parser import parse_world
+from cortex.viz.generator import build
+from cortex.viz import edit_server
 
 
 def _free_port():

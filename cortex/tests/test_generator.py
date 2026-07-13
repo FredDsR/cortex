@@ -2,8 +2,8 @@
 from pathlib import Path
 import json
 import pytest
-from work_viz.parser import parse_world
-from work_viz.generator import build
+from cortex.parser import parse_world
+from cortex.viz.generator import build
 
 
 def test_build_creates_output_dir(workspaces_root, tmp_path):
@@ -301,7 +301,7 @@ def test_payload_author_null_for_unauthored_kinds(workspaces_root, tmp_path):
     assert by_id["demo-ws/"]["author"] is None
 
 
-from work_viz import generator
+from cortex.viz import generator
 
 
 def test_build_payload_matches_root_page(workspaces_root, tmp_path):

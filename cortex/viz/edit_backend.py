@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from .model import World
+from cortex.model import World
 
 EDITABLE_KINDS = frozenset({"task", "knowledge", "workbench", "session"})
 
