@@ -1342,6 +1342,10 @@
       if (!r) return;
       close();
       input.blur();
+      // In-scope means the doc is in this page's graph (payload.nodes is the
+      // scoped node set: the workspace/session subgraph plus its neighbours).
+      // The tree is global so it can't distinguish scope; the graph can. In
+      // scope -> load + highlight in place; otherwise navigate to its home page.
       var id = idFromContentPath(r.contentPath);
       var inScope = id && STORE.payload && STORE.payload.nodes &&
                     STORE.payload.nodes.some(function (n) { return n.id === id; });

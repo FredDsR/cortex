@@ -437,7 +437,9 @@ li.collapsed > .tree-row > .tree-arrow { transform: rotate(-90deg); }
 .search-path { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); }
 .search-empty { padding: 0.5rem 0.6rem; color: var(--text-muted); }
 @keyframes search-pulse-kf {
-  0% { background: var(--accent-bg); }
-  100% { background: transparent; }
+  0%, 100% { background: transparent; box-shadow: none; }
+  15%, 55%  { background: rgba(31,122,224,0.55);
+              box-shadow: inset 0 0 0 2px rgba(31,122,224,0.85); }
+  35%, 80%  { background: rgba(31,122,224,0.18); box-shadow: none; }
 }
-.tree-node.search-pulse { animation: search-pulse-kf 1.1s ease-out 1; }
+.tree-node.search-pulse { animation: search-pulse-kf 2.4s ease-in-out 1; border-radius: 4px; }
