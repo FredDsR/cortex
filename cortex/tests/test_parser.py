@@ -152,3 +152,23 @@ def test_uppercase_index_excluded_from_graph(workspaces_root):
     world = parse_world(workspaces_root)
     assert "authored-ws/knowledge/INDEX" not in world.docs
     assert "authored-ws/knowledge/index" not in world.docs
+
+
+def test_raw_refs_exposes_authored_references(workspaces_root):
+    from cortex import parser
+    from cortex.model import DocId
+    world = parser.parse_world(workspaces_root, include_archive=True)
+    task_a = world.docs["demo-ws/alpha/task/task-a"]
+    refs = {(r.kind, r.raw_target) for r in parser.raw_refs(task_a)}
+    assert ("blocked", "task-b") in refs
+    assert ("related", "beta/task-c") in refs
+    assert ("follows", "other-ws/zeta/task-z") in refs
+
+
+def test_raw_refs_includes_unresolved_ghost_tokens(workspaces_root):
+    from cortex import parser
+    world = parser.parse_world(workspaces_root, include_archive=True)
+    ghosted = world.docs["kb-ghosts-ws/solo/task/task-ghosted"]
+    refs = {(r.kind, r.raw_target) for r in parser.raw_refs(ghosted)}
+    assert ("related", "knowledge/missing-note") in refs
+    assert ("related", "workbench/draft-x") in refs

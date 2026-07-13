@@ -103,6 +103,14 @@ def _extract_raw_edges(fm: dict, body: str) -> list[RawEdge]:
     return raw
 
 
+def raw_refs(doc: Doc) -> list[RawEdge]:
+    """Public: all authored references in a doc (frontmatter relations, typed
+    body lines, and mentions), deduped, BEFORE address resolution. parse_world
+    discards references that do not resolve to an on-disk doc, so ghost/unresolved
+    detection (cortex.query) re-derives them from the doc here."""
+    return _extract_raw_edges(doc.frontmatter, doc.body)
+
+
 def _read_doc(path: Path, id: DocId) -> tuple[Doc, list[RawEdge]]:
     text = path.read_text(encoding="utf-8")
     fm, body = _split_frontmatter(text)
