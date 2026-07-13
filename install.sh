@@ -104,7 +104,7 @@ echo "tracking-work skills installed. Restart your agent session to pick up chan
 
 # --- tracking-work-viz install ---
 VIZ_BIN_DIR="$HOME/.work/bin"
-VIZ_VENDOR="$REPO_DIR/skills/tracking-work-viz/templates/vendor"
+VIZ_VENDOR="$REPO_DIR/cortex/viz/templates/vendor"
 
 mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
 

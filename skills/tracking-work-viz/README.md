@@ -10,7 +10,7 @@ From the repo root:
 
     bash install.sh
 
-This symlinks the unified `cortex` bin to `~/.work/bin/cortex` (reach the viewer via `cortex viz ...`) and fetches two third-party JS files (Cytoscape, marked) into `skills/tracking-work-viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
+This symlinks the unified `cortex` bin to `~/.work/bin/cortex` (reach the viewer via `cortex viz ...`) and fetches two third-party JS files (Cytoscape, marked) into `cortex/viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
 
 ## Usage
 
@@ -98,9 +98,11 @@ other-ws/other-sess/workbench/foo   -> workbench across both boundaries
 
 ## Tests
 
+The viz tests moved into the unified engine suite at `cortex/tests/` and run
+from the repo root alongside the rest of `cortex`:
+
 ```bash
-cd skills/tracking-work-viz
-uvx --with pyyaml pytest -v
+uvx --with pyyaml pytest cortex -v
 ```
 
 The suite covers the address grammar, parser (typed-relation extraction, mentions, ghost generation, cross-workspace resolution, code-fence skipping, edge dedup), generator (vendor staging, markdown copy, index.md emission per scope, HTML shell + JSON blob shape, scope filtering, `build_payload` parity, build manifest), the static server, the CLI, and the edit backend + live edit server (source mapping, hash-guarded save, atomic write, rebuild, token/traversal rejection).

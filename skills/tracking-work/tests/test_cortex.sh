@@ -14,11 +14,11 @@ mkdir -p "$home/.work/workspaces/ws-a"
 
 # kb routing: creates a knowledge file
 HOME="$home" "$bindir/cortex" kb new knowledge foo --workspace ws-a --body b >/dev/null
-[ -f "$home/.work/workspaces/ws-a/knowledge/foo.md" ] || fail "cortex kb did not route to work-kb"
+[ -f "$home/.work/workspaces/ws-a/knowledge/foo.md" ] || fail "cortex kb did not route to the kb engine"
 
 # viz routing: --help exits 0 and mentions build
 vout="$(HOME="$home" "$bindir/cortex" viz --help 2>&1)" || fail "cortex viz --help nonzero"
-printf '%s\n' "$vout" | grep -qi "build" || fail "cortex viz --help not routed to work-viz"
+printf '%s\n' "$vout" | grep -qi "build" || fail "cortex viz --help not routed to the viz engine"
 
 # top-level help lists both groups, exit 0
 hout="$(HOME="$home" "$bindir/cortex" --help 2>&1)"; rc=$?

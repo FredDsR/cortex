@@ -9,7 +9,7 @@ Static browser-based viewer for `~/.work/workspaces/`. The CLI builds a folder o
 
 ## Invocation
 
-The user-facing command is `cortex viz` (the unified `cortex` bin, which `install.sh` symlinks to `~/.work/bin/cortex` and routes to this skill's `work-viz` script). The user must have `~/.work/bin/` on their `PATH` (or invoke via the absolute path).
+The user-facing command is `cortex viz` (the unified `cortex` bin, which `install.sh` symlinks to `~/.work/bin/cortex` and routes to the `cortex` engine via `python -m cortex.cli viz`; the viz code lives at `cortex/viz/`). The user must have `~/.work/bin/` on their `PATH` (or invoke via the absolute path).
 
 | Command | What happens |
 |---|---|
