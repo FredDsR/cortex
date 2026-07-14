@@ -186,6 +186,64 @@ def test_wire_preserves_unrelated_hooks(kbhome):
     assert any("inject here --format=claude-code" in c for c in cmds)
 
 
+def test_wire_refuses_to_clobber_malformed_settings(kbhome):
+    from cortex.inject import ClaudeCodeAdapter
+    from cortex.errors import CortexError
+    import pytest
+    _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
+    original = '{ "model": "opus", trailing-comma-here, }'   # invalid JSON
+    _settings(kbhome).write_text(original)
+    a = ClaudeCodeAdapter()
+    with pytest.raises(CortexError):
+        a.wire(home=kbhome)
+    assert _settings(kbhome).read_text() == original          # untouched, not clobbered
+
+
+def test_wire_refuses_non_dict_hooks(kbhome):
+    from cortex.inject import ClaudeCodeAdapter
+    from cortex.errors import CortexError
+    import pytest
+    _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
+    _settings(kbhome).write_text(json.dumps({"hooks": None}))
+    a = ClaudeCodeAdapter()
+    with pytest.raises(CortexError):
+        a.wire(home=kbhome)
+
+
+def test_status_survives_malformed_settings(kbhome, capsys):
+    # is_wired must not crash status on a broken settings file.
+    _enable(kbhome)
+    (kbhome / ".claude").mkdir(parents=True, exist_ok=True)
+    (kbhome / ".claude/settings.json").write_text("{ not json")
+    assert cli.main(["inject", "status", "--workspace", "ws-a"]) == 0
+    assert "wired hooks: (none)" in capsys.readouterr().out
+
+
+def test_wire_command_uses_passed_home_when_cortex_not_on_path(kbhome, monkeypatch):
+    from cortex.inject import ClaudeCodeAdapter
+    monkeypatch.setattr("cortex.inject.shutil.which", lambda _: None)
+    a = ClaudeCodeAdapter()
+    a.wire(home=kbhome)
+    cmd = json.loads(_settings(kbhome).read_text())["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert cmd.startswith(str(kbhome / ".work" / "bin" / "cortex"))
+
+
+def test_here_bad_max_errors(kbhome):
+    assert cli.main(["inject", "here", "--workspace", "ws-a", "--max", "abc"]) == 1
+
+
+def test_here_byte_ceiling_strictly_bounded(kbhome, monkeypatch):
+    _enable(kbhome)
+    for i in range(50):
+        _mk_knowledge(kbhome, f"doc-{i:03d}", "Reference", "y" * 60 + f" n{i}")
+    monkeypatch.setenv("CORTEX_INJECT_MAX_BYTES", "600")
+    from cortex import inject
+    block = inject.render_block(home=kbhome, cwd=kbhome, workspace="ws-a",
+                                session="", max_n=100)
+    assert len(block.encode("utf-8")) <= 600            # notice now counted
+    assert "truncated" in block
+
+
 def test_unwire_removes_only_our_entry(kbhome):
     from cortex.inject import ClaudeCodeAdapter
     _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)

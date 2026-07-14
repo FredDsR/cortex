@@ -173,7 +173,7 @@ if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "cortex: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: cortex kb ... / cortex viz ..."
+echo "cortex: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: cortex kb ... / cortex viz ... / cortex inject ..."
 # --- end tracking-work-viz install ---
 
 # --- slash command install (Claude Code symlink path) ---

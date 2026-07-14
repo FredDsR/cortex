@@ -108,6 +108,7 @@ def render_block(*, home: Path, cwd: Path, workspace: str, session: str,
     close_tag = "</tracking-work-index>"
 
     ceiling = _max_bytes()
+    notice_cost = len((_TRUNCATE_NOTICE + "\n").encode("utf-8"))
     kept: list[str] = []
     used = len((open_tag + "\n" + close_tag).encode("utf-8"))
     truncated = False
@@ -119,6 +120,10 @@ def render_block(*, home: Path, cwd: Path, workspace: str, session: str,
         kept.append(ln)
         used += cost
     if truncated:
+        # Reserve room for the notice inside the ceiling: drop kept lines until
+        # the notice fits, so the final block honors CORTEX_INJECT_MAX_BYTES.
+        while kept and used + notice_cost > ceiling:
+            used -= len((kept.pop() + "\n").encode("utf-8"))
         kept.append(_TRUNCATE_NOTICE)
     body = "\n".join(kept)
     return f"{open_tag}\n{body}\n{close_tag}"
@@ -156,20 +161,41 @@ class ClaudeCodeAdapter(Adapter):
         base = project_path if project_path is not None else home
         return Path(base) / ".claude" / "settings.json"
 
-    def _cortex_command(self) -> str:
-        exe = shutil.which("cortex") or str(Path.home() / ".work" / "bin" / "cortex")
+    def _cortex_command(self, home: Path) -> str:
+        # The cortex bin lives under the store (<home>/.work/bin), not the
+        # project, so the fallback is derived from the passed home.
+        exe = shutil.which("cortex") or str(Path(home) / ".work" / "bin" / "cortex")
         return f"{exe} {_CC_MARK}"
 
     def _load(self, path: Path) -> dict:
+        """Read and parse the settings file. A missing file is an empty config;
+        an unreadable or malformed one raises rather than silently resolving to
+        {} (which would let a write overwrite the user's whole settings.json)."""
         if not path.is_file():
             return {}
         try:
-            return json.loads(path.read_text(encoding="utf-8") or "{}")
-        except (json.JSONDecodeError, OSError):
-            return {}
+            raw = path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise CortexError(f"cannot read {path}: {e}")
+        try:
+            data = json.loads(raw or "{}")
+        except json.JSONDecodeError:
+            raise CortexError(
+                f"{path} is not valid JSON; refusing to modify it. "
+                "Fix the file or edit the SessionStart hook by hand.")
+        if not isinstance(data, dict):
+            raise CortexError(f"{path} is not a JSON object; refusing to modify it.")
+        return data
 
     def _entries(self, data: dict) -> list:
-        return data.setdefault("hooks", {}).setdefault("SessionStart", [])
+        hooks = data.setdefault("hooks", {})
+        if not isinstance(hooks, dict):
+            raise CortexError("settings.json 'hooks' is not an object; refusing to modify it.")
+        entries = hooks.setdefault("SessionStart", [])
+        if not isinstance(entries, list):
+            raise CortexError(
+                "settings.json 'hooks.SessionStart' is not a list; refusing to modify it.")
+        return entries
 
     def _is_ours(self, entry: dict) -> bool:
         return any(_CC_MARK in h.get("command", "")
@@ -183,7 +209,7 @@ class ClaudeCodeAdapter(Adapter):
             return False
         entries.append({
             "matcher": _CC_MATCHER,
-            "hooks": [{"type": "command", "command": self._cortex_command()}],
+            "hooks": [{"type": "command", "command": self._cortex_command(home)}],
         })
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -203,8 +229,15 @@ class ClaudeCodeAdapter(Adapter):
         return True
 
     def is_wired(self, *, home: Path, project_path: Path | None = None) -> bool:
-        data = self._load(self._settings_path(home, project_path))
+        # A read-only query: degrade to "not wired" on an unreadable/malformed
+        # file rather than raising, so `status` never crashes. Writes still refuse.
+        try:
+            data = self._load(self._settings_path(home, project_path))
+        except CortexError:
+            return False
         entries = data.get("hooks", {}).get("SessionStart", [])
+        if not isinstance(entries, list):
+            return False
         return any(self._is_ours(e) for e in entries)
 
 
@@ -220,11 +253,14 @@ def get_adapter(name: str) -> Adapter:
 
 
 def cmd_here(args) -> int:
+    # Validate --max up front so a bad value reports an error like every other
+    # command; only the render itself is wrapped in the never-error guard.
+    max_n = kb.parse_max(args.max)
     try:
         block = render_block(
             home=kb._home(), cwd=Path.cwd(),
             workspace=args.workspace, session=args.session,
-            max_n=kb.parse_max(args.max),
+            max_n=max_n,
         )
     except Exception:
         return 0
