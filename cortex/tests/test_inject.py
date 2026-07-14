@@ -73,3 +73,29 @@ def test_here_no_open_tasks_section_when_none(kbhome, capsys):
     _mk_task(kbhome, "task-done", "Resolved", "Already merged")
     cli.main(["inject", "here", "--workspace", "ws-a", "--session", "sess-a"])
     assert "## open tasks" not in capsys.readouterr().out
+
+
+def test_here_byte_ceiling_truncates(kbhome, capsys, monkeypatch):
+    _enable(kbhome)
+    for i in range(50):
+        _mk_knowledge(kbhome, f"doc-{i:03d}", "Reference",
+                      "x" * 60 + f" number {i}")
+    monkeypatch.setenv("CORTEX_INJECT_MAX_BYTES", "500")
+    cli.main(["inject", "here", "--workspace", "ws-a"])
+    out = capsys.readouterr().out
+    assert len(out.encode("utf-8")) <= 700          # ceiling + tag/notice slack
+    assert "truncated" in out
+    assert out.rstrip().endswith("</tracking-work-index>")
+
+
+def test_here_silent_on_corrupt_file(kbhome, capsys, monkeypatch):
+    _enable(kbhome)
+    kd = kbhome / ".work/workspaces/ws-a/knowledge"
+    kd.mkdir(parents=True, exist_ok=True)
+    (kd / "bad.md").write_bytes(b"\xff\xfe not utf8 \x00")
+
+    def boom(*a, **k):
+        raise ValueError("corrupt")
+    monkeypatch.setattr("cortex.inject.kb._render_section", boom)
+    assert cli.main(["inject", "here", "--workspace", "ws-a"]) == 0
+    assert capsys.readouterr().out == ""

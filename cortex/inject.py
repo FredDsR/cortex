@@ -10,6 +10,7 @@ yields exit 0 with empty stdout. See
 docs/superpowers/specs/2026-07-14-optin-sessionstart-inject-design.md.
 """
 from __future__ import annotations
+import os
 from pathlib import Path
 
 from cortex import frontmatter as fm
@@ -17,6 +18,16 @@ from cortex import kb
 from cortex import store
 
 SENTINEL_NAME = ".inject-enabled"
+
+_DEFAULT_MAX_BYTES = 8192
+_TRUNCATE_NOTICE = "... truncated; run 'cortex kb index'"
+
+
+def _max_bytes() -> int:
+    raw = os.environ.get("CORTEX_INJECT_MAX_BYTES", "")
+    if raw.isdigit():
+        return int(raw)
+    return _DEFAULT_MAX_BYTES
 
 
 def _sentinel(ws_root: Path) -> Path:
@@ -86,8 +97,24 @@ def render_block(*, home: Path, cwd: Path, workspace: str, session: str,
             lines += tasks
 
     attrs = f' workspace="{ws_root.name}"' + (f' session="{sess}"' if sess else "")
-    body = "\n".join(lines)
-    return f"<tracking-work-index{attrs}>\n{body}\n</tracking-work-index>"
+    open_tag = f"<tracking-work-index{attrs}>"
+    close_tag = "</tracking-work-index>"
+
+    ceiling = _max_bytes()
+    kept: list[str] = []
+    used = len((open_tag + "\n" + close_tag).encode("utf-8"))
+    truncated = False
+    for ln in lines:
+        cost = len((ln + "\n").encode("utf-8"))
+        if used + cost > ceiling and kept:
+            truncated = True
+            break
+        kept.append(ln)
+        used += cost
+    if truncated:
+        kept.append(_TRUNCATE_NOTICE)
+    body = "\n".join(kept)
+    return f"{open_tag}\n{body}\n{close_tag}"
 
 
 def cmd_here(args) -> int:
