@@ -77,6 +77,17 @@ def build_parser() -> argparse.ArgumentParser:
     here.add_argument("--workspace", default="")
     here.add_argument("--session", default="")
     here.add_argument("--max", default="100")
+
+    en = icmds.add_parser("enable", help="Opt this workspace in (+ optional --wire-hook)")
+    en.add_argument("--workspace", default="")
+    en.add_argument("--wire-hook", default="")
+
+    dis = icmds.add_parser("disable", help="Opt this workspace out (+ optional --unwire-hook)")
+    dis.add_argument("--workspace", default="")
+    dis.add_argument("--unwire-hook", default="")
+
+    st = icmds.add_parser("status", help="Show sentinel state + wired harnesses")
+    st.add_argument("--workspace", default="")
     return p
 
 
@@ -115,6 +126,9 @@ _QUERY_DISPATCH = {
 
 _INJECT_DISPATCH = {
     "here": inject.cmd_here,
+    "enable": inject.cmd_enable,
+    "disable": inject.cmd_disable,
+    "status": inject.cmd_status,
 }
 
 _GROUP_DISPATCH = {

@@ -117,3 +117,30 @@ def test_here_claude_code_empty_when_gated_off(kbhome, capsys):
     # No sentinel -> empty stdout even in claude-code format.
     cli.main(["inject", "here", "--workspace", "ws-a", "--format", "claude-code"])
     assert capsys.readouterr().out == ""
+
+
+def _sentinel_path(kbhome, ws="ws-a"):
+    return kbhome / ".work/workspaces" / ws / ".inject-enabled"
+
+
+def test_enable_creates_sentinel(kbhome, capsys):
+    assert cli.main(["inject", "enable", "--workspace", "ws-a"]) == 0
+    assert _sentinel_path(kbhome).is_file()
+
+
+def test_disable_removes_sentinel(kbhome):
+    _enable(kbhome)
+    assert cli.main(["inject", "disable", "--workspace", "ws-a"]) == 0
+    assert not _sentinel_path(kbhome).is_file()
+
+
+def test_disable_is_idempotent(kbhome):
+    assert cli.main(["inject", "disable", "--workspace", "ws-a"]) == 0
+
+
+def test_status_reports_sentinel(kbhome, capsys):
+    _enable(kbhome)
+    assert cli.main(["inject", "status", "--workspace", "ws-a"]) == 0
+    out = capsys.readouterr().out
+    assert "enabled" in out.lower()
+    assert "ws-a" in out

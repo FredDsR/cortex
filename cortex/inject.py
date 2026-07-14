@@ -127,6 +127,15 @@ class Adapter:
     def format(self, block: str) -> str:            # pragma: no cover - overridden
         raise NotImplementedError
 
+    def wire(self, *, home: Path, project_path: Path | None = None) -> bool:      # pragma: no cover - overridden
+        raise NotImplementedError
+
+    def unwire(self, *, home: Path, project_path: Path | None = None) -> bool:    # pragma: no cover - overridden
+        raise NotImplementedError
+
+    def is_wired(self, *, home: Path, project_path: Path | None = None) -> bool:
+        return False
+
 
 class ClaudeCodeAdapter(Adapter):
     name = "claude-code"
@@ -165,4 +174,46 @@ def cmd_here(args) -> int:
         print(block)
     else:
         print(get_adapter(args.format).format(block))
+    return 0
+
+
+def cmd_enable(args) -> int:
+    home, cwd = kb._home(), Path.cwd()
+    wired_note = ""
+    if args.wire_hook:
+        get_adapter(args.wire_hook).wire(home=home)
+        wired_note = f" hook wired for {args.wire_hook}."
+    try:
+        ws_root = store.resolve_workspace(args.workspace, home=home, cwd=cwd)
+    except store.StoreError:
+        if args.wire_hook:
+            print(f"no workspace resolved; nothing opted in.{wired_note}")
+            return 0
+        raise
+    _sentinel(ws_root).write_text("on\n", encoding="utf-8")
+    print(f"injection enabled for workspace '{ws_root.name}'.{wired_note}")
+    return 0
+
+
+def cmd_disable(args) -> int:
+    home, cwd = kb._home(), Path.cwd()
+    unwired_note = ""
+    if args.unwire_hook:
+        get_adapter(args.unwire_hook).unwire(home=home)
+        unwired_note = f" hook unwired for {args.unwire_hook}."
+    ws_root = store.resolve_workspace(args.workspace, home=home, cwd=cwd)
+    s = _sentinel(ws_root)
+    if s.is_file():
+        s.unlink()
+    print(f"injection disabled for workspace '{ws_root.name}'.{unwired_note}")
+    return 0
+
+
+def cmd_status(args) -> int:
+    home, cwd = kb._home(), Path.cwd()
+    ws_root = store.resolve_workspace(args.workspace, home=home, cwd=cwd)
+    state = "enabled" if _sentinel(ws_root).is_file() else "disabled"
+    print(f"workspace '{ws_root.name}': injection {state}")
+    wired = [name for name, a in sorted(ADAPTERS.items()) if a.is_wired(home=home)]
+    print("wired hooks: " + (", ".join(wired) if wired else "(none)"))
     return 0
