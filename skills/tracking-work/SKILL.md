@@ -20,6 +20,7 @@ Sub-skills handle optional concerns:
 - `tracking-work-migration` — per-session moves between local and global stores.
 - `tracking-work-sync` — cross-device sync of `~/.work/` via a private GitHub repo (opt-in).
 - `tracking-work-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `cortex kb` CLI.
+- `tracking-work-inject`: opt-in, off-by-default session-start context injection via the `cortex inject` CLI. The single exception to the no-auto-injection philosophy.
 
 ## When to Use
 
@@ -57,6 +58,7 @@ Then decide:
 3. **One session.** Summarize it. Ask continue/switch/new.
 4. **Multiple sessions.** Render the `list_sessions.sh` output — tag each line with origin (`[local]` / `[global]`) and any active markers (`[claude:...]`, `[copilot:...]`, etc.). Ask which to continue or whether to start a new one.
 5. **Other agent owns an `.active.<id>` in this workspace.** Surface it in the prompt so the user knows a concurrent session is active. Never overwrite another agent's `.active` file — always write only your own `.active.<SID>`.
+6. **Injection available.** If a workspace resolves and `cortex inject status` reports the hook is not wired, you MAY offer to enable opt-in session-start injection (`tracking-work-inject`). Never auto-enable it.
 
 ## Checkpoint Rules
 
@@ -146,7 +148,7 @@ See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 - Replace GitHub Issues / JIRA — tickets remain canonical
 - Auto-commit tracking files — the user decides
 - Enforce priorities, story points, or estimates — free-form fields
-- Use hooks or background automation
+- Use hooks or background automation, with ONE opt-in exception: session-start context injection, off by default, via `tracking-work-inject` (`cortex inject`).
 - Require a specific agent runtime — works wherever `bash` + the scripts run
 
 ## References

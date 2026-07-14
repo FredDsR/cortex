@@ -9,10 +9,12 @@ Usage:
   cortex kb    <command> [args...]  Author/query knowledge & workbench docs
                                      (new, update, index, ingest)
   cortex viz   <command> [args...]  Visualize the work tree (build, serve)
-  cortex query <command> [args...]  Query the work graph (neighbors)
+  cortex query  <command> [args...]  Query the work graph (neighbors)
+  cortex inject <command> [args...]  Opt-in session-start injection
+                                     (enable, disable, status, here)
 
-Run `cortex kb --help`, `cortex viz --help`, or `cortex query --help`
-for group-specific help.
+Run `cortex kb --help`, `cortex viz --help`, `cortex query --help`, or
+`cortex inject --help` for group-specific help.
 EOF
     exit "${1:-2}"
 }
@@ -44,7 +46,7 @@ REPO_ROOT="$(cd -P "$(dirname "$self")/../../.." && pwd -P)"
 [[ $# -ge 1 ]] || usage
 group="$1"; shift
 case "$group" in
-    kb|viz|query) [[ -f "$REPO_ROOT/cortex/cli.py" ]] || {
+    kb|viz|query|inject) [[ -f "$REPO_ROOT/cortex/cli.py" ]] || {
                    echo "cortex: cannot find the cortex engine at $REPO_ROOT/cortex (broken install?)" >&2
                    exit 1
                }
