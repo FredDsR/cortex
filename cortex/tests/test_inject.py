@@ -33,6 +33,13 @@ def test_here_empty_when_workspace_unresolved(kbhome, capsys):
     assert capsys.readouterr().out == ""
 
 
+def _mk_task(kbhome, slug, status, title, sess="sess-a", ws="ws-a"):
+    td = kbhome / ".work/workspaces" / ws / "sessions" / sess / "tasks"
+    td.mkdir(parents=True, exist_ok=True)
+    (td / f"{slug}.md").write_text(
+        f"---\nslug: {slug}\nstatus: {status}\nsession: {sess}\n---\n\n# {title}\n\nbody\n")
+
+
 def test_here_renders_knowledge_and_workbench_when_enabled(kbhome, capsys):
     _enable(kbhome)
     _mk_knowledge(kbhome, "api-ver", "Decision", "why we pin v2")
@@ -45,3 +52,24 @@ def test_here_renders_knowledge_and_workbench_when_enabled(kbhome, capsys):
     assert "## workbench (sess-a)" in out
     assert "pr-draft - draft PR description" in out
     assert out.rstrip().endswith("</tracking-work-index>")
+
+
+def test_here_open_tasks_section(kbhome, capsys):
+    _enable(kbhome)
+    _mk_task(kbhome, "task-b-open", "Open", "Do the docs")
+    _mk_task(kbhome, "task-a-wip", "In Progress", "Wire the hook")
+    _mk_task(kbhome, "task-done", "Resolved", "Already merged")
+    assert cli.main(["inject", "here", "--workspace", "ws-a", "--session", "sess-a"]) == 0
+    out = capsys.readouterr().out
+    assert "## open tasks" in out
+    tasks = [ln for ln in out.splitlines() if ln.startswith("[")]
+    assert tasks == ["[In Progress] task-a-wip - Wire the hook",
+                     "[Open] task-b-open - Do the docs"]
+    assert "task-done" not in out           # Resolved excluded
+
+
+def test_here_no_open_tasks_section_when_none(kbhome, capsys):
+    _enable(kbhome)
+    _mk_task(kbhome, "task-done", "Resolved", "Already merged")
+    cli.main(["inject", "here", "--workspace", "ws-a", "--session", "sess-a"])
+    assert "## open tasks" not in capsys.readouterr().out
