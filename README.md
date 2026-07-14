@@ -16,6 +16,7 @@ One CLI fronts the whole family: **`cortex`** (`cortex kb ...` to author knowled
 | `tracking-work-sync` | Optional cross-device sync of `~/.work/` via a private GitHub repo. See `skills/tracking-work-sync/docs/` for design. |
 | `tracking-work-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
 | `tracking-work-kb` | Author and bulk-ingest knowledge/workbench docs (`cortex kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `tracking-work-viz`, replicated by `tracking-work-sync`. |
+| `tracking-work-inject` | Optional, off-by-default session-start context injection (`cortex inject` CLI). The single exception to the otherwise pull-based, no-auto-injection design. |
 
 ## Knowledge base
 
@@ -134,9 +135,18 @@ Remove the symlinks in each harness's skills directory:
 
 ```bash
 for h in ~/.claude ~/.codex ~/.copilot ~/.gemini; do
-    rm -f "$h/skills/tracking-work"{,-github,-migration,-sync,-viz,-kb}
+    rm -f "$h/skills/tracking-work"{,-github,-migration,-sync,-viz,-kb,-inject}
 done
 ```
+
+## Opt-in session-start injection
+
+Off by default. `cortex inject enable --wire-hook claude-code` wires a Claude
+Code `SessionStart` hook that injects the active workspace's knowledge index,
+workbench, and open tasks at session start. Per-workspace opt-in via a sentinel;
+`cortex inject disable --unwire-hook claude-code` reverses it. See
+`skills/tracking-work-inject/SKILL.md`. This is the family's single exception to
+its otherwise pull-based, no-auto-injection design.
 
 ## State data vs skill code
 
