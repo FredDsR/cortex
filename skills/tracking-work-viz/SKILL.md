@@ -31,6 +31,8 @@ Heuristics:
 
 The viewer's sidebar tree spans every workspace and session, so once a page is open the user navigates by clicking nodes; no per-workspace invocation is needed.
 
+The root (dashboard) page is also the cross-workspace knowledge wiki: it lists every workspace's knowledge docs grouped by `type`, and its graph shows the cross-workspace `[[...]]` link and backlink edges. This is a derived view (the "brain"), regenerated from workspace knowledge on every build.
+
 ## Output layout
 
 ```

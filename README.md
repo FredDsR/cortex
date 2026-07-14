@@ -36,6 +36,10 @@ Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb
   what already exists before authoring a duplicate. Prints to stdout, or
   `--write` regenerates a derived `knowledge/INDEX.md` (like `SUMMARY.md`, never
   hand-maintained, never injected).
+- **The brain (cross-workspace).** `cortex kb index --workspace=all` aggregates
+  every workspace's knowledge into one dictionary grouped by type; the viz root
+  page renders the same data as a wiki whose concepts link across workspaces.
+  Derived and regenerable, never hand-authored.
 - **`cortex kb ingest`.** Bulk-ingest a codebase into a workspace's `knowledge/`:
   a deterministic path documents OpenAPI/Swagger and SQL DDL, and everything
   fuzzier (Prisma, README `## API` / `## Schema` sections, runbooks, model dirs)

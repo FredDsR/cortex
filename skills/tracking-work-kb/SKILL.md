@@ -87,6 +87,13 @@ stdout. `--write` (re)generates a derived, banner-marked `knowledge/INDEX.md`
 hand-maintained or injected into any context. `INDEX.md` is excluded from the
 viz graph.
 
+Pass `--workspace=all` to aggregate every workspace's `knowledge/` into one
+cross-workspace dictionary grouped by `type` and tagged with each doc's
+workspace (the "brain"). `--workspace=all --write` derives
+`~/.work/knowledge/INDEX.md`. Entries are one-per-doc and never merged; concepts
+relate only through real `[[...]]` links and backlinks, which the viz root page
+renders as a graph.
+
 ### Bulk ingestion (`cortex kb ingest`)
 
 Bulk-ingest documentable artifacts from a codebase into a workspace's
