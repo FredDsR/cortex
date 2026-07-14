@@ -92,7 +92,9 @@ cross-workspace dictionary grouped by `type` and tagged with each doc's
 workspace (the "brain"). `--workspace=all --write` derives
 `~/.work/knowledge/INDEX.md`. Entries are one-per-doc and never merged; concepts
 relate only through real `[[...]]` links and backlinks, which the viz root page
-renders as a graph.
+renders as a graph. Scope is the global store (`~/.work/workspaces/*`) only;
+repo-local `<repo>/.work` stores are intentionally excluded (they are per-repo,
+not part of the cross-workspace brain). Type grouping is case-insensitive.
 
 ### Bulk ingestion (`cortex kb ingest`)
 

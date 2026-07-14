@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from cortex import frontmatter as fm
+from cortex import model
 from cortex import store
 from cortex.errors import CortexError
 
@@ -124,8 +125,8 @@ def _render_section(dir_path: Path, max_n: int) -> list[str]:
         block, _ = fm.split(f.read_text(encoding="utf-8"))
         block = block or ""
         ty = fm.read_field(block, "type")
-        desc = fm.read_field(block, "description") or fm.read_field(block, "title") \
-            or "(no description)"
+        desc = model.format_description(fm.read_field(block, "description"),
+                                        fm.read_field(block, "title"))
         render = f.stem + (f" [{ty}]" if ty else "") + f" - {desc}"
         rows.append((ty.lower() if ty else "~~~", f.stem, render))
     if not rows:
@@ -149,31 +150,27 @@ def _knowledge_rows(kdir: Path, ws_name: str) -> list[tuple[str, str, str, str]]
         block, _ = fm.split(f.read_text(encoding="utf-8"))
         block = block or ""
         ty = fm.read_field(block, "type")
-        desc = fm.read_field(block, "description") or fm.read_field(block, "title") \
-            or "(no description)"
+        desc = model.format_description(fm.read_field(block, "description"),
+                                        fm.read_field(block, "title"))
         rows.append((ty, f.stem, ws_name, desc))
     return rows
 
 
 def _render_all(workspaces_root: Path, max_n: int) -> list[str]:
     """Cross-workspace dictionary: `## <type>` sections (untyped last), each
-    `<slug> (<ws>) - <desc>` sorted by slug then workspace, capped per section."""
+    `<slug> (<ws>) - <desc>` sorted by slug then workspace, capped per section.
+    Scope is the global store's workspaces; repo-local `.work` stores are not
+    included (they are per-repo, not part of the cross-workspace brain)."""
     rows: list[tuple[str, str, str, str]] = []
     if workspaces_root.is_dir():
         for ws in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
             rows += _knowledge_rows(ws / "knowledge", ws.name)
-    by_type: dict[str, list[tuple[str, str, str]]] = {}
-    for ty, slug, ws, desc in rows:
-        by_type.setdefault(ty, []).append((slug, ws, desc))
-    ordered = sorted((t for t in by_type if t), key=str.lower)
-    if "" in by_type:
-        ordered.append("")
     lines: list[str] = []
-    for ty in ordered:
-        lines.append(f"## {ty if ty else '(untyped)'}")
-        entries = sorted(by_type[ty], key=lambda r: (r[0], r[1]))
+    for display_ty, group in model.group_by_type(rows, lambda r: r[0]):
+        lines.append(f"## {display_ty if display_ty else '(untyped)'}")
+        entries = sorted(group, key=lambda r: (r[1], r[2]))   # slug, then workspace
         total = len(entries)
-        for slug, ws, desc in entries[:max_n]:
+        for _ty, slug, ws, desc in entries[:max_n]:
             lines.append(f"{slug} ({ws}) - {desc}")
         if total > max_n:
             lines.append(f"... {total - max_n} more (raise --max)")

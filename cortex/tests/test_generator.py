@@ -401,3 +401,13 @@ def test_root_index_has_cross_workspace_knowledge_dictionary(workspaces_root, tm
     assert "### Runbook" in root_idx                                   # authored-ws/typed.md
     assert "[typed (authored-ws)](workspaces/authored-ws/knowledge/typed.md)" in root_idx
     assert "a one-line description" in root_idx
+
+
+def test_root_index_description_placeholder_matches_cli(workspaces_root, tmp_path):
+    # authored-ws/by-agent.md has no type/description/title -> same placeholder
+    # the CLI uses, so the two brain surfaces render description-less docs alike.
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    build(world, out)
+    root_idx = (out / "index.md").read_text()
+    assert "[by-agent (authored-ws)](workspaces/authored-ws/knowledge/by-agent.md) - (no description)" in root_idx

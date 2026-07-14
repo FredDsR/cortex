@@ -17,6 +17,34 @@ AUTHORED_EDGE_KINDS = ("blocked", "related", "follows", "mentions")
 ALL_EDGE_KINDS = AUTHORED_EDGE_KINDS + ("contains",)
 
 
+def format_description(description: Optional[str], title: Optional[str]) -> str:
+    """Shared description fallback for knowledge/workbench rendering: the
+    description, else the title, else a placeholder. One source of truth so the
+    kb index CLI and the viz render description-less docs identically."""
+    return (description or "") or (title or "") or "(no description)"
+
+
+def group_by_type(items, type_of):
+    """Group items by their `type` for the knowledge dictionary. Returns an
+    ordered list of `(display_type, items)`: types are grouped and ordered
+    case-insensitively (so `API` and `api` are one group), untyped ('') last.
+    `display_type` is the first type string seen for that group (or '' when
+    untyped). Callers own the per-group sorting and rendering."""
+    groups: dict[str, list] = {}   # normalized key -> [display_type, items]
+    for it in items:
+        raw = type_of(it) or ""
+        key = raw.lower()
+        g = groups.get(key)
+        if g is None:
+            groups[key] = [raw, [it]]
+        else:
+            g[1].append(it)
+    ordered = sorted(k for k in groups if k)
+    if "" in groups:
+        ordered.append("")
+    return [(groups[k][0], groups[k][1]) for k in ordered]
+
+
 @dataclass(frozen=True)
 class DocId:
     """Canonical identifier for any first-class node."""
