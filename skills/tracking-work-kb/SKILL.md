@@ -211,7 +211,8 @@ never misparsed. The viz uses real YAML for its own reads.
 - Open the editor by default. Agent-primary CLI; `$EDITOR` opens only
   when `--open` is passed.
 - Inject the index into any context. `cortex kb index` is pull-based (stdout or a
-  derived `INDEX.md`).
+  derived `INDEX.md`). Opt-in session-start injection (which builds on this index)
+  is a separate, off-by-default feature: see `tracking-work-inject` (`cortex inject`).
 
 ## Sync integration
 

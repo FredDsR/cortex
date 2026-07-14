@@ -20,6 +20,7 @@ Sub-skills handle optional concerns:
 - `tracking-work-migration` — per-session moves between local and global stores.
 - `tracking-work-sync` — cross-device sync of `~/.work/` via a private GitHub repo (opt-in).
 - `tracking-work-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `cortex kb` CLI.
+- `tracking-work-inject`: opt-in, off-by-default session-start context injection via the `cortex inject` CLI. The single exception to the no-auto-injection philosophy.
 
 ## When to Use
 
