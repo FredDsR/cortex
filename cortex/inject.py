@@ -10,12 +10,14 @@ yields exit 0 with empty stdout. See
 docs/superpowers/specs/2026-07-14-optin-sessionstart-inject-design.md.
 """
 from __future__ import annotations
+import json
 import os
 from pathlib import Path
 
 from cortex import frontmatter as fm
 from cortex import kb
 from cortex import store
+from cortex.errors import CortexError
 
 SENTINEL_NAME = ".inject-enabled"
 
@@ -117,6 +119,37 @@ def render_block(*, home: Path, cwd: Path, workspace: str, session: str,
     return f"{open_tag}\n{body}\n{close_tag}"
 
 
+class Adapter:
+    """Per-harness wiring + stdout envelope. Every adapter provides `format`;
+    the config methods are filled in per harness."""
+    name = ""
+
+    def format(self, block: str) -> str:            # pragma: no cover - overridden
+        raise NotImplementedError
+
+
+class ClaudeCodeAdapter(Adapter):
+    name = "claude-code"
+
+    def format(self, block: str) -> str:
+        payload = {"hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": block,
+        }}
+        return json.dumps(payload)
+
+
+ADAPTERS: dict[str, Adapter] = {a.name: a for a in (ClaudeCodeAdapter(),)}
+
+
+def get_adapter(name: str) -> Adapter:
+    try:
+        return ADAPTERS[name]
+    except KeyError:
+        known = ", ".join(sorted(ADAPTERS)) or "(none)"
+        raise CortexError(f"unknown harness '{name}'; known: {known}")
+
+
 def cmd_here(args) -> int:
     try:
         block = render_block(
@@ -126,6 +159,10 @@ def cmd_here(args) -> int:
         )
     except Exception:
         return 0
-    if block:
+    if not block:
+        return 0
+    if args.format == "text":
         print(block)
+    else:
+        print(get_adapter(args.format).format(block))
     return 0

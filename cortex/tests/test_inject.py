@@ -1,3 +1,5 @@
+import json
+
 from cortex import cli, inject
 from pathlib import Path
 
@@ -98,4 +100,20 @@ def test_here_silent_on_corrupt_file(kbhome, capsys, monkeypatch):
         raise ValueError("corrupt")
     monkeypatch.setattr("cortex.inject.kb._render_section", boom)
     assert cli.main(["inject", "here", "--workspace", "ws-a"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_here_claude_code_envelope(kbhome, capsys):
+    _enable(kbhome)
+    _mk_knowledge(kbhome, "api-ver", "Decision", "why we pin v2")
+    cli.main(["inject", "here", "--workspace", "ws-a", "--format", "claude-code"])
+    payload = json.loads(capsys.readouterr().out)
+    hso = payload["hookSpecificOutput"]
+    assert hso["hookEventName"] == "SessionStart"
+    assert "api-ver [Decision] - why we pin v2" in hso["additionalContext"]
+
+
+def test_here_claude_code_empty_when_gated_off(kbhome, capsys):
+    # No sentinel -> empty stdout even in claude-code format.
+    cli.main(["inject", "here", "--workspace", "ws-a", "--format", "claude-code"])
     assert capsys.readouterr().out == ""
