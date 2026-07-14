@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from cortex import model
 from cortex.model import World, Doc, DocId, Edge
 
 _PACKAGE_DIR = Path(__file__).parent
@@ -124,6 +125,27 @@ def _emit_root_index(world: World, out_dir: Path) -> None:
     lines = ["# Fred's Work Tracking", "", "## Workspaces", ""]
     for ws in workspaces:
         lines.append(f"- [{ws.id.workspace}](workspaces/{ws.id.workspace}/index.html)")
+
+    # The brain: a derived cross-workspace knowledge dictionary, grouped by type.
+    # Grouping/ordering and the description fallback are shared with the
+    # `cortex kb index --workspace=all` CLI (cortex.model) so the two brain
+    # surfaces stay consistent.
+    kdocs = [d for d in world.docs.values()
+             if d.id.kind == "knowledge" and not d.ghost]
+    lines += ["", f"## Knowledge ({len(kdocs)})", ""]
+    if not kdocs:
+        lines.append("_No knowledge docs yet._")
+    else:
+        for display_ty, group in model.group_by_type(kdocs, lambda d: d.type):
+            lines += ["", f"### {display_ty if display_ty else '(untyped)'}", ""]
+            for d in sorted(group,
+                            key=lambda d: (d.id.slug or "", d.id.workspace or "")):
+                href = _content_path(d.id) or ""
+                # Raw frontmatter title (not the slug-fallback Doc.title) so the
+                # description fallback matches the CLI's `kb index` exactly.
+                raw_title = d.frontmatter.get("title") if d.frontmatter else None
+                desc = model.format_description(d.description, raw_title)
+                lines.append(f"- [{d.id.slug} ({d.id.workspace})]({href}) - {desc}")
     lines.append("")
     (out_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
 
