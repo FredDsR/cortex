@@ -390,3 +390,14 @@ def test_build_stages_minisearch_vendor(workspaces_root, tmp_path):
     out = tmp_path / "out"
     build(parser.parse_world(workspaces_root), out, workspaces_root=workspaces_root)
     assert (out / "vendor" / "minisearch.min.js").is_file()
+
+
+def test_root_index_has_cross_workspace_knowledge_dictionary(workspaces_root, tmp_path):
+    out = tmp_path / "out"
+    world = parse_world(workspaces_root)
+    build(world, out)
+    root_idx = (out / "index.md").read_text()
+    assert "## Knowledge" in root_idx
+    assert "### Runbook" in root_idx                                   # authored-ws/typed.md
+    assert "[typed (authored-ws)](workspaces/authored-ws/knowledge/typed.md)" in root_idx
+    assert "a one-line description" in root_idx

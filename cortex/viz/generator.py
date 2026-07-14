@@ -124,6 +124,28 @@ def _emit_root_index(world: World, out_dir: Path) -> None:
     lines = ["# Fred's Work Tracking", "", "## Workspaces", ""]
     for ws in workspaces:
         lines.append(f"- [{ws.id.workspace}](workspaces/{ws.id.workspace}/index.html)")
+
+    # The brain: a derived cross-workspace knowledge dictionary, grouped by type.
+    kdocs = [d for d in world.docs.values()
+             if d.id.kind == "knowledge" and not d.ghost]
+    lines += ["", f"## Knowledge ({len(kdocs)})", ""]
+    if not kdocs:
+        lines.append("_No knowledge docs yet._")
+    else:
+        by_type: dict[str, list] = {}
+        for d in kdocs:
+            by_type.setdefault(d.type or "", []).append(d)
+        ordered = sorted((t for t in by_type if t), key=str.lower)
+        if "" in by_type:
+            ordered.append("")
+        for ty in ordered:
+            lines += ["", f"### {ty if ty else '(untyped)'}", ""]
+            for d in sorted(by_type[ty],
+                            key=lambda d: (d.id.slug or "", d.id.workspace or "")):
+                href = f"workspaces/{d.id.workspace}/knowledge/{d.id.slug}.md"
+                desc = d.description or d.title or ""
+                suffix = f" - {desc}" if desc else ""
+                lines.append(f"- [{d.id.slug} ({d.id.workspace})]({href}){suffix}")
     lines.append("")
     (out_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
 
