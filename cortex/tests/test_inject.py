@@ -1,0 +1,47 @@
+from cortex import cli, inject
+from pathlib import Path
+
+
+def _enable(kbhome, ws="ws-a"):
+    (kbhome / ".work/workspaces" / ws / ".inject-enabled").write_text("on\n")
+
+
+def _mk_knowledge(kbhome, slug, typ, desc, ws="ws-a"):
+    kd = kbhome / ".work/workspaces" / ws / "knowledge"
+    kd.mkdir(parents=True, exist_ok=True)
+    (kd / f"{slug}.md").write_text(
+        f"---\ntype: {typ}\nauthor: agent\ncreated: 2026-01-01\n"
+        f"updated: 2026-01-01\ndescription: {desc}\n---\n\nbody\n")
+
+
+def _mk_workbench(kbhome, slug, desc, sess="sess-a", ws="ws-a"):
+    wd = kbhome / ".work/workspaces" / ws / "sessions" / sess / "workbench"
+    wd.mkdir(parents=True, exist_ok=True)
+    (wd / f"{slug}.md").write_text(
+        f"---\nauthor: agent\ncreated: 2026-01-01\nupdated: 2026-01-01\n"
+        f"description: {desc}\n---\n\nbody\n")
+
+
+def test_here_empty_when_sentinel_absent(kbhome, capsys):
+    _mk_knowledge(kbhome, "api-ver", "Decision", "why we pin v2")
+    assert cli.main(["inject", "here", "--workspace", "ws-a"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_here_empty_when_workspace_unresolved(kbhome, capsys):
+    assert cli.main(["inject", "here", "--workspace", "nope"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_here_renders_knowledge_and_workbench_when_enabled(kbhome, capsys):
+    _enable(kbhome)
+    _mk_knowledge(kbhome, "api-ver", "Decision", "why we pin v2")
+    _mk_workbench(kbhome, "pr-draft", "draft PR description")
+    assert cli.main(["inject", "here", "--workspace", "ws-a", "--session", "sess-a"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith('<tracking-work-index workspace="ws-a" session="sess-a">')
+    assert "## knowledge" in out
+    assert "api-ver [Decision] - why we pin v2" in out
+    assert "## workbench (sess-a)" in out
+    assert "pr-draft - draft PR description" in out
+    assert out.rstrip().endswith("</tracking-work-index>")

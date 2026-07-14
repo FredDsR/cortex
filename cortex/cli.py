@@ -9,6 +9,7 @@ import sys
 from cortex import kb
 from cortex import ingest
 from cortex import query
+from cortex import inject
 from cortex.errors import CortexError
 from cortex.store import StoreError
 
@@ -67,6 +68,15 @@ def build_parser() -> argparse.ArgumentParser:
     nb.add_argument("--session", default="")
     nb.add_argument("--kind", choices=["task", "knowledge", "workbench"], default="")
     nb.add_argument("--max", default="20")
+
+    ip = groups.add_parser("inject", help="Opt-in session-start injection")
+    icmds = ip.add_subparsers(dest="cmd", required=True)
+
+    here = icmds.add_parser("here", help="Render the injection block for this context")
+    here.add_argument("--format", choices=["text", "claude-code"], default="text")
+    here.add_argument("--workspace", default="")
+    here.add_argument("--session", default="")
+    here.add_argument("--max", default="100")
     return p
 
 
@@ -75,7 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
 # rewrite `--flag value` -> `--flag=value` (the "=" form accepts leading dashes),
 # matching the bash parser which stored $2 verbatim.
 _VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
-                "--description", "--body", "--body-from", "--from", "--only", "--max"}
+                "--description", "--body", "--body-from", "--from", "--only", "--max",
+                "--format", "--wire-hook", "--unwire-hook"}
 
 
 def _glue_flag_values(argv):
@@ -102,9 +113,14 @@ _QUERY_DISPATCH = {
     "neighbors": query.cmd_neighbors,
 }
 
+_INJECT_DISPATCH = {
+    "here": inject.cmd_here,
+}
+
 _GROUP_DISPATCH = {
     "kb": _KB_DISPATCH,
     "query": _QUERY_DISPATCH,
+    "inject": _INJECT_DISPATCH,
 }
 
 
