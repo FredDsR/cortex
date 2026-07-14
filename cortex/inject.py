@@ -12,6 +12,7 @@ docs/superpowers/specs/2026-07-14-optin-sessionstart-inject-design.md.
 from __future__ import annotations
 import json
 import os
+import shutil
 from pathlib import Path
 
 from cortex import frontmatter as fm
@@ -30,6 +31,10 @@ def _max_bytes() -> int:
     if raw.isdigit():
         return int(raw)
     return _DEFAULT_MAX_BYTES
+
+
+_CC_MATCHER = "startup|clear|compact"
+_CC_MARK = "inject here --format=claude-code"
 
 
 def _sentinel(ws_root: Path) -> Path:
@@ -146,6 +151,61 @@ class ClaudeCodeAdapter(Adapter):
             "additionalContext": block,
         }}
         return json.dumps(payload)
+
+    def _settings_path(self, home: Path, project_path: Path | None) -> Path:
+        base = project_path if project_path is not None else home
+        return Path(base) / ".claude" / "settings.json"
+
+    def _cortex_command(self) -> str:
+        exe = shutil.which("cortex") or str(Path.home() / ".work" / "bin" / "cortex")
+        return f"{exe} {_CC_MARK}"
+
+    def _load(self, path: Path) -> dict:
+        if not path.is_file():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8") or "{}")
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _entries(self, data: dict) -> list:
+        return data.setdefault("hooks", {}).setdefault("SessionStart", [])
+
+    def _is_ours(self, entry: dict) -> bool:
+        return any(_CC_MARK in h.get("command", "")
+                   for h in entry.get("hooks", []))
+
+    def wire(self, *, home: Path, project_path: Path | None = None) -> bool:
+        path = self._settings_path(home, project_path)
+        data = self._load(path)
+        entries = self._entries(data)
+        if any(self._is_ours(e) for e in entries):
+            return False
+        entries.append({
+            "matcher": _CC_MATCHER,
+            "hooks": [{"type": "command", "command": self._cortex_command()}],
+        })
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return True
+
+    def unwire(self, *, home: Path, project_path: Path | None = None) -> bool:
+        path = self._settings_path(home, project_path)
+        if not path.is_file():
+            return False
+        data = self._load(path)
+        entries = self._entries(data)
+        kept = [e for e in entries if not self._is_ours(e)]
+        if len(kept) == len(entries):
+            return False
+        data["hooks"]["SessionStart"] = kept
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return True
+
+    def is_wired(self, *, home: Path, project_path: Path | None = None) -> bool:
+        data = self._load(self._settings_path(home, project_path))
+        entries = data.get("hooks", {}).get("SessionStart", [])
+        return any(self._is_ours(e) for e in entries)
 
 
 ADAPTERS: dict[str, Adapter] = {a.name: a for a in (ClaudeCodeAdapter(),)}

@@ -144,3 +144,59 @@ def test_status_reports_sentinel(kbhome, capsys):
     out = capsys.readouterr().out
     assert "enabled" in out.lower()
     assert "ws-a" in out
+
+
+def _settings(kbhome):
+    return kbhome / ".claude/settings.json"
+
+
+def test_wire_creates_entry_and_is_idempotent(kbhome):
+    from cortex.inject import ClaudeCodeAdapter
+    a = ClaudeCodeAdapter()
+    assert a.wire(home=kbhome) is True
+    assert a.is_wired(home=kbhome) is True
+    data = json.loads(_settings(kbhome).read_text())
+    entries = data["hooks"]["SessionStart"]
+    ours = [e for e in entries
+            if any("inject here --format=claude-code" in h["command"]
+                   for h in e["hooks"])]
+    assert len(ours) == 1
+    assert ours[0]["matcher"] == "startup|clear|compact"
+    # Second wire is a no-op.
+    assert a.wire(home=kbhome) is False
+    data2 = json.loads(_settings(kbhome).read_text())
+    assert len(data2["hooks"]["SessionStart"]) == 1
+
+
+def test_wire_preserves_unrelated_hooks(kbhome):
+    from cortex.inject import ClaudeCodeAdapter
+    _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
+    _settings(kbhome).write_text(json.dumps({
+        "hooks": {"SessionStart": [
+            {"matcher": "startup",
+             "hooks": [{"type": "command", "command": "echo other"}]}]},
+        "model": "opus",
+    }))
+    a = ClaudeCodeAdapter()
+    a.wire(home=kbhome)
+    data = json.loads(_settings(kbhome).read_text())
+    assert data["model"] == "opus"                       # untouched
+    cmds = [h["command"] for e in data["hooks"]["SessionStart"] for h in e["hooks"]]
+    assert "echo other" in cmds                           # preserved
+    assert any("inject here --format=claude-code" in c for c in cmds)
+
+
+def test_unwire_removes_only_our_entry(kbhome):
+    from cortex.inject import ClaudeCodeAdapter
+    _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
+    _settings(kbhome).write_text(json.dumps({
+        "hooks": {"SessionStart": [
+            {"matcher": "startup",
+             "hooks": [{"type": "command", "command": "echo other"}]}]}}))
+    a = ClaudeCodeAdapter()
+    a.wire(home=kbhome)
+    assert a.unwire(home=kbhome) is True
+    assert a.is_wired(home=kbhome) is False
+    cmds = [h["command"] for e in json.loads(_settings(kbhome).read_text())
+            ["hooks"]["SessionStart"] for h in e["hooks"]]
+    assert cmds == ["echo other"]                         # ours gone, other kept
