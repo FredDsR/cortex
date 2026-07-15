@@ -23,18 +23,28 @@ fi
 
 git commit -q -m "$MSG"
 
-push() { git push -q origin HEAD 2>/tmp/twsync-push.err; }
+PUSH_ERR=/tmp/twsync-push.err
+push() { git push -q origin HEAD 2>"$PUSH_ERR"; }
 
 # Push. A rejection usually means the remote advanced (another device/session).
 if push; then
     exit 0
 fi
 
-# Rejected: rebase onto the advanced remote via pull.sh, then retry once.
-# pull.sh exit codes: 0 = rebased (SUMMARY.md may be auto-resolved to upstream),
-# 2 = task-file/other conflict to resolve by hand, other = unexpected. Its stdout
-# can carry the "SUMMARY.md regenerate-needed" signal, so forward it verbatim.
-pull_out=$(bash "$SCRIPTS_DIR/pull.sh") && pull_rc=0 || pull_rc=$?
+# Only a non-fast-forward rejection is fixable by rebasing. Auth failures,
+# protected branches, and pre-receive hook rejections are not — don't rewrite
+# history pointlessly; report and keep the commit local.
+if ! grep -qiE 'non-fast-forward|fetch first|\[rejected\]' "$PUSH_ERR"; then
+    echo "tracking-work-sync: push failed (not a fast-forward conflict); commit saved locally. See $PUSH_ERR" >&2
+    exit 0
+fi
+
+# Rebase onto the advanced remote via pull.sh, then retry once. Pass
+# SUMMARY_CONFLICT=surface: the SUMMARY.md we just committed is a fresh edit, so
+# a conflict on it must be surfaced (exit 2), not auto-resolved to upstream.
+# pull.sh exit codes: 0 = rebased cleanly, 2 = conflict to resolve by hand,
+# other = unexpected. Forward any stdout it produces verbatim.
+pull_out=$(SUMMARY_CONFLICT=surface bash "$SCRIPTS_DIR/pull.sh") && pull_rc=0 || pull_rc=$?
 [[ -n "$pull_out" ]] && printf '%s\n' "$pull_out"
 
 if [[ "$pull_rc" -ne 0 ]]; then
@@ -43,7 +53,7 @@ if [[ "$pull_rc" -ne 0 ]]; then
 fi
 
 if ! push; then
-    echo "tracking-work-sync: push still failing after rebase; commit saved locally. See /tmp/twsync-push.err" >&2
+    echo "tracking-work-sync: push still failing; commit saved locally. See $PUSH_ERR" >&2
     exit 0
 fi
 
