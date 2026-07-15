@@ -65,4 +65,61 @@ changed=$(git -C "$tmp4/.work" show --name-only --format= HEAD | sort | tr '\n' 
 [[ "$changed" != *".meta"* ]] || { echo "FAIL: .meta leaked"; exit 1; }
 cleanup_test_home "$tmp4"
 
+# Advance the remote from a throwaway second clone. Usage:
+#   advance_remote "$home_dir" '<bash using $other as the clone path>'
+advance_remote() {
+    local home_dir="$1" frag="$2"
+    local other="$home_dir/other"
+    rm -rf "$other"
+    git clone -q "$home_dir/remote.git" "$other"
+    git -C "$other" config user.email other@example.com
+    git -C "$other" config user.name other
+    bash -c "set -e; other='$other'; $frag"
+    rm -rf "$other"
+}
+
+# Case 5: remote advanced, non-conflicting local change → rebase + retry, push succeeds
+tmp5="$(make_test_home)"
+setup_enabled_repo "$tmp5"
+advance_remote "$tmp5" '
+echo "from other" > "$other/other.md"
+git -C "$other" add other.md
+git -C "$other" commit -q -m "other advances remote"
+git -C "$other" push -q
+'
+echo "local change" > "$tmp5/.work/local.md"
+HOME="$tmp5" bash "$SCRIPT" "track: local after remote advanced"
+remote_subjects="$(git --git-dir "$tmp5/remote.git" log --format=%s | tr '\n' '|')"
+[[ "$remote_subjects" == *"track: local after remote advanced"* ]] || \
+    { echo "FAIL: local commit not pushed after rebase" >&2; exit 1; }
+[[ "$remote_subjects" == *"other advances remote"* ]] || \
+    { echo "FAIL: remote commit lost after rebase" >&2; exit 1; }
+cleanup_test_home "$tmp5"
+
+# Case 6: remote advanced with a conflicting SUMMARY.md edit → surfaced, NOT
+# clobbered, commit stays local, remote unchanged, exit 0 (commit-safe-local)
+tmp6="$(make_test_home)"
+setup_enabled_repo "$tmp6"
+mkdir -p "$tmp6/.work/ws/s"
+echo "shared" > "$tmp6/.work/ws/s/SUMMARY.md"
+git -C "$tmp6/.work" add .
+git -C "$tmp6/.work" commit -q -m "seed summary"
+git -C "$tmp6/.work" push -q
+advance_remote "$tmp6" '
+echo "remote summary" > "$other/ws/s/SUMMARY.md"
+git -C "$other" commit -q -am "remote summary edit"
+git -C "$other" push -q
+'
+echo "local summary" > "$tmp6/.work/ws/s/SUMMARY.md"
+set +e
+out6="$(HOME="$tmp6" bash "$SCRIPT" "track: local summary edit" 2>&1)"; code6=$?
+set -e
+assert_eq "0" "$code6" "commit path stays commit-safe-local on conflict"
+assert_eq "local summary" "$(cat "$tmp6/.work/ws/s/SUMMARY.md")" "local SUMMARY must not be clobbered"
+remote_top="$(git --git-dir "$tmp6/remote.git" log -1 --format=%s)"
+assert_eq "remote summary edit" "$remote_top" "local commit must not reach remote on conflict"
+echo "$out6" | grep -q "SUMMARY.md" || { echo "FAIL: SUMMARY conflict not surfaced: $out6" >&2; exit 1; }
+[[ ! -d "$tmp6/.work/.git/rebase-merge" ]] || { echo "FAIL: rebase left in progress" >&2; exit 1; }
+cleanup_test_home "$tmp6"
+
 echo "test_commit_push: PASS"
