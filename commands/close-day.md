@@ -14,7 +14,7 @@ Follow that routine exactly:
    updates and any knowledge notes worth capturing, reconciled against what's
    already recorded.
 4. On my confirmation, write the task/SUMMARY updates, create/update knowledge
-   notes via `cortex kb`, run `commit_push.sh`, and sign off with the day-aware
+   notes via `cortex kb`, run `cortex sync push`, and sign off with the day-aware
    greeting ("see you tomorrow" / "see you Monday").
 
 Do NOT archive or close the session — it stays active for tomorrow.

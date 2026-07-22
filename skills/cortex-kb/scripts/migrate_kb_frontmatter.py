@@ -103,7 +103,7 @@ def _iter_docs(root: Path):
 
 def main(argv):
     ap = argparse.ArgumentParser(prog="migrate_kb_frontmatter")
-    ap.add_argument("--root", default=str(Path.home() / ".work" / "workspaces"))
+    ap.add_argument("--root", default=str(Path.home() / ".cortex" / "workspaces"))
     ap.add_argument("--write", action="store_true")
     args = ap.parse_args(argv)
     root = Path(args.root)

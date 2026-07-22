@@ -4,7 +4,7 @@
 #
 #   WORKSPACE\t<slug>
 #   SESSION_ID\t<id>\t<source>
-#   SYNC\t<state>          # ok | regenerate-needed | not-installed | disabled | error rc=<n>
+#   SYNC\t<state>          # ok | regenerate-needed | conflict | not-installed | error rc=<n>
 #   SESSIONS               # divider
 #   <list_sessions.sh TSV rows: origin\tslug\tmtime\tactive-ids>
 #
@@ -19,9 +19,10 @@ cwd="$(cd "$cwd" && pwd)"
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 
 # Legacy store notice: the store moved from ~/.work to ~/.cortex during the
-# cortex rebrand. If the old store still exists and the new one does not, the
-# user has not migrated yet.
-if [ -d "$HOME/.work" ] && [ ! -d "$HOME/.cortex" ]; then
+# cortex rebrand. install.sh creates ~/.cortex/bin, so the presence of ~/.cortex
+# alone does not mean the data moved. Gate on the workspaces/ dir instead: if the
+# old store still has workspaces and the new one does not, migration is pending.
+if [ -d "$HOME/.work/workspaces" ] && [ ! -d "$HOME/.cortex/workspaces" ]; then
     echo "cortex: legacy ~/.work store detected. Run: cortex migrate-store --write" >&2
 fi
 
@@ -42,10 +43,20 @@ rm -f "$src_tmp"
 bash "$script_dir/sweep_active.sh" "$HOME/.cortex/workspaces/$slug" 7 >/dev/null 2>&1 || true
 
 # 4. Conditionally pull sync via the cortex CLI. `cortex sync pull` self-gates
-#    when sync is disabled or unconfigured (exits 0 with no output).
-sync_state="not-installed"
+#    when sync is disabled or unconfigured (exits 0 with no output). Resolve the
+#    bin from PATH, else the store bin dir (~/.cortex/bin or legacy ~/.work/bin),
+#    so an unconfigured PATH does not silently skip the pull.
+cortex_bin=""
 if command -v cortex >/dev/null 2>&1; then
-  if pull_out="$(cortex sync pull 2>&1)"; then
+  cortex_bin="cortex"
+elif [ -x "$HOME/.cortex/bin/cortex" ]; then
+  cortex_bin="$HOME/.cortex/bin/cortex"
+elif [ -x "$HOME/.work/bin/cortex" ]; then
+  cortex_bin="$HOME/.work/bin/cortex"
+fi
+sync_state="not-installed"
+if [ -n "$cortex_bin" ]; then
+  if pull_out="$("$cortex_bin" sync pull 2>&1)"; then
     if echo "$pull_out" | grep -q "regenerate-needed"; then
       sync_state="regenerate-needed"
     else

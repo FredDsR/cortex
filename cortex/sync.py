@@ -36,6 +36,15 @@ def _err(msg: str) -> None:
     print(msg, file=sys.stderr)
 
 
+def _err_detail(text: str) -> None:
+    """Echo captured git stderr, indented, so failures stay diagnosable."""
+    text = (text or "").strip()
+    if not text:
+        return
+    for line in text.splitlines():
+        print("  " + line, file=sys.stderr)
+
+
 def is_enabled(home) -> bool:
     wd = _work_dir(home)
     # No store on disk -> not enabled (git -C on a missing dir would raise).
@@ -76,8 +85,11 @@ def push(msg: str, *, home) -> int:
     stderr = r.stderr or ""
     if not any(s in stderr.lower() for s in
                ("non-fast-forward", "fetch first", "[rejected]")):
+        # Auth failure, protected branch, pre-receive hook, etc. Surface git's
+        # own diagnostic so the stuck-local commit is debuggable.
         _err("cortex-sync: push failed (not a fast-forward conflict); "
              "commit saved locally.")
+        _err_detail(stderr)
         return 0
 
     # Rebase onto the advanced remote, then retry once. surface mode: the
@@ -89,8 +101,10 @@ def push(msg: str, *, home) -> int:
              f"(rc={pull_rc}); commit saved locally.")
         return 0
 
-    if _push().returncode != 0:
+    r2 = _push()
+    if r2.returncode != 0:
         _err("cortex-sync: push still failing; commit saved locally.")
+        _err_detail(r2.stderr or "")
         return 0
     return 0
 
@@ -218,6 +232,33 @@ def setup(mode: str, *, home, url: str | None = None, name: str = "work-tracking
     raise SystemExit(f"setup: unknown mode '{mode}'")
 
 
+def interactive_setup(home) -> int:
+    """No-flag `cortex sync setup`: prompt clone / create / skip, matching the
+    former setup.sh menu (including <owner>/<repo> shorthand normalization)."""
+    print("cortex-sync setup")
+    print("-----------------")
+    print("1) Clone an existing sync repo (for a second/Nth device)")
+    print("2) Create a new sync repo (first device)")
+    print("3) Skip (local only)")
+    print()
+    try:
+        choice = input("Choose [1/2/3]: ").strip()
+        if choice == "1":
+            url = input("Clone URL or <owner>/<repo>: ").strip()
+            if "://" not in url and "@" not in url:
+                url = f"https://github.com/{url}.git"
+            return setup("clone", home=home, url=url)
+        if choice == "2":
+            name = input("Repo name [work-tracking]: ").strip() or "work-tracking"
+            return setup("init", home=home, name=name)
+        if choice == "3":
+            return setup("skip", home=home)
+    except EOFError:
+        raise SystemExit("setup: no input on stdin; "
+                         "pass --skip / --clone URL / --init [--name N] explicitly")
+    raise SystemExit("setup: unknown choice (expected 1/2/3)")
+
+
 # --- CLI wrappers ----------------------------------------------------------
 
 def cmd_push(args) -> int:
@@ -247,4 +288,5 @@ def cmd_setup(args) -> int:
         return setup("clone", home=Path.home(), url=args.clone)
     if getattr(args, "init", False):
         return setup("init", home=Path.home(), name=getattr(args, "name", None) or "work-tracking")
-    raise SystemExit("usage: cortex sync setup [--skip | --clone URL | --init [--name N]]")
+    # No flags: fall back to the interactive menu (matches the docs).
+    return interactive_setup(Path.home())

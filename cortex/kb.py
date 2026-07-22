@@ -1,6 +1,6 @@
 """kb commands (new / update / index / ingest) for the cortex engine.
 
-Ports skills/cortex-tracking-kb/bin/work-kb onto the shared core
+Ports the former skills/cortex-kb bash `work-kb` bin onto the shared core
 (cortex.frontmatter + cortex.store). Behavior-preserving: same frontmatter
 bytes, exit codes, and messages.
 """
