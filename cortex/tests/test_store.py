@@ -3,7 +3,7 @@ from cortex import store
 
 
 def _mk_ws(home, name, active=None, sessions=()):
-    ws = home / ".work" / "workspaces" / name
+    ws = home / ".cortex" / "workspaces" / name
     (ws / "sessions").mkdir(parents=True, exist_ok=True)
     for s in sessions:
         (ws / "sessions" / s).mkdir(parents=True, exist_ok=True)
@@ -52,10 +52,10 @@ def test_resolve_session_explicit_and_active_and_ambiguous(tmp_path):
 
 def test_find_local_store_walks_up_within_home(tmp_path):
     repo = tmp_path / "proj"
-    (repo / ".work").mkdir(parents=True)
+    (repo / ".cortex").mkdir(parents=True)
     deep = repo / "a" / "b"
     deep.mkdir(parents=True)
-    assert store.find_local_store(deep, home=tmp_path) == repo / ".work"
+    assert store.find_local_store(deep, home=tmp_path) == repo / ".cortex"
     assert store.find_local_store(tmp_path, home=tmp_path) is None
 
 

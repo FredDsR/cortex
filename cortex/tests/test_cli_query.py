@@ -5,9 +5,9 @@ from cortex import cli as cortex_cli
 
 
 def _home_with_fixtures(tmp_path, monkeypatch):
-    """Build $HOME/.work/workspaces/ from the shared fixture tree."""
+    """Build $HOME/.cortex/workspaces/ from the shared fixture tree."""
     from cortex.conftest import FIXTURES
-    root = tmp_path / ".work" / "workspaces"
+    root = tmp_path / ".cortex" / "workspaces"
     root.mkdir(parents=True)
     for sub in ("demo-ws", "other-ws", "kb-ghosts-ws", "authored-ws"):
         shutil.copytree(FIXTURES / sub, root / sub)
@@ -43,7 +43,7 @@ def test_unknown_slug_exits_1(tmp_path, monkeypatch, capsys):
 
 def test_ambiguous_slug_lists_candidates(tmp_path, monkeypatch, capsys):
     # Two workspaces with the same task slug -> ambiguous without narrowing.
-    root = tmp_path / ".work" / "workspaces"
+    root = tmp_path / ".cortex" / "workspaces"
     for ws in ("wsx", "wsy"):
         d = root / ws / "sessions" / "s1" / "tasks"
         d.mkdir(parents=True)
@@ -69,7 +69,7 @@ def test_bad_max_exits_1(tmp_path, monkeypatch, capsys):
 
 def test_kind_disambiguates_cross_kind_collision(tmp_path, monkeypatch, capsys):
     # A task and a knowledge doc share slug "dup" in the same workspace.
-    ws = tmp_path / ".work" / "workspaces" / "wsz"
+    ws = tmp_path / ".cortex" / "workspaces" / "wsz"
     (ws / "knowledge").mkdir(parents=True)
     (ws / "sessions" / "s1" / "tasks").mkdir(parents=True)
     (ws / "sessions" / "s1" / "SUMMARY.md").write_text(

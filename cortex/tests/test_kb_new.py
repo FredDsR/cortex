@@ -7,7 +7,7 @@ TODAY = datetime.date.today().isoformat()
 def test_new_knowledge_happy_path(kbhome, capsys):
     rc = cli.main(["kb", "new", "knowledge", "sample", "--body", "hello world"])
     assert rc == 0
-    path = kbhome / ".work/workspaces/ws-a/knowledge/sample.md"
+    path = kbhome / ".cortex/workspaces/ws-a/knowledge/sample.md"
     assert path.is_file()
     out = capsys.readouterr().out.strip()
     assert out == str(path)                       # prints the path
@@ -21,14 +21,14 @@ def test_new_knowledge_happy_path(kbhome, capsys):
 def test_new_workbench_uses_active_session(kbhome):
     rc = cli.main(["kb", "new", "workbench", "draft", "--body", "b"])
     assert rc == 0
-    assert (kbhome / ".work/workspaces/ws-a/sessions/sess-a/workbench/draft.md").is_file()
+    assert (kbhome / ".cortex/workspaces/ws-a/sessions/sess-a/workbench/draft.md").is_file()
 
 
 def test_new_fields_written_in_canonical_order(kbhome):
     cli.main(["kb", "new", "knowledge", "decided",
               "--title", "A decision", "--type", "Decision",
               "--description", "why we chose X", "--body", "body text"])
-    text = (kbhome / ".work/workspaces/ws-a/knowledge/decided.md").read_text()
+    text = (kbhome / ".cortex/workspaces/ws-a/knowledge/decided.md").read_text()
     assert text == (
         "---\n"
         "title: A decision\n"
@@ -44,6 +44,6 @@ def test_new_fields_written_in_canonical_order(kbhome):
 
 def test_new_plain_omits_optional_fields(kbhome):
     cli.main(["kb", "new", "knowledge", "plain", "--body", "hi"])
-    text = (kbhome / ".work/workspaces/ws-a/knowledge/plain.md").read_text()
+    text = (kbhome / ".cortex/workspaces/ws-a/knowledge/plain.md").read_text()
     assert "title:" not in text and "type:" not in text and "description:" not in text
     assert f"updated: {TODAY}" in text

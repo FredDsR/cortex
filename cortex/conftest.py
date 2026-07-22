@@ -10,10 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 @pytest.fixture
 def kbhome(tmp_path, monkeypatch):
-    """A temp HOME with ~/.work/workspaces/ws-a + an active session sess-a
+    """A temp HOME with ~/.cortex/workspaces/ws-a + an active session sess-a
     (mirrors the bash tests' make_test_home)."""
     home = tmp_path
-    ws = home / ".work" / "workspaces" / "ws-a"
+    ws = home / ".cortex" / "workspaces" / "ws-a"
     (ws / "sessions" / "sess-a" / "workbench").mkdir(parents=True)
     (ws / "sessions" / "sess-a" / "tasks").mkdir()
     (ws / ".active.testid").write_text("sess-a\n")

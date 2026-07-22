@@ -5,11 +5,11 @@ from pathlib import Path
 
 
 def _enable(kbhome, ws="ws-a"):
-    (kbhome / ".work/workspaces" / ws / ".inject-enabled").write_text("on\n")
+    (kbhome / ".cortex/workspaces" / ws / ".inject-enabled").write_text("on\n")
 
 
 def _mk_knowledge(kbhome, slug, typ, desc, ws="ws-a"):
-    kd = kbhome / ".work/workspaces" / ws / "knowledge"
+    kd = kbhome / ".cortex/workspaces" / ws / "knowledge"
     kd.mkdir(parents=True, exist_ok=True)
     (kd / f"{slug}.md").write_text(
         f"---\ntype: {typ}\nauthor: agent\ncreated: 2026-01-01\n"
@@ -17,7 +17,7 @@ def _mk_knowledge(kbhome, slug, typ, desc, ws="ws-a"):
 
 
 def _mk_workbench(kbhome, slug, desc, sess="sess-a", ws="ws-a"):
-    wd = kbhome / ".work/workspaces" / ws / "sessions" / sess / "workbench"
+    wd = kbhome / ".cortex/workspaces" / ws / "sessions" / sess / "workbench"
     wd.mkdir(parents=True, exist_ok=True)
     (wd / f"{slug}.md").write_text(
         f"---\nauthor: agent\ncreated: 2026-01-01\nupdated: 2026-01-01\n"
@@ -36,7 +36,7 @@ def test_here_empty_when_workspace_unresolved(kbhome, capsys):
 
 
 def _mk_task(kbhome, slug, status, title, sess="sess-a", ws="ws-a"):
-    td = kbhome / ".work/workspaces" / ws / "sessions" / sess / "tasks"
+    td = kbhome / ".cortex/workspaces" / ws / "sessions" / sess / "tasks"
     td.mkdir(parents=True, exist_ok=True)
     (td / f"{slug}.md").write_text(
         f"---\nslug: {slug}\nstatus: {status}\nsession: {sess}\n---\n\n# {title}\n\nbody\n")
@@ -48,12 +48,12 @@ def test_here_renders_knowledge_and_workbench_when_enabled(kbhome, capsys):
     _mk_workbench(kbhome, "pr-draft", "draft PR description")
     assert cli.main(["inject", "here", "--workspace", "ws-a", "--session", "sess-a"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith('<tracking-work-index workspace="ws-a" session="sess-a">')
+    assert out.startswith('<cortex-index workspace="ws-a" session="sess-a">')
     assert "## knowledge" in out
     assert "api-ver [Decision] - why we pin v2" in out
     assert "## workbench (sess-a)" in out
     assert "pr-draft - draft PR description" in out
-    assert out.rstrip().endswith("</tracking-work-index>")
+    assert out.rstrip().endswith("</cortex-index>")
 
 
 def test_here_open_tasks_section(kbhome, capsys):
@@ -87,12 +87,12 @@ def test_here_byte_ceiling_truncates(kbhome, capsys, monkeypatch):
     out = capsys.readouterr().out
     assert len(out.encode("utf-8")) <= 700          # ceiling + tag/notice slack
     assert "truncated" in out
-    assert out.rstrip().endswith("</tracking-work-index>")
+    assert out.rstrip().endswith("</cortex-index>")
 
 
 def test_here_silent_on_corrupt_file(kbhome, capsys, monkeypatch):
     _enable(kbhome)
-    kd = kbhome / ".work/workspaces/ws-a/knowledge"
+    kd = kbhome / ".cortex/workspaces/ws-a/knowledge"
     kd.mkdir(parents=True, exist_ok=True)
     (kd / "bad.md").write_bytes(b"\xff\xfe not utf8 \x00")
 
@@ -120,7 +120,7 @@ def test_here_claude_code_empty_when_gated_off(kbhome, capsys):
 
 
 def _sentinel_path(kbhome, ws="ws-a"):
-    return kbhome / ".work/workspaces" / ws / ".inject-enabled"
+    return kbhome / ".cortex/workspaces" / ws / ".inject-enabled"
 
 
 def test_enable_creates_sentinel(kbhome, capsys):
@@ -225,7 +225,7 @@ def test_wire_command_uses_passed_home_when_cortex_not_on_path(kbhome, monkeypat
     a = ClaudeCodeAdapter()
     a.wire(home=kbhome)
     cmd = json.loads(_settings(kbhome).read_text())["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    assert cmd.startswith(str(kbhome / ".work" / "bin" / "cortex"))
+    assert cmd.startswith(str(kbhome / ".cortex" / "bin" / "cortex"))
 
 
 def test_here_bad_max_errors(kbhome):

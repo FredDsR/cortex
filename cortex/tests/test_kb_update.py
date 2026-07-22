@@ -5,7 +5,7 @@ TODAY = datetime.date.today().isoformat()
 
 
 def _seed(kbhome):
-    path = kbhome / ".work/workspaces/ws-a/knowledge/note.md"
+    path = kbhome / ".cortex/workspaces/ws-a/knowledge/note.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "---\ntitle: Original\ntype: Reference\nauthor: agent\n"

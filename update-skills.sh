@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update the tracking-work skills bundle: pull latest from origin, then re-run
+# Update the cortex-tracking skills bundle: pull latest from origin, then re-run
 # install.sh so any new skill folder, harness, or vendored asset is picked up.
 #
 # Usage:

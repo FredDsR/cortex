@@ -10,6 +10,8 @@ from cortex import kb
 from cortex import ingest
 from cortex import query
 from cortex import inject
+from cortex import migrate_store
+from cortex import sync
 from cortex.errors import CortexError
 from cortex.store import StoreError
 
@@ -88,6 +90,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = icmds.add_parser("status", help="Show sentinel state + wired harnesses")
     st.add_argument("--workspace", default="")
+
+    msp = groups.add_parser("migrate-store",
+                            help="Move the store from ~/.work to ~/.cortex (dry-run default)")
+    msp.add_argument("--write", action="store_true")
+
+    syp = groups.add_parser("sync", help="Sync the ~/.cortex store to a private GitHub repo")
+    scmds = syp.add_subparsers(dest="cmd", required=True)
+    pushp = scmds.add_parser("push", help="Stage, commit, and push the store")
+    pushp.add_argument("message")
+    pullp = scmds.add_parser("pull", help="Pull --rebase the store")
+    pullp.add_argument("--summary-conflict", dest="summary_conflict",
+                       choices=["resolve", "surface"], default="resolve")
+    setupp = scmds.add_parser("setup", help="Bootstrap sync (skip / clone / init)")
+    setupp.add_argument("--skip", action="store_true")
+    setupp.add_argument("--clone", default="")
+    setupp.add_argument("--init", action="store_true")
+    setupp.add_argument("--name", default="")
+    scmds.add_parser("status", help="Show sync state (enabled + origin)")
     return p
 
 
@@ -131,10 +151,18 @@ _INJECT_DISPATCH = {
     "status": inject.cmd_status,
 }
 
+_SYNC_DISPATCH = {
+    "push": sync.cmd_push,
+    "pull": sync.cmd_pull,
+    "setup": sync.cmd_setup,
+    "status": sync.cmd_status,
+}
+
 _GROUP_DISPATCH = {
     "kb": _KB_DISPATCH,
     "query": _QUERY_DISPATCH,
     "inject": _INJECT_DISPATCH,
+    "sync": _SYNC_DISPATCH,
 }
 
 
@@ -164,6 +192,8 @@ def main(argv=None) -> int:
         args = parser.parse_args(_glue_flag_values(argv))
     except SystemExit as e:               # argparse usage error -> exit 2
         return _exit_code(e)
+    if args.group == "migrate-store":
+        return migrate_store.cmd_migrate_store(args)
     try:
         dispatch = _GROUP_DISPATCH.get(args.group)
         if dispatch is not None:

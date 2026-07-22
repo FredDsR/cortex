@@ -104,8 +104,8 @@ def render_block(*, home: Path, cwd: Path, workspace: str, session: str,
             lines += tasks
 
     attrs = f' workspace="{ws_root.name}"' + (f' session="{sess}"' if sess else "")
-    open_tag = f"<tracking-work-index{attrs}>"
-    close_tag = "</tracking-work-index>"
+    open_tag = f"<cortex-index{attrs}>"
+    close_tag = "</cortex-index>"
 
     ceiling = _max_bytes()
     notice_cost = len((_TRUNCATE_NOTICE + "\n").encode("utf-8"))
@@ -162,9 +162,9 @@ class ClaudeCodeAdapter(Adapter):
         return Path(base) / ".claude" / "settings.json"
 
     def _cortex_command(self, home: Path) -> str:
-        # The cortex bin lives under the store (<home>/.work/bin), not the
+        # The cortex bin lives under the store (<home>/.cortex/bin), not the
         # project, so the fallback is derived from the passed home.
-        exe = shutil.which("cortex") or str(Path(home) / ".work" / "bin" / "cortex")
+        exe = shutil.which("cortex") or str(Path(home) / ".cortex" / "bin" / "cortex")
         return f"{exe} {_CC_MARK}"
 
     def _load(self, path: Path) -> dict:

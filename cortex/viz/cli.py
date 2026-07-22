@@ -11,13 +11,13 @@ from .generator import build as build_world
 from .serve import serve, _make_server
 
 
-DEFAULT_WORKSPACES_ROOT = Path.home() / ".work" / "workspaces"
-DEFAULT_OUT_DIR = Path.home() / ".cache" / "work-viz" / "out"
+DEFAULT_WORKSPACES_ROOT = Path.home() / ".cortex" / "workspaces"
+DEFAULT_OUT_DIR = Path.home() / ".cache" / "cortex" / "out"
 
 
 def _build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cortex viz",
-                                 description="Static browser-based viewer for ~/.work/.")
+                                 description="Static browser-based viewer for ~/.cortex/.")
     sub = p.add_subparsers(dest="cmd")
 
     b = sub.add_parser("build", help="Build the static site.")

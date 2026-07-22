@@ -44,7 +44,7 @@ def test_build_emits_root_index(workspaces_root, tmp_path):
     world = parse_world(workspaces_root)
     build(world, out)
     root_idx = (out / "index.md").read_text()
-    assert "# Fred's Work Tracking" in root_idx
+    assert "# Your Cortex" in root_idx
     assert "demo-ws" in root_idx
     assert "other-ws" in root_idx
 

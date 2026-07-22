@@ -1,6 +1,11 @@
 :root {
+  /* cortex brand core */
+  --brand-indigo: #4f46e5;
+  --brand-cyan: #2fa6c9;
+  --brand-teal: #14b8a6;
+
   --status-open: #8a929c;
-  --status-in-progress: #1f7ae0;
+  --status-in-progress: #4f46e5;
   --status-blocked: #e53935;
   --status-resolved: #2e9358;
   --status-unknown: #c8ccd1;
@@ -8,8 +13,12 @@
   --bg: #fbfcfd;
   --surface: #ffffff;
   --border: #e3e6eb;
-  --accent: #1f7ae0;
-  --accent-bg: #eef4fb;
+  --accent: #4f46e5;
+  --accent-bg: #eef0fe;
+
+  /* content links: fresh (unseen) vs remembered (seen) */
+  --link: #0e7490;
+  --link-seen: #6366f1;
 
   --text-primary: #1f2933;
   --text-muted: #5a6573;
@@ -19,8 +28,10 @@ body.dark {
   --bg: #11151c;
   --surface: #1a212c;
   --border: #2a3340;
-  --accent: #4a9eff;
-  --accent-bg: #1e2a3d;
+  --accent: #818cf8;
+  --accent-bg: #262b45;
+  --link: #38bdf8;
+  --link-seen: #a5b4fc;
 
   --text-primary: #e6e9ef;
   --text-muted: #8a929c;
@@ -52,6 +63,9 @@ body { display: flex; flex-direction: column; height: 100vh; }
   align-items: center;
   gap: 16px;
 }
+.appbar-logo { flex: 0 0 auto; display: flex; align-items: center; margin-right: 12px; }
+.appbar-logo svg { height: 34px; width: 34px; display: block; }
+
 .appbar-title { flex: 1 1 auto; min-width: 0; }
 
 /* Light-switch-style theme toggle */
@@ -354,8 +368,9 @@ li.collapsed > .tree-row > .tree-arrow { transform: rotate(-90deg); }
   font-size: 12.5px;
   line-height: 1.45;
 }
-#content a { color: var(--accent); text-decoration: none; }
+#content a { color: var(--link); text-decoration: none; }
 #content a:hover { text-decoration: underline; }
+#content a.seen { color: var(--link-seen); }
 #content a.wikilink { font-style: italic; }
 #content .wikilink-broken {
   color: var(--text-muted);

@@ -1,0 +1,6 @@
+# cortex device-local files, not synced
+.active.*
+.meta
+
+# cortex-viz output (regenerable via cortex viz + install.sh)
+viz/

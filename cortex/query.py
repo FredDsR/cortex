@@ -160,7 +160,7 @@ def _print_result(res: NeighborResult) -> None:
 
 
 def cmd_neighbors(args) -> int:
-    root = Path.home() / ".work" / "workspaces"
+    root = Path.home() / ".cortex" / "workspaces"
     world = parse_world(root, include_archive=True)
     matches = find_by_slug(world, args.slug,
                            workspace=args.workspace or None,

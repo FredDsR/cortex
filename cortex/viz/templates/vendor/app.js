@@ -4,6 +4,19 @@
   var STORE = { cy: null, payload: null, layout: 'concentric-hier',
                 rootPrefix: '', contentBase: '', wikilinkIndex: new Map(),
                 selectedId: null };
+
+  // Session-persistent set of content docs the user has opened, so links to
+  // them render "seen" (a distinct color) instead of everything looking fresh
+  // or, with a brand-indigo accent, everything looking already-visited.
+  var SEEN = new Set();
+  try {
+    (JSON.parse(localStorage.getItem('cortex-seen')) || []).forEach(function (p) { SEEN.add(p); });
+  } catch (e) { /* localStorage unavailable (e.g. file://): seen-state is in-memory only */ }
+  function rememberSeen(path) {
+    if (!path) return;
+    SEEN.add(path);
+    try { localStorage.setItem('cortex-seen', JSON.stringify(Array.from(SEEN))); } catch (e) {}
+  }
   var KIND_RADIUS = { root: 0, workspace: 320, session: 600, task: 1400,
                       knowledge: 460, workbench: 1050 };
   // Angular weight per leaf-kind. Knowledge / workbench leaves count for
@@ -474,7 +487,7 @@
     // share a soft pastel, all sessions in a workspace are distinct hues, and
     // tasks of different sessions in the same workspace are visually grouped.
     var dark = isDark();
-    if (node.kind === 'root') return dark ? '#5a6884' : '#1f2933';
+    if (node.kind === 'root') return dark ? '#818cf8' : '#4f46e5';
     var key;
     if (node.kind === 'workspace') key = node.id.replace(/\/$/, '');
     else key = (node.id.split('/').slice(0, 2).join('/'));
@@ -504,7 +517,7 @@
         })
       .selector('node[kind="root"]')
         .style({ 'color': '#ffffff', 'border-width': 0,
-                 'background-color': dark ? '#5a6884' : '#1f2933' })
+                 'background-color': dark ? '#818cf8' : '#4f46e5' })
       .selector('edge[kind="contains"]')
         .style({ 'line-color': dark ? '#6b7790' : '#8a929c',
                  'opacity': dark ? 0.75 : 0.7 })
@@ -975,12 +988,34 @@
     });
   }
 
+  // Resolve an in-pane <a href> to a site-root-relative .md path (the same key
+  // loadContent uses), or null for external / non-doc links. Shared by the
+  // click handler and the seen-link marker so both agree on identity.
+  function contentLinkKey(href) {
+    if (!href || isExternalUrl(href)) return null;
+    var resolved;
+    try {
+      resolved = new URL(href, new URL(STORE.contentBase, window.location.href)).pathname;
+    } catch (e) { return null; }
+    if (!/\.md$/.test(resolved)) return null;
+    var rootAbs = new URL(STORE.rootPrefix || './', window.location.href).pathname;
+    return resolved.indexOf(rootAbs) === 0 ? resolved.slice(rootAbs.length) : resolved;
+  }
+
+  function markSeenLinks(pane) {
+    pane.querySelectorAll('a[href]').forEach(function (a) {
+      var key = contentLinkKey(a.getAttribute('href'));
+      if (key && SEEN.has(key)) a.classList.add('seen');
+    });
+  }
+
   function loadContent(path) {
     var pane = document.getElementById('content');
     removeStalePickers();
     var url = resolveContent(path);
     STORE.contentBase = url.replace(/[^/]+$/, ''); // dirname + trailing slash
     STORE.currentContentPath = path;
+    rememberSeen(path);
     setSelected(idFromContentPath(path));
     fetch(url).then(function (r) {
       if (!r.ok) throw new Error('Could not load ' + url + ': ' + r.status);
@@ -988,6 +1023,7 @@
     }).then(function (txt) {
       var body = stripFrontmatter(txt);
       pane.innerHTML = renderWikilinks(marked.parse(body));
+      markSeenLinks(pane);
       maybeAddEditButton(path);
     }).catch(function (err) {
       pane.innerHTML = '<p style="color:#a00">' + err.message + '</p>';
@@ -1262,21 +1298,13 @@
     pane.addEventListener('click', function (ev) {
       var a = ev.target.closest('a[href]');
       if (!a || !pane.contains(a)) return;
-      var href = a.getAttribute('href');
-      if (!href || isExternalUrl(href)) return;
-      // Resolve href against the document the pane currently shows.
-      var resolved;
-      try {
-        resolved = new URL(href, new URL(STORE.contentBase, window.location.href)).pathname;
-      } catch (e) { return; }
-      if (/\.md$/.test(resolved)) {
+      // contentLinkKey returns non-null only for in-site .md docs; those load
+      // in-pane. .html / external links navigate natively (full reload).
+      var key = contentLinkKey(a.getAttribute('href'));
+      if (key) {
         ev.preventDefault();
-        // Convert back to a path relative to the site root for loadContent.
-        var rootAbs = new URL(STORE.rootPrefix || './', window.location.href).pathname;
-        var relToRoot = resolved.indexOf(rootAbs) === 0 ? resolved.slice(rootAbs.length) : resolved;
-        loadContent(relToRoot);
+        loadContent(key);
       }
-      // .html links navigate natively (full reload to that shell).
     });
   }
 
