@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/cortex-logo.svg" alt="cortex" width="340">
+</p>
+
 # cortex
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Gemini CLI.
