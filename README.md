@@ -2,25 +2,25 @@
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Gemini CLI.
 
-One CLI fronts the whole family: **`cortex`** (`cortex kb ...` to author knowledge, `cortex viz ...` to visualize, `cortex query neighbors <slug>` to explore a doc's links). All three verbs run through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired. Internally the skills are still named `tracking-work-*`.
+One CLI fronts the whole family: **`cortex`** (`cortex kb ...` to author knowledge, `cortex viz ...` to visualize, `cortex query neighbors <slug>` to explore a doc's links). All three verbs run through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired. Internally the skills are still named `cortex-tracking-*`.
 
-> **Migration:** the former `work-kb` / `work-viz` bins are replaced by `cortex kb` / `cortex viz`. Re-run `install.sh` to pick up the `cortex` bin (the old bins are removed). To bring an existing `~/.work/` store up to the current knowledge frontmatter, run `skills/tracking-work-kb/scripts/migrate_kb_frontmatter.py` (dry-run by default; `--write` to apply).
+> **Migration:** the former `work-kb` / `work-viz` bins are replaced by `cortex kb` / `cortex viz`. Re-run `install.sh` to pick up the `cortex` bin (the old bins are removed). To bring an existing `~/.work/` store up to the current knowledge frontmatter, run `skills/cortex-kb/scripts/migrate_kb_frontmatter.py` (dry-run by default; `--write` to apply).
 
 ## Skills in this repo
 
 | Skill | Purpose |
 |---|---|
-| `tracking-work` | Main skill — file-based session/task tracking across workspaces, with global + local stores and concurrent-agent support. |
-| `tracking-work-github` | Optional PR/commit drift detection via the `gh` CLI, invoked by the main skill when a session has `github:` frontmatter. |
-| `tracking-work-migration` | Move a session between the global store (`~/.work/`) and a repo-local store. |
-| `tracking-work-sync` | Optional cross-device sync of `~/.work/` via a private GitHub repo. See `skills/tracking-work-sync/docs/` for design. |
-| `tracking-work-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
-| `tracking-work-kb` | Author and bulk-ingest knowledge/workbench docs (`cortex kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `tracking-work-viz`, replicated by `tracking-work-sync`. |
-| `tracking-work-inject` | Optional, off-by-default session-start context injection (`cortex inject` CLI). The single exception to the otherwise pull-based, no-auto-injection design. |
+| `cortex-tracking` | Main skill — file-based session/task tracking across workspaces, with global + local stores and concurrent-agent support. |
+| `cortex-github` | Optional PR/commit drift detection via the `gh` CLI, invoked by the main skill when a session has `github:` frontmatter. |
+| `cortex-migration` | Move a session between the global store (`~/.work/`) and a repo-local store. |
+| `cortex-sync` | Optional cross-device sync of `~/.work/` via a private GitHub repo. See `skills/cortex-sync/docs/` for design. |
+| `cortex-viz` | Browser-based viewer for `~/.work/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
+| `cortex-kb` | Author and bulk-ingest knowledge/workbench docs (`cortex kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `cortex-viz`, replicated by `cortex-sync`. |
+| `cortex-inject` | Optional, off-by-default session-start context injection (`cortex inject` CLI). The single exception to the otherwise pull-based, no-auto-injection design. |
 
 ## Knowledge base
 
-Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb`
+Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 (the `cortex kb` CLI) owns writing them:
 
 - **Two document classes.** `knowledge/<slug>.md` is workspace-scoped (context
@@ -50,15 +50,15 @@ Beyond sessions and tasks, a workspace can hold durable notes. `tracking-work-kb
 
 ### How the skills connect
 
-- `cortex kb` **writes** knowledge/workbench docs; `tracking-work-viz` **renders**
+- `cortex kb` **writes** knowledge/workbench docs; `cortex-viz` **renders**
   them (tree, graph, content, with the frontmatter fields above); and
-  `tracking-work-sync` **replicates** the whole `~/.work/` store. All three
+  `cortex-sync` **replicates** the whole `~/.work/` store. All three
   share one file layout and the same `commit_push.sh` sync hook.
-- The main `tracking-work` skill invokes `tracking-work-kb` at its knowledge
+- The main `cortex-tracking` skill invokes `cortex-kb` at its knowledge
   checkpoints (capturing durable notes, resolving `[[knowledge/...]]` ghost
   links, recording spec/plan output).
 - `cortex kb ingest` reads a codebase and writes into a KB workspace. It is
-  unrelated to `tracking-work-migration`, which **moves a session** between the
+  unrelated to `cortex-migration`, which **moves a session** between the
   global and local stores. Different verbs, opposite direction, different data.
 
 ## Install
@@ -140,7 +140,9 @@ Remove the symlinks in each harness's skills directory:
 
 ```bash
 for h in ~/.claude ~/.codex ~/.copilot ~/.gemini; do
-    rm -f "$h/skills/tracking-work"{,-github,-migration,-sync,-viz,-kb,-inject}
+    rm -f "$h/skills/cortex-tracking" "$h/skills/cortex-github" \
+          "$h/skills/cortex-kb" "$h/skills/cortex-viz" "$h/skills/cortex-sync" \
+          "$h/skills/cortex-migration" "$h/skills/cortex-inject"
 done
 ```
 
@@ -150,9 +152,9 @@ Off by default. `cortex inject enable --wire-hook claude-code` wires a Claude
 Code `SessionStart` hook that injects the active workspace's knowledge index,
 workbench, and open tasks at session start. Per-workspace opt-in via a sentinel;
 `cortex inject disable --unwire-hook claude-code` reverses it. See
-`skills/tracking-work-inject/SKILL.md`. This is the family's single exception to
+`skills/cortex-inject/SKILL.md`. This is the family's single exception to
 its otherwise pull-based, no-auto-injection design.
 
 ## State data vs skill code
 
-These skills are the **code**. Your actual session/task data lives in `~/.work/` on each machine. If you enable `tracking-work-sync`, that data is synced via a separate private repo (created by `skills/tracking-work-sync/scripts/setup.sh`). This repo contains no personal work data.
+These skills are the **code**. Your actual session/task data lives in `~/.work/` on each machine. If you enable `cortex-sync`, that data is synced via a separate private repo (created by `skills/cortex-sync/scripts/setup.sh`). This repo contains no personal work data.

@@ -1,8 +1,8 @@
-# tracking-work-viz
+# cortex-viz
 
 Static browser-based viewer for `~/.work/workspaces/`. Three panes (collapsible tree, hub-and-spoke Cytoscape graph, rendered markdown content) over a copied markdown tree. Read-only.
 
-It surfaces the knowledge/workbench frontmatter authored by `tracking-work-kb` (the `cortex kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `INDEX.md` files (from `cortex kb index`) are excluded from the graph.
+It surfaces the knowledge/workbench frontmatter authored by `cortex-kb` (the `cortex kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `INDEX.md` files (from `cortex kb index`) are excluded from the graph.
 
 ## Install
 
@@ -40,7 +40,7 @@ inserts the most-abbreviated valid addressing-grammar token.
 
 Saves are guarded by an on-disk content hash: if the file changed since you
 opened it, Save is refused and the current version is reloaded so you can
-reapply your edit. A successful save runs `tracking-work-sync`'s
+reapply your edit. A successful save runs `cortex-sync`'s
 `commit_push.sh` when sync is configured. The plain `serve` and static `build`
 have no write API and stay Pages-safe.
 
@@ -109,7 +109,7 @@ The suite covers the address grammar, parser (typed-relation extraction, mention
 
 ## Limitations
 
-- Knowledge and workbench docs are authored via the `tracking-work-kb` CLI (`cortex kb`) or, for existing docs, the `serve --edit` mode. Unresolved `knowledge/*` or `workbench/*` references still render as ghost nodes until the target file exists.
+- Knowledge and workbench docs are authored via the `cortex-kb` CLI (`cortex kb`) or, for existing docs, the `serve --edit` mode. Unresolved `knowledge/*` or `workbench/*` references still render as ghost nodes until the target file exists.
 - No search across the world (Spec B).
 - No graph algorithm beyond the built-in hierarchical and `cose` layouts.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).

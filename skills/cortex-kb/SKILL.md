@@ -1,5 +1,5 @@
 ---
-name: tracking-work-kb
+name: cortex-kb
 description: Use when authoring workspace-scoped knowledge entries or session-scoped workbench drafts in the ~/.work knowledge base. Creates markdown files at the correct path with valid frontmatter; agents pass --body or pipe content via stdin.
 ---
 
@@ -8,7 +8,7 @@ description: Use when authoring workspace-scoped knowledge entries or session-sc
 Authors `knowledge/<slug>.md` (workspace-scoped) and `workbench/<slug>.md`
 (session-scoped) markdown files in the `~/.work/` (global) or
 `<repo>/.work/` (local) tracking store. Sibling skill to
-`tracking-work-viz`, which renders the resulting files in the graph and
+`cortex-viz`, which renders the resulting files in the graph and
 tree.
 
 > The CLI is `cortex kb` (`cortex kb new|update|index|ingest`), implemented in
@@ -101,7 +101,7 @@ not part of the cross-workspace brain). Type grouping is case-insensitive.
 Bulk-ingest documentable artifacts from a codebase into a workspace's
 `knowledge/`. **Direction:** `--from <src>` reads a codebase (default `.`);
 `--workspace <dest>` writes the KB (default: the active workspace), same as
-`new`/`update`/`index`. Not to be confused with `tracking-work-migration`
+`new`/`update`/`index`. Not to be confused with `cortex-migration`
 (which moves a session between stores).
 
 - **Dry-run by default**; `--write` is the confirmation gate. Existing
@@ -126,11 +126,11 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
 
 ## Related skills
 
-- `tracking-work-viz` renders these docs (graph/tree/content) including the
+- `cortex-viz` renders these docs (graph/tree/content) including the
   `type`/`title`/`description`/`updated` fields.
-- `tracking-work-sync` replicates the store; both write paths call its
+- `cortex-sync` replicates the store; both write paths call its
   `commit_push.sh`.
-- `tracking-work-migration` is a different thing entirely (session store moves),
+- `cortex-migration` is a different thing entirely (session store moves),
   despite the surface similarity to `ingest`.
 
 ## Agent invocation patterns
@@ -221,12 +221,12 @@ never misparsed. The viz uses real YAML for its own reads.
   when `--open` is passed.
 - Inject the index into any context. `cortex kb index` is pull-based (stdout or a
   derived `INDEX.md`). Opt-in session-start injection (which builds on this index)
-  is a separate, off-by-default feature: see `tracking-work-inject` (`cortex inject`).
+  is a separate, off-by-default feature: see `cortex-inject` (`cortex inject`).
 
 ## Sync integration
 
 After a successful write, calls
-`$HOME/.claude/skills/tracking-work-sync/scripts/commit_push.sh` if
+`$HOME/.claude/skills/cortex-sync/scripts/commit_push.sh` if
 present and executable. No-op if sync is not installed or disabled.
 
 ## Tests
@@ -240,4 +240,4 @@ The kb commands are tested in the engine package:
 `cortex/tests/test_kb_*.py` set up a temp `HOME`, drive `cortex.cli.main(["kb", ...])`,
 and assert file contents / exit codes (parity ports of the former bash suites).
 The one-shot migration keeps its own test at
-`skills/tracking-work-kb/tests/test_migrate_kb_frontmatter.py`.
+`skills/cortex-kb/tests/test_migrate_kb_frontmatter.py`.

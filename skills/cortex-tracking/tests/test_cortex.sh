@@ -2,7 +2,7 @@
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SELF_DIR/../../.." && pwd)"
-CORTEX="$REPO/skills/tracking-work/bin/cortex"
+CORTEX="$REPO/skills/cortex-tracking/bin/cortex"
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
@@ -41,13 +41,13 @@ set +e; PATH="$bindir:$PATH" HOME="$home" cortex kb new knowledge bare --workspa
 [ "$rc" -eq 0 ] || fail "bare-via-PATH invocation failed ($rc)"
 
 # harness-dir install shape: cortex is reached through a symlinked skill dir
-# (mimics ~/.claude/skills/tracking-work/bin/cortex). Physical path resolution
+# (mimics ~/.claude/skills/cortex-tracking/bin/cortex). Physical path resolution
 # must still find the real repo root (where the top-level cortex/ package is).
 hdir="$(mktemp -d "${TMPDIR:-/tmp}/cortex-harness-XXXXXX")"
 trap 'rm -rf "$bindir" "$home" "$hdir"' EXIT
 mkdir -p "$hdir/skills"
-ln -s "$REPO/skills/tracking-work" "$hdir/skills/tracking-work"
-HOME="$home" "$hdir/skills/tracking-work/bin/cortex" kb new knowledge harness --workspace ws-a --body b >/dev/null \
+ln -s "$REPO/skills/cortex-tracking" "$hdir/skills/cortex-tracking"
+HOME="$home" "$hdir/skills/cortex-tracking/bin/cortex" kb new knowledge harness --workspace ws-a --body b >/dev/null \
     || fail "harness-dir invocation did not route to the cortex engine"
 [ -f "$home/.work/workspaces/ws-a/knowledge/harness.md" ] || fail "harness-dir kb new wrote no file"
 

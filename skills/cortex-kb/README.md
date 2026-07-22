@@ -1,13 +1,13 @@
-# tracking-work-kb
+# cortex-kb
 
 Thin CLI for authoring `knowledge/<slug>.md` (workspace-scoped) and
 `workbench/<slug>.md` (session-scoped) markdown files in the `~/.work/`
-tracking store. Sibling to `tracking-work-viz`, which renders them.
+tracking store. Sibling to `cortex-viz`, which renders them.
 
 ## Install
 
 The root `install.sh` registers this skill alongside the other
-`tracking-work-*` skills.
+`cortex-tracking-*` skills.
 
 ## Usage
 
@@ -40,7 +40,7 @@ cortex kb new knowledge cross-project-note --workspace personal
 
 `ingest` deterministically documents OpenAPI and SQL DDL; fuzzier sources
 (Prisma, README `## API`/`## Schema`, runbooks) come back as an agent worklist.
-It never overwrites existing docs. This is unrelated to `tracking-work-migration`
+It never overwrites existing docs. This is unrelated to `cortex-migration`
 (which moves a session between stores).
 
 Frontmatter fields: `title`, `type`, `author`, `created`, `updated`,

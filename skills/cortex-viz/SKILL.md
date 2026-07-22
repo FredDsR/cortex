@@ -1,9 +1,9 @@
 ---
-name: tracking-work-viz
+name: cortex-viz
 description: Use when the user wants a visual overview of `~/.work/` sessions and tasks ("show me what's going on", "visualize my work", "open the dashboard"). Builds a static HTML site with three panes (tree, hub-and-spoke graph, rendered markdown) for browsing every workspace, session, and task. Read-only by default; opt-in `serve --edit` adds localhost in-browser editing.
 ---
 
-# tracking-work-viz
+# cortex-viz
 
 Static browser-based viewer for `~/.work/workspaces/`. The CLI builds a folder of HTML + copied markdown and serves it locally over plain HTTP. The static build is read-only; an opt-in `serve --edit` mode adds localhost-only in-browser editing.
 
@@ -73,11 +73,11 @@ localhost-only and never part of a static build.
 - Optimistic concurrency: if the file changed on disk since you opened it (sync
   pull, `cortex kb`, or an external editor), Save is refused and the browser
   reloads the current version so you can reapply your edit.
-- A successful save runs `tracking-work-sync`'s `commit_push.sh` when sync is
+- A successful save runs `cortex-sync`'s `commit_push.sh` when sync is
   configured (no-op otherwise), mirroring `cortex kb`.
 
 ## Sync interaction
 
-The build output lives at `~/.cache/work-viz/out/` by default, which is outside the synced tree. No interaction with `tracking-work-sync`.
+The build output lives at `~/.cache/work-viz/out/` by default, which is outside the synced tree. No interaction with `cortex-sync`.
 
 For UI feature reference, the addressing grammar, and the typed-relation chips, see `README.md`.

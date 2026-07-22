@@ -1,11 +1,11 @@
 ---
-name: tracking-work-github
-description: Use only when invoked by tracking-work for a session that has a `github: <owner>/<repo>` frontmatter field. Syncs task files with PR state via the `gh` CLI.
+name: cortex-github
+description: Use only when invoked by cortex-tracking for a session that has a `github: <owner>/<repo>` frontmatter field. Syncs task files with PR state via the `gh` CLI.
 ---
 
 # Tracking Work — GitHub Sync
 
-Invoked by the core `tracking-work` skill when a session is marked as GitHub-backed. Never load standalone.
+Invoked by the core `cortex-tracking` skill when a session is marked as GitHub-backed. Never load standalone.
 
 ## When to Sync
 

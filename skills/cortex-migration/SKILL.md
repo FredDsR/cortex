@@ -1,13 +1,13 @@
 ---
-name: tracking-work-migration
-description: Use only when invoked by tracking-work to move a session between the global store (~/.work/workspaces/<slug>/) and a repo-local store (<repo>/.work/). Per-session, explicit, never implicit.
+name: cortex-migration
+description: Use only when invoked by cortex-tracking to move a session between the global store (~/.work/workspaces/<slug>/) and a repo-local store (<repo>/.work/). Per-session, explicit, never implicit.
 ---
 
 # Tracking Work — Migration
 
-Invoked by the core `tracking-work` skill when the user asks to move a session between stores. Never moves data on its own.
+Invoked by the core `cortex-tracking` skill when the user asks to move a session between stores. Never moves data on its own.
 
-Not to be confused with `cortex kb ingest` (tracking-work-kb), which imports knowledge from a codebase into a workspace. This skill moves a whole session between the global and local stores; it does not read codebases or write knowledge docs.
+Not to be confused with `cortex kb ingest` (cortex-kb), which imports knowledge from a codebase into a workspace. This skill moves a whole session between the global and local stores; it does not read codebases or write knowledge docs.
 
 ## When to Invoke
 

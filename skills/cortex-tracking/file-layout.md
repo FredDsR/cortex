@@ -44,13 +44,13 @@ started: YYYY-MM-DD
 last_updated: YYYY-MM-DD
 status: Active
 branch: <optional>
-github: <owner>/<repo>   # optional; triggers tracking-work-github
+github: <owner>/<repo>   # optional; triggers cortex-github
 ---
 
 # Session: ...
 ```
 
-When `github:` is set, the core skill invokes `tracking-work-github` at appropriate checkpoints.
+When `github:` is set, the core skill invokes `cortex-github` at appropriate checkpoints.
 
 **Regenerate (full rewrite):** when the user asks "overview" / "status" / "where are we". Rebuild from task files + `git log` (if a repo) + `gh` (if `github:` is set). For a cheap snapshot without a full regen, run `scripts/manifest.sh` first.
 

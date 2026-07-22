@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install / update tracking-work skills.
+# Install / update cortex skills.
 # Default: global install (symlinks each skill into $HOME/.<harness>/skills/).
 # --project [path]: project-local install (symlinks into <path>/.<harness>/skills/).
 # Idempotent. Safe to re-run after `git pull`.
@@ -70,6 +70,16 @@ install_into() {
 
     mkdir -p "$dest_root"
 
+    # Clean up stale pre-rebrand symlinks (tracking-work* -> cortex*).
+    for old in tracking-work tracking-work-github tracking-work-kb \
+               tracking-work-viz tracking-work-sync tracking-work-migration \
+               tracking-work-inject; do
+        if [[ -L "$dest_root/$old" ]]; then
+            rm -f "$dest_root/$old"
+            echo "[$harness] removed stale $old symlink"
+        fi
+    done
+
     for skill_dir in "$SKILLS_SRC"/*/; do
         local skill_name
         skill_name=$(basename "$skill_dir")
@@ -100,16 +110,16 @@ for entry in "${HARNESSES[@]}"; do
 done
 
 echo ""
-echo "tracking-work skills installed. Restart your agent session to pick up changes."
+echo "cortex skills installed. Restart your agent session to pick up changes."
 
-# --- tracking-work-viz install ---
+# --- cortex-viz install ---
 VIZ_BIN_DIR="$HOME/.work/bin"
 VIZ_VENDOR="$REPO_DIR/cortex/viz/templates/vendor"
 
 mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
 
 # Unified cortex bin (replaces the former work-viz / work-kb bins).
-ln -sf "$REPO_DIR/skills/tracking-work/bin/cortex" "$VIZ_BIN_DIR/cortex"
+ln -sf "$REPO_DIR/skills/cortex-tracking/bin/cortex" "$VIZ_BIN_DIR/cortex"
 # Remove superseded bins from prior installs (symlinks only).
 for old in work-viz work-kb; do
     [ -L "$VIZ_BIN_DIR/$old" ] && rm -f "$VIZ_BIN_DIR/$old"
@@ -160,7 +170,7 @@ done
 
 if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
   echo "" >&2
-  echo "ERROR: tracking-work-viz install incomplete." >&2
+  echo "ERROR: cortex-viz install incomplete." >&2
   echo "  Missing vendor file(s) in $VIZ_VENDOR/:" >&2
   for m in "${VIZ_MISSING[@]}"; do
     echo "    - $m" >&2
@@ -174,7 +184,7 @@ if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
 fi
 
 echo "cortex: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: cortex kb ... / cortex viz ... / cortex inject ..."
-# --- end tracking-work-viz install ---
+# --- end cortex-viz install ---
 
 # --- slash command install (Claude Code symlink path) ---
 # Plugin/marketplace installs pick up commands/ natively. For symlink installs,
@@ -187,7 +197,7 @@ if [ -d "$HOME/.claude" ]; then
 fi
 # --- end slash command install ---
 
-# --- tracking-work-kb install ---
+# --- cortex-kb install ---
 # The kb CLI is now reached via `cortex kb ...`; no separate bin is installed.
 # (cortex symlink is handled in the viz block above; both live in ~/.work/bin.)
-# --- end tracking-work-kb install ---
+# --- end cortex-kb install ---

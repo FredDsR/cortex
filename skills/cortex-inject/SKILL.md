@@ -1,12 +1,12 @@
 ---
-name: tracking-work-inject
+name: cortex-inject
 description: Use only when the user explicitly opts into session-start context injection ("orient me at session start", "auto-load what we know", "inject the index"). Wires a strictly opt-in, off-by-default hook that injects a workspace's knowledge index + workbench + open tasks via the `cortex inject` CLI. The single exception to the family's no-auto-injection philosophy.
 ---
 
-# tracking-work-inject
+# cortex-inject
 
 Strictly opt-in session-start injection. Off by default. This is the ONE
-exception to the tracking-work family's no-auto-injection philosophy, and it
+exception to the cortex-tracking family's no-auto-injection philosophy, and it
 stays an exception: never enable it without an explicit user request.
 
 ## Two guards, both required
