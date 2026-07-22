@@ -474,7 +474,7 @@
     // share a soft pastel, all sessions in a workspace are distinct hues, and
     // tasks of different sessions in the same workspace are visually grouped.
     var dark = isDark();
-    if (node.kind === 'root') return dark ? '#5a6884' : '#1f2933';
+    if (node.kind === 'root') return dark ? '#818cf8' : '#4f46e5';
     var key;
     if (node.kind === 'workspace') key = node.id.replace(/\/$/, '');
     else key = (node.id.split('/').slice(0, 2).join('/'));
@@ -504,7 +504,7 @@
         })
       .selector('node[kind="root"]')
         .style({ 'color': '#ffffff', 'border-width': 0,
-                 'background-color': dark ? '#5a6884' : '#1f2933' })
+                 'background-color': dark ? '#818cf8' : '#4f46e5' })
       .selector('edge[kind="contains"]')
         .style({ 'line-color': dark ? '#6b7790' : '#8a929c',
                  'opacity': dark ? 0.75 : 0.7 })

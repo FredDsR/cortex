@@ -1,6 +1,11 @@
 :root {
+  /* cortex brand core */
+  --brand-indigo: #4f46e5;
+  --brand-cyan: #2fa6c9;
+  --brand-teal: #14b8a6;
+
   --status-open: #8a929c;
-  --status-in-progress: #1f7ae0;
+  --status-in-progress: #4f46e5;
   --status-blocked: #e53935;
   --status-resolved: #2e9358;
   --status-unknown: #c8ccd1;
@@ -8,8 +13,8 @@
   --bg: #fbfcfd;
   --surface: #ffffff;
   --border: #e3e6eb;
-  --accent: #1f7ae0;
-  --accent-bg: #eef4fb;
+  --accent: #4f46e5;
+  --accent-bg: #eef0fe;
 
   --text-primary: #1f2933;
   --text-muted: #5a6573;
@@ -19,8 +24,8 @@ body.dark {
   --bg: #11151c;
   --surface: #1a212c;
   --border: #2a3340;
-  --accent: #4a9eff;
-  --accent-bg: #1e2a3d;
+  --accent: #818cf8;
+  --accent-bg: #262b45;
 
   --text-primary: #e6e9ef;
   --text-muted: #8a929c;
