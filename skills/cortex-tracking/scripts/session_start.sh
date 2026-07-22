@@ -17,6 +17,13 @@ set -u
 cwd="${1:-$PWD}"
 cwd="$(cd "$cwd" && pwd)"
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+
+# Legacy store notice: the store moved from ~/.work to ~/.cortex during the
+# cortex rebrand. If the old store still exists and the new one does not, the
+# user has not migrated yet.
+if [ -d "$HOME/.work" ] && [ ! -d "$HOME/.cortex" ]; then
+    echo "cortex: legacy ~/.work store detected. Run: cortex migrate-store --write" >&2
+fi
 sync_dir="$HOME/.claude/skills/tracking-work-sync"
 
 # 1. Workspace slug. Pass through exit 2 (collision); stderr goes to stderr.

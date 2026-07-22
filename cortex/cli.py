@@ -10,6 +10,7 @@ from cortex import kb
 from cortex import ingest
 from cortex import query
 from cortex import inject
+from cortex import migrate_store
 from cortex.errors import CortexError
 from cortex.store import StoreError
 
@@ -88,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = icmds.add_parser("status", help="Show sentinel state + wired harnesses")
     st.add_argument("--workspace", default="")
+
+    msp = groups.add_parser("migrate-store",
+                            help="Move the store from ~/.work to ~/.cortex (dry-run default)")
+    msp.add_argument("--write", action="store_true")
     return p
 
 
@@ -164,6 +169,8 @@ def main(argv=None) -> int:
         args = parser.parse_args(_glue_flag_values(argv))
     except SystemExit as e:               # argparse usage error -> exit 2
         return _exit_code(e)
+    if args.group == "migrate-store":
+        return migrate_store.cmd_migrate_store(args)
     try:
         dispatch = _GROUP_DISPATCH.get(args.group)
         if dispatch is not None:
