@@ -10,6 +10,26 @@ One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author
 
 > **Upgrading from `tracking-work`?** See [Upgrading from tracking-work](#upgrading-from-tracking-work) below: rename the repo remote, re-run `install.sh`, and run `cortex migrate-store --write` to move `~/.work` to `~/.cortex`.
 
+## The dashboard
+
+`cortex viz` builds a static, browser-based view of every workspace, session, and task: a collapsible tree, a hub-and-spoke graph of typed links, and a rendered-markdown content pane. Read-only by default; theme-aware (light + dark).
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/viz-dark.png">
+    <img src="assets/screenshots/viz-light.png" alt="cortex viz dashboard: tree, graph, and content panes" width="900">
+  </picture>
+</p>
+
+<details>
+<summary>Dark theme</summary>
+
+<p align="center">
+  <img src="assets/screenshots/viz-dark.png" alt="cortex viz dashboard in dark theme" width="900">
+</p>
+
+</details>
+
 ## Skills in this repo
 
 | Skill | Purpose |
