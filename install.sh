@@ -113,7 +113,7 @@ echo ""
 echo "cortex skills installed. Restart your agent session to pick up changes."
 
 # --- cortex-viz install ---
-VIZ_BIN_DIR="$HOME/.work/bin"
+VIZ_BIN_DIR="$HOME/.cortex/bin"
 VIZ_VENDOR="$REPO_DIR/cortex/viz/templates/vendor"
 
 mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
@@ -199,5 +199,5 @@ fi
 
 # --- cortex-kb install ---
 # The kb CLI is now reached via `cortex kb ...`; no separate bin is installed.
-# (cortex symlink is handled in the viz block above; both live in ~/.work/bin.)
+# (cortex symlink is handled in the viz block above; both live in ~/.cortex/bin.)
 # --- end cortex-kb install ---

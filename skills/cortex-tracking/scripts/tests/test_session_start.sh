@@ -10,7 +10,7 @@ test_emits_structured_header() {
   out="$(bash "$SCRIPT" "$TEST_CWD")"
   assert_contains "$out" $'WORKSPACE\t' "WORKSPACE line present"
   assert_contains "$out" $'SESSION_ID\t' "SESSION_ID line present"
-  assert_contains "$out" $'SYNC\tnot-installed' "SYNC reports not-installed when sub-skill missing"
+  assert_contains "$out" $'SYNC\t' "SYNC line present (state depends on whether the cortex CLI + sync are configured)"
   assert_contains "$out" $'SESSIONS' "SESSIONS divider present"
   teardown_tmp
 }
