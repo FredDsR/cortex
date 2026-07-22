@@ -13,35 +13,35 @@ def test_already_exists_exit_1(kbhome):
 
 
 def test_no_active_no_workspace_exit_1(tmp_path, monkeypatch):
-    (tmp_path / ".work/workspaces/ws-orphan/knowledge").mkdir(parents=True)
+    (tmp_path / ".cortex/workspaces/ws-orphan/knowledge").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(tmp_path))
     assert cli.main(["kb", "new", "knowledge", "foo", "--body", "x"]) == 1
 
 
 def test_multiple_active_workspaces_exit_1(kbhome):
-    wsb = kbhome / ".work/workspaces/ws-b/sessions/sess-b"
+    wsb = kbhome / ".cortex/workspaces/ws-b/sessions/sess-b"
     wsb.mkdir(parents=True)
-    (kbhome / ".work/workspaces/ws-b/.active.testid2").write_text("sess-b\n")
+    (kbhome / ".cortex/workspaces/ws-b/.active.testid2").write_text("sess-b\n")
     assert cli.main(["kb", "new", "knowledge", "foo", "--body", "x"]) == 1
 
 
 def test_author_human(kbhome):
     cli.main(["kb", "new", "knowledge", "human-entry", "--author", "human", "--body", "x"])
     assert "author: human" in (
-        kbhome / ".work/workspaces/ws-a/knowledge/human-entry.md").read_text()
+        kbhome / ".cortex/workspaces/ws-a/knowledge/human-entry.md").read_text()
 
 
 def test_body_from_stdin(kbhome, monkeypatch):
     monkeypatch.setattr(sys, "stdin", io.StringIO("piped body"))
     cli.main(["kb", "new", "knowledge", "piped", "--body-from", "-"])
     assert "piped body" in (
-        kbhome / ".work/workspaces/ws-a/knowledge/piped.md").read_text()
+        kbhome / ".cortex/workspaces/ws-a/knowledge/piped.md").read_text()
 
 
 def test_explicit_workspace_override(kbhome):
-    (kbhome / ".work/workspaces/ws-c/knowledge").mkdir(parents=True)
+    (kbhome / ".cortex/workspaces/ws-c/knowledge").mkdir(parents=True)
     cli.main(["kb", "new", "knowledge", "cross", "--workspace", "ws-c", "--body", "x"])
-    assert (kbhome / ".work/workspaces/ws-c/knowledge/cross.md").is_file()
+    assert (kbhome / ".cortex/workspaces/ws-c/knowledge/cross.md").is_file()
 
 
 def test_open_defaults_author_human(kbhome, monkeypatch):
@@ -49,17 +49,17 @@ def test_open_defaults_author_human(kbhome, monkeypatch):
     rc = cli.main(["kb", "new", "knowledge", "editable", "--body", "x", "--open"])
     assert rc == 0
     assert "author: human" in (
-        kbhome / ".work/workspaces/ws-a/knowledge/editable.md").read_text()
+        kbhome / ".cortex/workspaces/ws-a/knowledge/editable.md").read_text()
 
 
 def test_workbench_session_flag(kbhome):
-    (kbhome / ".work/workspaces/ws-a/sessions/sess-b/workbench").mkdir(parents=True)
+    (kbhome / ".cortex/workspaces/ws-a/sessions/sess-b/workbench").mkdir(parents=True)
     cli.main(["kb", "new", "workbench", "from-other", "--session", "sess-b", "--body", "x"])
-    assert (kbhome / ".work/workspaces/ws-a/sessions/sess-b/workbench/from-other.md").is_file()
+    assert (kbhome / ".cortex/workspaces/ws-a/sessions/sess-b/workbench/from-other.md").is_file()
 
 
 def test_workbench_no_active_no_session_exit_1(tmp_path, monkeypatch):
-    (tmp_path / ".work/workspaces/ws-x/sessions/sess-x/workbench").mkdir(parents=True)
+    (tmp_path / ".cortex/workspaces/ws-x/sessions/sess-x/workbench").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(tmp_path))
     assert cli.main(["kb", "new", "workbench", "foo", "--workspace", "ws-x", "--body", "x"]) == 1
 
@@ -84,7 +84,7 @@ def test_dash_leading_flag_value_accepted(kbhome):
                    "--description", "-> migration notes", "--body", "b"])
     assert rc == 0
     assert "-> migration notes" in (
-        kbhome / ".work/workspaces/ws-a/knowledge/changelog.md").read_text()
+        kbhome / ".cortex/workspaces/ws-a/knowledge/changelog.md").read_text()
 
 
 def test_open_missing_editor_clean_error(kbhome, monkeypatch, capsys):
@@ -92,4 +92,4 @@ def test_open_missing_editor_clean_error(kbhome, monkeypatch, capsys):
     rc = cli.main(["kb", "new", "knowledge", "ed", "--body", "x", "--open"])
     assert rc == 1
     assert "Traceback" not in capsys.readouterr().err
-    assert (kbhome / ".work/workspaces/ws-a/knowledge/ed.md").is_file()  # written before open
+    assert (kbhome / ".cortex/workspaces/ws-a/knowledge/ed.md").is_file()  # written before open

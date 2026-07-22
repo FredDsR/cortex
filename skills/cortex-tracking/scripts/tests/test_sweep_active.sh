@@ -7,7 +7,7 @@ SCRIPT="$(cd .. && pwd)/sweep_active.sh"
 
 test_removes_old_and_keeps_new() {
   setup_tmp
-  ws="$TEST_HOME/.work/workspaces/example"
+  ws="$TEST_HOME/.cortex/workspaces/example"
   mkdir -p "$ws"
   old="$ws/.active.oldid"
   touch "$old"
@@ -24,7 +24,7 @@ test_removes_old_and_keeps_new() {
 
 test_noop_on_empty_workspace() {
   setup_tmp
-  ws="$TEST_HOME/.work/workspaces/empty"
+  ws="$TEST_HOME/.cortex/workspaces/empty"
   mkdir -p "$ws"
   out="$(bash "$SCRIPT" "$ws" 7)"
   assert_eq "$out" ""
@@ -33,7 +33,7 @@ test_noop_on_empty_workspace() {
 
 test_respects_custom_threshold() {
   setup_tmp
-  ws="$TEST_HOME/.work/workspaces/custom"
+  ws="$TEST_HOME/.cortex/workspaces/custom"
   mkdir -p "$ws"
   f="$ws/.active.threedays"
   touch "$f"

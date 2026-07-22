@@ -26,7 +26,7 @@ def test_dry_run_plans_writes_nothing(kbhome, repo, capsys):
     assert "op-get-users [API]" in out
     assert "agent worklist" in out
     assert "schema.prisma" in out and "README.md" in out
-    assert not (kbhome / ".work/workspaces/ws-a/knowledge/table-accounts.md").exists()
+    assert not (kbhome / ".cortex/workspaces/ws-a/knowledge/table-accounts.md").exists()
 
 
 def test_only_sql_restricts(kbhome, repo, capsys):
@@ -37,7 +37,7 @@ def test_only_sql_restricts(kbhome, repo, capsys):
 
 def test_write_creates_docs_crosslinks_and_skips(kbhome, repo, capsys):
     assert cli.main(["kb", "ingest", "--from", str(repo), "--workspace", "ws-a", "--write"]) == 0
-    kd = kbhome / ".work/workspaces/ws-a/knowledge"
+    kd = kbhome / ".cortex/workspaces/ws-a/knowledge"
     acc = kd / "table-accounts.md"
     assert acc.is_file()
     assert "type: Reference" in acc.read_text() and "title: accounts" in acc.read_text()
@@ -57,7 +57,7 @@ def test_max_caps_writes(kbhome, repo, capsys):
     cli.main(["kb", "ingest", "--from", str(repo), "--workspace", "ws-a", "--write", "--max", "1"])
     out = capsys.readouterr().out
     assert "more (raise --max)" in out
-    n = len(list((kbhome / ".work/workspaces/ws-a/knowledge").glob("*.md")))
+    n = len(list((kbhome / ".cortex/workspaces/ws-a/knowledge").glob("*.md")))
     assert n == 1
 
 

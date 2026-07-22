@@ -12,14 +12,14 @@ test_lists_global_and_local_merged() {
   cwd="$TEST_CWD/repo"
   ws_slug="$(bash "$RESOLVE" "$cwd")"
 
-  global="$TEST_HOME/.work/workspaces/$ws_slug/sessions"
+  global="$TEST_HOME/.cortex/workspaces/$ws_slug/sessions"
   mkdir -p "$global/alpha" "$global/beta"
   touch "$global/alpha/SUMMARY.md" "$global/beta/SUMMARY.md"
   sleep 0.1
   touch "$global/beta/SUMMARY.md"
-  echo "alpha" > "$TEST_HOME/.work/workspaces/$ws_slug/.active.xyz"
+  echo "alpha" > "$TEST_HOME/.cortex/workspaces/$ws_slug/.active.xyz"
 
-  localws="$cwd/.work/sessions"
+  localws="$cwd/.cortex/sessions"
   mkdir -p "$localws/gamma"
   touch "$localws/gamma/SUMMARY.md"
 

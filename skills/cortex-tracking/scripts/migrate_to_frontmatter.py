@@ -8,7 +8,7 @@ Usage:
     migrate_to_frontmatter.py [--root PATH] [--apply] [--quiet]
 
 Walks <root>/workspaces/*/sessions/*/SUMMARY.md and <root>/workspaces/*/sessions/*/tasks/*.md.
-Also handles a repo-local store: if --root points at a `.work/` directory itself,
+Also handles a repo-local store: if --root points at a `.cortex/` directory itself,
 walks <root>/sessions/*/... directly.
 """
 from __future__ import annotations
@@ -141,7 +141,7 @@ def iter_target_files(root: Path):
         for ws in sorted(workspaces.iterdir()):
             if (ws / "sessions").is_dir():
                 sessions_roots.append(ws / "sessions")
-    # Layout 2: root/sessions/<sess>/SUMMARY.md  (repo-local .work/)
+    # Layout 2: root/sessions/<sess>/SUMMARY.md  (repo-local .cortex/)
     if (root / "sessions").is_dir():
         sessions_roots.append(root / "sessions")
     for sroot in sessions_roots:
@@ -162,8 +162,8 @@ def iter_target_files(root: Path):
 
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--root", default=os.path.expanduser("~/.work"),
-                   help="Root to scan. Default: ~/.work")
+    p.add_argument("--root", default=os.path.expanduser("~/.cortex"),
+                   help="Root to scan. Default: ~/.cortex")
     p.add_argument("--apply", action="store_true",
                    help="Actually write changes. Without this flag, runs as dry-run.")
     p.add_argument("--quiet", action="store_true")

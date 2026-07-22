@@ -22,7 +22,7 @@ from . import edit_backend
 
 
 class EditHandler(http.server.SimpleHTTPRequestHandler):
-    server_version = "work-viz-edit/1"
+    server_version = "cortex-viz-edit/1"
 
     # Bound per-server by make_edit_server via a dynamic subclass:
     workspaces_root: Path = None
@@ -150,7 +150,7 @@ class EditHandler(http.server.SimpleHTTPRequestHandler):
         if not self.commit_on_save:
             return
         script = os.path.expanduser(
-            "~/.claude/skills/tracking-work-sync/scripts/commit_push.sh")
+            "~/.claude/skills/cortex-tracking-sync/scripts/commit_push.sh")
         if os.path.isfile(script) and os.access(script, os.X_OK):
             try:
                 subprocess.run(["bash", script, f"track(viz): edit {cid}"],

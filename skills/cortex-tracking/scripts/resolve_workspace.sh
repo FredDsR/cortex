@@ -6,8 +6,8 @@ set -u
 
 cwd="${1:-$PWD}"
 cwd="$(cd "$cwd" && pwd)"
-WORK_ROOT="${WORK_ROOT:-$HOME/.work}"
-WORKSPACES="$WORK_ROOT/workspaces"
+CORTEX_ROOT="${CORTEX_ROOT:-$HOME/.cortex}"
+WORKSPACES="$CORTEX_ROOT/workspaces"
 mkdir -p "$WORKSPACES"
 
 slug=""
@@ -69,7 +69,7 @@ if [ -z "$slug" ]; then
 fi
 
 # Write/refresh .meta only when content changed.
-# Avoids dirtying ~/.work/ on every session start (relevant when sync is enabled).
+# Avoids dirtying ~/.cortex/ on every session start (relevant when sync is enabled).
 mkdir -p "$WORKSPACES/$slug"
 meta_path="$WORKSPACES/$slug/.meta"
 today="$(date -u +%Y-%m-%d)"

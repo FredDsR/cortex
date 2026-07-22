@@ -8,9 +8,9 @@ cwd="$(cd "$cwd" && pwd)"
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 
 slug="$(bash "$script_dir/resolve_workspace.sh" "$cwd" 2>/dev/null)" || exit 0
-WORK_ROOT="${WORK_ROOT:-$HOME/.work}"
-global_ws="$WORK_ROOT/workspaces/$slug"
-local_ws="$cwd/.work"
+CORTEX_ROOT="${CORTEX_ROOT:-$HOME/.cortex}"
+global_ws="$CORTEX_ROOT/workspaces/$slug"
+local_ws="$cwd/.cortex"
 
 declare -A active_map=()
 for af in "$global_ws"/.active.* "$local_ws"/.active.*; do

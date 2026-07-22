@@ -1,4 +1,4 @@
-"""Filesystem resolution for the cortex engine: locate the ~/.work store, the
+"""Filesystem resolution for the cortex engine: locate the ~/.cortex store, the
 target workspace, and the active session. Ports work-kb's resolve_workspace /
 resolve_session / find_local_store, including their die-on-ambiguity semantics
 (raised here as StoreError, exit code 1)."""
@@ -13,7 +13,7 @@ class StoreError(Exception):
 
 
 def find_local_store(cwd: Path, home: Path) -> Path | None:
-    """Walk up from cwd (only within home) for a `.work/` dir. Returns None if
+    """Walk up from cwd (only within home) for a `.cortex/` dir. Returns None if
     cwd is not inside home or none is found."""
     cwd = Path(cwd).resolve()
     home = Path(home).resolve()
@@ -21,7 +21,7 @@ def find_local_store(cwd: Path, home: Path) -> Path | None:
         return None
     d = cwd
     while d != d.parent and d != home:
-        candidate = d / ".work"
+        candidate = d / ".cortex"
         if candidate.is_dir():
             return candidate
         d = d.parent
@@ -43,14 +43,14 @@ def _active_targets(ws_root: Path) -> list[str]:
 def resolve_workspace(explicit_ws: str, *, home: Path, cwd: Path) -> Path:
     home = Path(home)
     if explicit_ws:
-        ws = home / ".work" / "workspaces" / explicit_ws
+        ws = home / ".cortex" / "workspaces" / explicit_ws
         if not ws.is_dir():
             raise StoreError(f"workspace '{explicit_ws}' not found")
         return ws
     local = find_local_store(cwd, home)
     if local is not None:
         return local
-    root = home / ".work" / "workspaces"
+    root = home / ".cortex" / "workspaces"
     matches = []
     if root.is_dir():
         for ws in sorted(p for p in root.iterdir() if p.is_dir()):

@@ -10,11 +10,11 @@ bindir="$(mktemp -d "${TMPDIR:-/tmp}/cortex-bin-XXXXXX")"
 home="$(mktemp -d "${TMPDIR:-/tmp}/cortex-home-XXXXXX")"
 trap 'rm -rf "$bindir" "$home"' EXIT
 ln -s "$CORTEX" "$bindir/cortex"
-mkdir -p "$home/.work/workspaces/ws-a"
+mkdir -p "$home/.cortex/workspaces/ws-a"
 
 # kb routing: creates a knowledge file
 HOME="$home" "$bindir/cortex" kb new knowledge foo --workspace ws-a --body b >/dev/null
-[ -f "$home/.work/workspaces/ws-a/knowledge/foo.md" ] || fail "cortex kb did not route to the kb engine"
+[ -f "$home/.cortex/workspaces/ws-a/knowledge/foo.md" ] || fail "cortex kb did not route to the kb engine"
 
 # viz routing: --help exits 0 and mentions build
 vout="$(HOME="$home" "$bindir/cortex" viz --help 2>&1)" || fail "cortex viz --help nonzero"
@@ -49,6 +49,6 @@ mkdir -p "$hdir/skills"
 ln -s "$REPO/skills/cortex-tracking" "$hdir/skills/cortex-tracking"
 HOME="$home" "$hdir/skills/cortex-tracking/bin/cortex" kb new knowledge harness --workspace ws-a --body b >/dev/null \
     || fail "harness-dir invocation did not route to the cortex engine"
-[ -f "$home/.work/workspaces/ws-a/knowledge/harness.md" ] || fail "harness-dir kb new wrote no file"
+[ -f "$home/.cortex/workspaces/ws-a/knowledge/harness.md" ] || fail "harness-dir kb new wrote no file"
 
 echo "test_cortex: PASS"

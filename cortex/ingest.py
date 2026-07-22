@@ -22,7 +22,7 @@ except Exception:
     _HAVE_YAML = False
 
 _HTTP_METHODS = ("get", "post", "put", "patch", "delete", "head", "options")
-_PRUNE = {".git", "node_modules", ".work"}
+_PRUNE = {".git", "node_modules", ".cortex"}
 
 
 # ---- extractor (pure) ----

@@ -14,7 +14,7 @@ _PACKAGE_DIR = Path(__file__).parent
 _VENDOR_SRC = _PACKAGE_DIR / "templates" / "vendor"
 _SHELL_TEMPLATE = (_PACKAGE_DIR / "templates" / "shell.html").read_text(encoding="utf-8")
 
-MANIFEST_NAME = ".work-viz-build.json"
+MANIFEST_NAME = ".cortex-build.json"
 
 
 def _stage_vendor(out_dir: Path) -> None:

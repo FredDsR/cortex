@@ -17,7 +17,7 @@ test_emits_structured_header() {
 
 test_includes_existing_sessions() {
   setup_tmp
-  ws="$TEST_HOME/.work/workspaces/$(basename "$TEST_CWD")"
+  ws="$TEST_HOME/.cortex/workspaces/$(basename "$TEST_CWD")"
   mkdir -p "$ws/sessions/sess-a"
   printf '# Session: A\n' > "$ws/sessions/sess-a/SUMMARY.md"
   out="$(bash "$SCRIPT" "$TEST_CWD")"
@@ -28,9 +28,9 @@ test_includes_existing_sessions() {
 test_collision_passes_through_exit_2() {
   setup_tmp
   base="$(basename "$TEST_CWD")"
-  mkdir -p "$TEST_HOME/.work/workspaces/$base"
+  mkdir -p "$TEST_HOME/.cortex/workspaces/$base"
   printf 'cwd: /elsewhere\nremote:\nsource: basename\nupdated: 2026-04-20\n' \
-    > "$TEST_HOME/.work/workspaces/$base/.meta"
+    > "$TEST_HOME/.cortex/workspaces/$base/.meta"
   bash "$SCRIPT" "$TEST_CWD" >/dev/null 2>&1
   rc=$?
   assert_eq "$rc" "2" "collision should propagate exit 2"

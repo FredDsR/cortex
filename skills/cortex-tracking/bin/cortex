@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cortex: unified front door for the tracking-work skill family.
+# cortex: unified front door for the cortex-tracking skill family.
 # Dispatches to the per-skill scripts (kb, viz). See skills/*/SKILL.md.
 set -euo pipefail
 
@@ -38,7 +38,7 @@ case "$self" in
     *)   self="$(command -v -- "$self")" ;;
 esac
 self="$(_resolve "$self")"
-# bin/ -> tracking-work/ -> skills/ -> repo root
+# bin/ -> cortex-tracking/ -> skills/ -> repo root
 # Physical resolution (-P) so an invocation through a symlinked skill dir still
 # lands at the real repo root, where the top-level `cortex/` package lives.
 REPO_ROOT="$(cd -P "$(dirname "$self")/../../.." && pwd -P)"
@@ -51,7 +51,7 @@ case "$group" in
                    exit 1
                }
                exec env PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" \
-                    "${WORK_KB_PYTHON:-python3}" -m cortex.cli "$group" "$@" ;;
+                    "${CORTEX_PYTHON:-python3}" -m cortex.cli "$group" "$@" ;;
     -h|--help) usage 0 ;;
     *) echo "cortex: unknown command '$group'" >&2; usage ;;
 esac

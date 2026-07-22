@@ -9,7 +9,7 @@ SCRIPT="$(cd .. && pwd)/close_day.sh"
 # Slug resolves to basename(TEST_CWD) == "cwd".
 mk_active_session() {
   local session="$1" started="${2:-}"
-  local ws="$TEST_HOME/.work/workspaces/cwd"
+  local ws="$TEST_HOME/.cortex/workspaces/cwd"
   mkdir -p "$ws/sessions/$session/tasks"
   {
     printf -- '---\n'
@@ -77,7 +77,7 @@ test_next_day_sunday_is_monday() {
 test_tasks_lists_active_session_only() {
   setup_tmp
   mk_active_session "sess-a" "2026-06-01"
-  local ws="$TEST_HOME/.work/workspaces/cwd"
+  local ws="$TEST_HOME/.cortex/workspaces/cwd"
   {
     printf -- '---\nstatus: In Progress\n---\n\n# Task A\n'
   } > "$ws/sessions/sess-a/tasks/task-a.md"
@@ -129,7 +129,7 @@ test_non_repo_omits_git_sections_but_status_ok() {
 test_helper_does_not_write_session_files() {
   setup_tmp
   mk_active_session "sess-a" "2026-06-01"
-  local ws="$TEST_HOME/.work/workspaces/cwd"
+  local ws="$TEST_HOME/.cortex/workspaces/cwd"
   {
     printf -- '---\nstatus: Open\n---\n\n# Task A\n'
   } > "$ws/sessions/sess-a/tasks/task-a.md"

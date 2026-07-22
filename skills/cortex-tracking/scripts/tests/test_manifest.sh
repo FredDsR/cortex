@@ -29,7 +29,7 @@ mk_task_bp() {
 
 test_emits_header_and_rows() {
   setup_tmp
-  ws="$TEST_HOME/.work/workspaces/$(basename "$TEST_CWD")"
+  ws="$TEST_HOME/.cortex/workspaces/$(basename "$TEST_CWD")"
   mk_task_fm "$ws/sessions/sess-a/tasks/task-foo.md" "In Progress" "456"
   mk_task_bp "$ws/sessions/sess-a/tasks/task-bar.md" "Open"
   out="$(bash "$SCRIPT" "$TEST_CWD")"
@@ -41,7 +41,7 @@ test_emits_header_and_rows() {
 
 test_local_store_walked() {
   setup_tmp
-  mk_task_fm "$TEST_CWD/.work/sessions/local-sess/tasks/task-x.md" "Resolved"
+  mk_task_fm "$TEST_CWD/.cortex/sessions/local-sess/tasks/task-x.md" "Resolved"
   out="$(bash "$SCRIPT" "$TEST_CWD")"
   assert_contains "$out" $'local\tlocal-sess\ttask-x\tResolved' "local-store row"
   teardown_tmp
@@ -49,7 +49,7 @@ test_local_store_walked() {
 
 test_pr_link_extracted_from_legacy() {
   setup_tmp
-  ws="$TEST_HOME/.work/workspaces/$(basename "$TEST_CWD")"
+  ws="$TEST_HOME/.cortex/workspaces/$(basename "$TEST_CWD")"
   mkdir -p "$ws/sessions/s/tasks"
   cat > "$ws/sessions/s/tasks/task-pr.md" <<'EOF'
 # task-pr

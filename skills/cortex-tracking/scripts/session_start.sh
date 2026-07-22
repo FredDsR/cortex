@@ -33,7 +33,7 @@ sid_src="$(cat "$src_tmp" 2>/dev/null | tr -d '[:space:]')"
 rm -f "$src_tmp"
 
 # 3. Sweep stale active pointers (best-effort, never fail the bootstrap).
-bash "$script_dir/sweep_active.sh" "$HOME/.work/workspaces/$slug" 7 >/dev/null 2>&1 || true
+bash "$script_dir/sweep_active.sh" "$HOME/.cortex/workspaces/$slug" 7 >/dev/null 2>&1 || true
 
 # 4. Conditionally pull sync. The sub-skill's pull.sh self-gates when sync is
 #    disabled or unconfigured (exits 0 with no output).
