@@ -16,6 +16,10 @@
   --accent: #4f46e5;
   --accent-bg: #eef0fe;
 
+  /* content links: fresh (unseen) vs remembered (seen) */
+  --link: #0e7490;
+  --link-seen: #6366f1;
+
   --text-primary: #1f2933;
   --text-muted: #5a6573;
 }
@@ -26,6 +30,8 @@ body.dark {
   --border: #2a3340;
   --accent: #818cf8;
   --accent-bg: #262b45;
+  --link: #38bdf8;
+  --link-seen: #a5b4fc;
 
   --text-primary: #e6e9ef;
   --text-muted: #8a929c;
@@ -362,8 +368,9 @@ li.collapsed > .tree-row > .tree-arrow { transform: rotate(-90deg); }
   font-size: 12.5px;
   line-height: 1.45;
 }
-#content a { color: var(--accent); text-decoration: none; }
+#content a { color: var(--link); text-decoration: none; }
 #content a:hover { text-decoration: underline; }
+#content a.seen { color: var(--link-seen); }
 #content a.wikilink { font-style: italic; }
 #content .wikilink-broken {
   color: var(--text-muted);
