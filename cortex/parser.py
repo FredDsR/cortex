@@ -150,7 +150,7 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
     raw_edges: dict[str, list[RawEdge]] = {}
 
     # Root hub
-    root = Doc(id=DocId(kind="root"), title="Fred's Work Tracking", body="",
+    root = Doc(id=DocId(kind="root"), title="Fred's Cortex", body="",
                frontmatter={}, rel_path=None, edges_out=[])
     docs["/"] = root
 

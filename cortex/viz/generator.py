@@ -122,7 +122,7 @@ def _children_of(world: World, parent_canon: str, kind: str) -> list[Doc]:
 
 def _emit_root_index(world: World, out_dir: Path) -> None:
     workspaces = _children_of(world, "/", "workspace")
-    lines = ["# Fred's Work Tracking", "", "## Workspaces", ""]
+    lines = ["# Fred's Cortex", "", "## Workspaces", ""]
     for ws in workspaces:
         lines.append(f"- [{ws.id.workspace}](workspaces/{ws.id.workspace}/index.html)")
 
@@ -432,7 +432,7 @@ def _global_wikilink_index(world: World) -> dict[str, str]:
 def _build_tree(world: World) -> list[dict]:
     import re as _re
     root_doc = world.docs.get("/")
-    root_node = {"id": "/", "label": "Fred's Work Tracking", "kind": "root",
+    root_node = {"id": "/", "label": "Fred's Cortex", "kind": "root",
                  "scopeId": "/", "href": "index.html",
                  "contentPath": _content_path(root_doc.id) if root_doc else "index.md",
                  "archived": False,
@@ -554,8 +554,8 @@ def _emit_html_pages(world: World, out_dir: Path) -> None:
     payload = build_payload(world, "root", "/")
     (out_dir / "index.html").write_text(
         _render_shell("root", "/", payload, _vendor_rel("root", "/"),
-                      "Fred's Work Tracking",
-                      title_line="Fred's Work Tracking",
+                      "Fred's Cortex",
+                      title_line="Fred's Cortex",
                       subtitle_line="all workspaces"),
         encoding="utf-8")
 
