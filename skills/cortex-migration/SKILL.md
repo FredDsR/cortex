@@ -1,9 +1,9 @@
 ---
 name: cortex-migration
-description: Use only when invoked by cortex-tracking to move a session between the global store (~/.work/workspaces/<slug>/) and a repo-local store (<repo>/.work/). Per-session, explicit, never implicit.
+description: Use only when invoked by cortex-tracking to move a session between the global store (~/.cortex/workspaces/<slug>/) and a repo-local store (<repo>/.cortex/). Per-session, explicit, never implicit.
 ---
 
-# Tracking Work — Migration
+# Cortex: Migration
 
 Invoked by the core `cortex-tracking` skill when the user asks to move a session between stores. Never moves data on its own.
 
@@ -31,7 +31,7 @@ Given a session at `<src-store>/sessions/<slug>/` moving to `<dst-store>/session
    Content:
    ```markdown
    This session moved to the global store on YYYY-MM-DD.
-   New path: ~/.work/workspaces/<workspace-slug>/sessions/<session-slug>/
+   New path: ~/.cortex/workspaces/<workspace-slug>/sessions/<session-slug>/
 
    If you're on a different machine, recreate the session locally or ask the author.
    ```

@@ -1,6 +1,6 @@
 # cortex-viz
 
-Static browser-based viewer for `~/.work/workspaces/`. Three panes (collapsible tree, hub-and-spoke Cytoscape graph, rendered markdown content) over a copied markdown tree. Read-only.
+Static browser-based viewer for `~/.cortex/workspaces/`. Three panes (collapsible tree, hub-and-spoke Cytoscape graph, rendered markdown content) over a copied markdown tree. Read-only.
 
 It surfaces the knowledge/workbench frontmatter authored by `cortex-kb` (the `cortex kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `INDEX.md` files (from `cortex kb index`) are excluded from the graph.
 
@@ -10,7 +10,7 @@ From the repo root:
 
     bash install.sh
 
-This symlinks the unified `cortex` bin to `~/.work/bin/cortex` (reach the viewer via `cortex viz ...`) and fetches two third-party JS files (Cytoscape, marked) into `cortex/viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.work/bin` to your `PATH` if it isn't already.
+This symlinks the unified `cortex` bin to `~/.cortex/bin/cortex` (reach the viewer via `cortex viz ...`) and fetches two third-party JS files (Cytoscape, marked) into `cortex/viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.cortex/bin` to your `PATH` if it isn't already.
 
 ## Usage
 
@@ -23,7 +23,7 @@ cortex viz serve [OUT_DIR] --edit                       # localhost in-browser e
 cortex viz serve [OUT_DIR] --edit --workspaces-root DIR # override the source root
 ```
 
-`WORKSPACES_ROOT` defaults to `~/.work/workspaces/`. `OUT` and `OUT_DIR` default to `~/.cache/work-viz/out/`.
+`WORKSPACES_ROOT` defaults to `~/.cortex/workspaces/`. `OUT` and `OUT_DIR` default to `~/.cache/cortex/out/`.
 
 The build is a folder you can browse via the bundled static server, via `python -m http.server`, or as a plain markdown wiki in any markdown viewer (Obsidian, etc.). Opening the HTML directly via `file://` works for navigation but the content pane's marked.js fetch requires a server.
 
@@ -34,7 +34,7 @@ static build. An **Edit** button appears on `task`, `knowledge`, `workbench`,
 and session (`SUMMARY.md`) docs; it opens the raw markdown in a textarea. Save
 writes the source file, rebuilds the site, and refreshes the graph, tree, and
 content in place. The source root comes from the build manifest
-(`.work-viz-build.json`); `--workspaces-root PATH` overrides it. Typing `[[` in
+(`.cortex-build.json`); `--workspaces-root PATH` overrides it. Typing `[[` in
 the editor opens an autocomplete over task / knowledge / workbench docs and
 inserts the most-abbreviated valid addressing-grammar token.
 
@@ -94,7 +94,7 @@ other-ws/other-sess/workbench/foo   -> workbench across both boundaries
       tasks/index.md, <slug>.md
 ```
 
-`<slug>.md` and `SUMMARY.md` are byte-for-byte copies of the source files in `~/.work/`. The HTML shells render whichever `.md` the user clicks via `marked.js`.
+`<slug>.md` and `SUMMARY.md` are byte-for-byte copies of the source files in `~/.cortex/`. The HTML shells render whichever `.md` the user clicks via `marked.js`.
 
 ## Tests
 

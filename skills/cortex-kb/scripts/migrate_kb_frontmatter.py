@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot migration for existing ~/.work knowledge/workbench docs.
+"""One-shot migration for existing ~/.cortex knowledge/workbench docs.
 
 - Normalizes frontmatter: backfills `updated` (= created) and enforces the
   canonical field order, line-preservingly (no yaml.dump / re-quoting).
@@ -12,7 +12,7 @@ import sys, re, argparse
 from pathlib import Path
 
 # Bootstrap: this script may run standalone (python3 .../migrate_kb_frontmatter.py),
-# so put the repo root (scripts -> tracking-work-kb -> skills -> root) on sys.path
+# so put the repo root (scripts -> cortex-kb -> skills -> root) on sys.path
 # to import the cortex engine. Guard the depth so a stray shallow copy fails with
 # the clear message below rather than an IndexError.
 _parents = Path(__file__).resolve().parents
@@ -29,7 +29,7 @@ try:
     from cortex.frontmatter import CANON, split_lines
 except ModuleNotFoundError:
     sys.exit("migrate_kb_frontmatter: cannot import the cortex engine. "
-             "Run this script from within the tracking-work-skills repo.")
+             "Run this script from within the cortex-skills repo.")
 STALE = re.compile(r"\bwork-(kb|viz)\b")
 _KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):")
 

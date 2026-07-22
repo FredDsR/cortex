@@ -1,6 +1,6 @@
 ---
 name: cortex-tracking
-description: Tracks tasks, priorities, status, blockers, and progress across concurrent agent sessions, using ~/.work/ (global) or <repo>/.work/ (local). Use when the user mentions tasks, priorities, status, blockers, overview, "where are we", or starts non-trivial work that spans multiple steps.
+description: Tracks tasks, priorities, status, blockers, and progress across concurrent agent sessions, using ~/.cortex/ (global) or <repo>/.cortex/ (local). Use when the user mentions tasks, priorities, status, blockers, overview, "where are we", or starts non-trivial work that spans multiple steps.
 ---
 
 # Cortex Tracking
@@ -9,8 +9,8 @@ description: Tracks tasks, priorities, status, blockers, and progress across con
 
 A composable, file-based workflow for tracking work across sessions and workspaces. Supports:
 
-- A **global store** at `~/.work/workspaces/<slug>/` (default) so tracking is not tied to any one repo.
-- An **optional local store** at `<repo>/.work/` when the user wants to commit session state alongside code.
+- A **global store** at `~/.cortex/workspaces/<slug>/` (default) so tracking is not tied to any one repo.
+- An **optional local store** at `<repo>/.cortex/` when the user wants to commit session state alongside code.
 - **Concurrent agents:** one `.active.<session-id>` pointer per agent/shell, resolved by a layered ID algorithm.
 - **Any runtime:** works with Claude Code, Copilot CLI, Codex, or a plain shell. No hard dependency on a specific harness.
 
@@ -18,7 +18,7 @@ Sub-skills handle optional concerns:
 
 - `cortex-github` — PR/commit sync when a session has a `github:` field.
 - `cortex-migration` — per-session moves between local and global stores.
-- `cortex-sync` — cross-device sync of `~/.work/` via a private GitHub repo (opt-in).
+- `cortex-sync` — cross-device sync of `~/.cortex/` via a private GitHub repo (opt-in).
 - `cortex-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `cortex kb` CLI.
 - `cortex-inject`: opt-in, off-by-default session-start context injection via the `cortex inject` CLI. The single exception to the no-auto-injection philosophy.
 
@@ -53,7 +53,7 @@ SESSIONS
 
 Then decide:
 
-1. **Collision (`session_start.sh` exits 2).** Read the existing CWD from its stderr and prompt using the wording in `slug-resolution.md`. Write the chosen slug into `~/.work/workspaces/<chosen>/.meta` with `cwd: <current>` before retrying.
+1. **Collision (`session_start.sh` exits 2).** Read the existing CWD from its stderr and prompt using the wording in `slug-resolution.md`. Write the chosen slug into `~/.cortex/workspaces/<chosen>/.meta` with `cwd: <current>` before retrying.
 2. **No sessions.** Ask the user if they want to start tracking. If yes, prompt for slug + global-vs-local store. Create `sessions/<slug>/SUMMARY.md` from the template and set `.active.<id>`.
 3. **One session.** Summarize it. Ask continue/switch/new.
 4. **Multiple sessions.** Render the `list_sessions.sh` output — tag each line with origin (`[local]` / `[global]`) and any active markers (`[claude:...]`, `[copilot:...]`, etc.). Ask which to continue or whether to start a new one.
@@ -133,7 +133,7 @@ If a session's SUMMARY.md has a `github: <owner>/<repo>` frontmatter field, invo
 ## Local vs Global Store
 
 - **Global is the default.** Use it unless the user explicitly wants to commit tracking files.
-- **Local store** is opt-in — ask on session creation: *"Track this session globally in `~/.work/` or locally in `<repo>/.work/` (git-committable)?"*. Default = global.
+- **Local store** is opt-in — ask on session creation: *"Track this session globally in `~/.cortex/` or locally in `<repo>/.cortex/` (git-committable)?"*. Default = global.
 - `list_sessions.sh` merges both; the skill tags each session with origin.
 - **Never auto-migrate.** Migration is explicit via `cortex-migration`.
 

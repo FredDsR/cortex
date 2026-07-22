@@ -1,6 +1,6 @@
-# tracking-work device-local files — do not sync
+# cortex device-local files, not synced
 .active.*
 .meta
 
-# tracking-work-viz output (regenerable via cortex viz + install.sh)
+# cortex-viz output (regenerable via cortex viz + install.sh)
 viz/

@@ -1,20 +1,20 @@
 ---
 name: cortex-viz
-description: Use when the user wants a visual overview of `~/.work/` sessions and tasks ("show me what's going on", "visualize my work", "open the dashboard"). Builds a static HTML site with three panes (tree, hub-and-spoke graph, rendered markdown) for browsing every workspace, session, and task. Read-only by default; opt-in `serve --edit` adds localhost in-browser editing.
+description: Use when the user wants a visual overview of `~/.cortex/` sessions and tasks ("show me what's going on", "visualize my work", "open the dashboard"). Builds a static HTML site with three panes (tree, hub-and-spoke graph, rendered markdown) for browsing every workspace, session, and task. Read-only by default; opt-in `serve --edit` adds localhost in-browser editing.
 ---
 
 # cortex-viz
 
-Static browser-based viewer for `~/.work/workspaces/`. The CLI builds a folder of HTML + copied markdown and serves it locally over plain HTTP. The static build is read-only; an opt-in `serve --edit` mode adds localhost-only in-browser editing.
+Static browser-based viewer for `~/.cortex/workspaces/`. The CLI builds a folder of HTML + copied markdown and serves it locally over plain HTTP. The static build is read-only; an opt-in `serve --edit` mode adds localhost-only in-browser editing.
 
 ## Invocation
 
-The user-facing command is `cortex viz` (the unified `cortex` bin, which `install.sh` symlinks to `~/.work/bin/cortex` and routes to the `cortex` engine via `python -m cortex.cli viz`; the viz code lives at `cortex/viz/`). The user must have `~/.work/bin/` on their `PATH` (or invoke via the absolute path).
+The user-facing command is `cortex viz` (the unified `cortex` bin, which `install.sh` symlinks to `~/.cortex/bin/cortex` and routes to the `cortex` engine via `python -m cortex.cli viz`; the viz code lives at `cortex/viz/`). The user must have `~/.cortex/bin/` on their `PATH` (or invoke via the absolute path).
 
 | Command | What happens |
 |---|---|
-| `cortex viz` | Default: builds into `~/.cache/work-viz/out/` and serves it on a random local port, opens the browser. |
-| `cortex viz build [WORKSPACES_ROOT] [--out OUT]` | Parses `WORKSPACES_ROOT` (default `~/.work/workspaces/`) and writes the static site into `OUT` (default `~/.cache/work-viz/out/`). |
+| `cortex viz` | Default: builds into `~/.cache/cortex/out/` and serves it on a random local port, opens the browser. |
+| `cortex viz build [WORKSPACES_ROOT] [--out OUT]` | Parses `WORKSPACES_ROOT` (default `~/.cortex/workspaces/`) and writes the static site into `OUT` (default `~/.cache/cortex/out/`). |
 | `cortex viz serve [OUT_DIR] [--host H] [--port P] [--no-open]` | Serves an existing built directory. No build, no watch. |
 | `cortex viz serve [OUT_DIR] --edit [--workspaces-root PATH]` | Same, plus localhost-only in-browser editing. See "In-browser editing" below. |
 
@@ -42,8 +42,8 @@ The root (dashboard) page is also the cross-workspace knowledge wiki: it lists e
   workspaces/<ws>/index.html, index.md
   workspaces/<ws>/knowledge/index.md
   workspaces/<ws>/sessions/<sess>/index.html, index.md
-  workspaces/<ws>/sessions/<sess>/SUMMARY.md           # copied from ~/.work/
-  workspaces/<ws>/sessions/<sess>/tasks/<slug>.md      # copied from ~/.work/
+  workspaces/<ws>/sessions/<sess>/SUMMARY.md           # copied from ~/.cortex/
+  workspaces/<ws>/sessions/<sess>/tasks/<slug>.md      # copied from ~/.cortex/
   workspaces/<ws>/sessions/<sess>/workbench/index.md
 ```
 
@@ -52,7 +52,7 @@ The `index.md` files at every scope are auto-generated and OpenKB-style, so the 
 ## Read-only by default
 
 The static `build` output and plain `cortex viz serve` never edit anything under
-`~/.work/`. This keeps a shared or published build (e.g. GitHub Pages) safe.
+`~/.cortex/`. This keeps a shared or published build (e.g. GitHub Pages) safe.
 
 ## In-browser editing (`serve --edit`)
 
@@ -68,7 +68,7 @@ localhost-only and never part of a static build.
 - Typing `[[` in the editor opens an autocomplete over every task / knowledge /
   workbench doc and inserts the most-abbreviated valid addressing-grammar token
   (bare slug for the same session, `session/slug` cross-session, and so on).
-- The source root is read from the build manifest (`.work-viz-build.json`);
+- The source root is read from the build manifest (`.cortex-build.json`);
   pass `--workspaces-root PATH` to override it.
 - Optimistic concurrency: if the file changed on disk since you opened it (sync
   pull, `cortex kb`, or an external editor), Save is refused and the browser
@@ -78,6 +78,6 @@ localhost-only and never part of a static build.
 
 ## Sync interaction
 
-The build output lives at `~/.cache/work-viz/out/` by default, which is outside the synced tree. No interaction with `cortex-sync`.
+The build output lives at `~/.cache/cortex/out/` by default, which is outside the synced tree. No interaction with `cortex-sync`.
 
 For UI feature reference, the addressing grammar, and the typed-relation chips, see `README.md`.

@@ -1,7 +1,7 @@
 # cortex-kb
 
 Thin CLI for authoring `knowledge/<slug>.md` (workspace-scoped) and
-`workbench/<slug>.md` (session-scoped) markdown files in the `~/.work/`
+`workbench/<slug>.md` (session-scoped) markdown files in the `~/.cortex/`
 tracking store. Sibling to `cortex-viz`, which renders them.
 
 ## Install

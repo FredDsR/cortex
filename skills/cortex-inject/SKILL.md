@@ -14,7 +14,7 @@ stays an exception: never enable it without an explicit user request.
 Injection happens only when BOTH are true:
 
 1. The harness session-start hook is wired (per harness, global, one-time).
-2. The resolved workspace has a sentinel: `~/.work/workspaces/<slug>/.inject-enabled`.
+2. The resolved workspace has a sentinel: `~/.cortex/workspaces/<slug>/.inject-enabled`.
 
 Either guard alone injects nothing. This is what keeps it off by default.
 
@@ -28,7 +28,7 @@ cortex inject here    [--format text|claude-code] [--workspace W] [--session S] 
 ```
 
 - `cortex inject here` is the universal renderer: it prints the byte-bounded
-  `<tracking-work-index>` block (knowledge index + active workbench + open or
+  `<cortex-index>` block (knowledge index + active workbench + open or
   in-progress tasks) to stdout, or nothing when a guard is not satisfied. Any
   harness, skill, or human can call it.
 - Enable in a tracked repo, wiring Claude Code in one line:

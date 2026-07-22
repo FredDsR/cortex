@@ -1,13 +1,13 @@
 ---
 name: cortex-kb
-description: Use when authoring workspace-scoped knowledge entries or session-scoped workbench drafts in the ~/.work knowledge base. Creates markdown files at the correct path with valid frontmatter; agents pass --body or pipe content via stdin.
+description: Use when authoring workspace-scoped knowledge entries or session-scoped workbench drafts in the ~/.cortex knowledge base. Creates markdown files at the correct path with valid frontmatter; agents pass --body or pipe content via stdin.
 ---
 
-# Tracking Work: Knowledge Base writes
+# Cortex: Knowledge Base writes
 
 Authors `knowledge/<slug>.md` (workspace-scoped) and `workbench/<slug>.md`
-(session-scoped) markdown files in the `~/.work/` (global) or
-`<repo>/.work/` (local) tracking store. Sibling skill to
+(session-scoped) markdown files in the `~/.cortex/` (global) or
+`<repo>/.cortex/` (local) tracking store. Sibling skill to
 `cortex-viz`, which renders the resulting files in the graph and
 tree.
 
@@ -90,10 +90,10 @@ viz graph.
 Pass `--workspace=all` to aggregate every workspace's `knowledge/` into one
 cross-workspace dictionary grouped by `type` and tagged with each doc's
 workspace (the "brain"). `--workspace=all --write` derives
-`~/.work/knowledge/INDEX.md`. Entries are one-per-doc and never merged; concepts
+`~/.cortex/knowledge/INDEX.md`. Entries are one-per-doc and never merged; concepts
 relate only through real `[[...]]` links and backlinks, which the viz root page
-renders as a graph. Scope is the global store (`~/.work/workspaces/*`) only;
-repo-local `<repo>/.work` stores are intentionally excluded (they are per-repo,
+renders as a graph. Scope is the global store (`~/.cortex/workspaces/*`) only;
+repo-local `<repo>/.cortex` stores are intentionally excluded (they are per-repo,
 not part of the cross-workspace brain). Type grouping is case-insensitive.
 
 ### Bulk ingestion (`cortex kb ingest`)
@@ -120,7 +120,7 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
 - `--only openapi|sql` restricts the deterministic scan; `--max <N>` caps writes
   (default 100) with a `... K more (raise --max)` notice.
 - **Dependency / fallback.** The deterministic path uses a Python helper
-  (stdlib + PyYAML, no new pip deps), selected via `${WORK_KB_PYTHON:-python3}`.
+  (stdlib + PyYAML, no new pip deps), selected via `${CORTEX_PYTHON:-python3}`.
   If Python/PyYAML is unavailable, structured files fall into the agent worklist
   and the run still exits 0 (plain-shell harness-agnosticism preserved).
 
@@ -161,7 +161,7 @@ cortex kb new workbench draft-pr-description --body-from /tmp/pr-draft.md
 ## Resolution rules
 
 - Workspace discovery walks up from cwd (only within `$HOME`) to find a
-  local `.work/` first; otherwise scans `~/.work/workspaces/*/` for the
+  local `.cortex/` first; otherwise scans `~/.cortex/workspaces/*/` for the
   unique workspace that has any `.active.*` pointer. Errors if zero or
   multiple.
 - Session discovery (workbench only) reads `.active.*` pointers in the

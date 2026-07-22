@@ -4,8 +4,8 @@ Exact format of files in the global and local stores, and how they interact.
 
 ## Stores
 
-- **Global (default):** `~/.work/workspaces/<slug>/`
-- **Local (opt-in):** `<repo>/.work/`
+- **Global (default):** `~/.cortex/workspaces/<slug>/`
+- **Local (opt-in):** `<repo>/.cortex/`
 
 Both share the same internal layout. A session exists in one store or the other, not both. `list_sessions.sh` merges them for display.
 
