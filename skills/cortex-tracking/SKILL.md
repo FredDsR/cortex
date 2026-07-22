@@ -75,7 +75,7 @@ Then decide:
 | After any write to `tasks/*.md` or `SUMMARY.md` | Run `commit_push.sh "<track: ... message>"`. |
 | `pull.sh` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
 | On session close (after archive move) | Run `commit_push.sh "track: archive session <slug>"`. |
-| User says "close the day" / "see you tomorrow" / `/tracking-work:close-day` | Run the **Closing the Day** routine: snapshot via `close_day.sh`, propose updates, confirm once, write + `commit_push.sh`, sign off. Never archive. |
+| User says "close the day" / "see you tomorrow" / `/cortex:close-day` | Run the **Closing the Day** routine: snapshot via `close_day.sh`, propose updates, confirm once, write + `commit_push.sh`, sign off. Never archive. |
 
 All `cortex-sync/scripts/*` no-op when sync is unavailable, so checkpoints call them unconditionally. Full path: `$HOME/.claude/skills/cortex-sync/scripts/`.
 
@@ -85,7 +85,7 @@ Explicit, user-triggered wrap-up of the active session. This is NOT "Closing a
 Session" — it never archives the session and never deletes `.active.<id>`. The
 session stays live so the next day resumes seamlessly.
 
-**Triggers:** the `/tracking-work:close-day` slash command, or any of these
+**Triggers:** the `/cortex:close-day` slash command, or any of these
 phrases (phrases are the cross-harness mechanism): "close the day", "that's all
 for today", "see you tomorrow", "I'm done for today", "wrapping up".
 

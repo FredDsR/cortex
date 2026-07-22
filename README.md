@@ -100,7 +100,7 @@ A `.claude-plugin/marketplace.json` + `plugin.json` are included so this repo is
 
 ```
 /plugin marketplace add FredDsR/tracking-work-skills
-/plugin install tracking-work
+/plugin install cortex
 ```
 
 Note: some cross-skill invocations in the main skill hardcode `$HOME/.claude/skills/<sub-skill>/...` paths, so the symlink path is the first-class install. The plugin route is provided as a convenience for Claude-Code-only users who prefer the `/plugin` UX; behavior is best-effort.

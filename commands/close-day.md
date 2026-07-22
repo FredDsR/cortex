@@ -1,8 +1,8 @@
 ---
-description: Wrap up the active tracking-work session for the day — save work, update tasks and knowledge notes, sync, and sign off.
+description: Wrap up the active cortex-tracking session for the day. Save work, update tasks and knowledge notes, sync, and sign off.
 ---
 
-Invoke the `tracking-work` skill's **Closing the Day** routine for the current
+Invoke the `cortex-tracking` skill's **Closing the Day** routine for the current
 workspace's active session(s).
 
 Follow that routine exactly:

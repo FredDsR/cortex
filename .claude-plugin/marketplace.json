@@ -1,14 +1,14 @@
 {
-  "name": "tracking-work-skills",
+  "name": "cortex-skills",
   "owner": {
     "name": "FredDsR"
   },
-  "description": "FredDsR's personal agentic-skills marketplace. Starts with the tracking-work suite; may grow.",
+  "description": "FredDsR's personal agentic-skills marketplace. Starts with the cortex suite; may grow.",
   "plugins": [
     {
-      "name": "tracking-work",
+      "name": "cortex",
       "source": ".",
-      "description": "cortex: main tracking-work skill plus sub-skills (github, migration, sync, kb, viz), fronted by the `cortex` CLI.",
+      "description": "cortex: main cortex-tracking skill plus sub-skills (github, migration, sync, kb, viz, inject), fronted by the `cortex` CLI.",
       "version": "1.0.0"
     }
   ]

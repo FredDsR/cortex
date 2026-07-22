@@ -1,11 +1,11 @@
 {
-  "name": "tracking-work",
-  "description": "cortex: file-based session/task tracking + knowledge base for AI coding agents, fronted by the `cortex` CLI (cortex kb / cortex viz). Bundles the main skill + github/migration/sync/kb/viz/inject sub-skills. Works with Claude Code, Codex, Gemini CLI, Copilot CLI (any harness reading SKILL.md).",
+  "name": "cortex",
+  "description": "cortex: file-based session/task tracking + knowledge base for AI coding agents, fronted by the `cortex` CLI (cortex kb / cortex viz / cortex sync). Bundles the main cortex-tracking skill + github/migration/sync/kb/viz/inject sub-skills. Works with Claude Code, Codex, Gemini CLI, Copilot CLI (any harness reading SKILL.md).",
   "version": "1.0.0",
   "author": {
     "name": "FredDsR"
   },
-  "homepage": "https://github.com/FredDsR/tracking-work-skills",
-  "repository": "https://github.com/FredDsR/tracking-work-skills",
+  "homepage": "https://github.com/FredDsR/cortex-skills",
+  "repository": "https://github.com/FredDsR/cortex-skills",
   "license": "MIT"
 }
