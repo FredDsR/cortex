@@ -79,10 +79,12 @@ def _read_body(args, *, allow_stdin: bool) -> str:
 
 
 def sync_after(verb: str, kind: str, slug: str) -> None:
-    hook = _home() / ".claude/skills/cortex-tracking-sync/scripts/commit_push.sh"
-    if os.access(hook, os.X_OK):
-        subprocess.run(["bash", str(hook), f"track(kb): {verb} {kind} {slug}"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    # Best-effort: cortex.sync.push is a no-op when sync is not enabled.
+    from cortex import sync
+    try:
+        sync.push(f"track(kb): {verb} {kind} {slug}", home=_home())
+    except Exception:
+        pass
 
 
 def _maybe_open(args, path: Path) -> None:

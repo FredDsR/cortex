@@ -40,8 +40,8 @@ inserts the most-abbreviated valid addressing-grammar token.
 
 Saves are guarded by an on-disk content hash: if the file changed since you
 opened it, Save is refused and the current version is reloaded so you can
-reapply your edit. A successful save runs `cortex-sync`'s
-`commit_push.sh` when sync is configured. The plain `serve` and static `build`
+reapply your edit. A successful save runs `cortex sync push` when sync is
+configured. The plain `serve` and static `build`
 have no write API and stay Pages-safe.
 
 ## UI panes

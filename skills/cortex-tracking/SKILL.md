@@ -72,12 +72,12 @@ Then decide:
 | Blocker resolves | Remove from **Blockers**, unset **Blocked** on dependents. |
 | User asks to move a session between stores | Invoke `cortex-migration`. |
 | User wants to capture a durable note, an unresolved `[[knowledge/...]]` / `[[workbench/...]]` ghost link needs a real entry, spec/plan/brainstorm output should be recorded, or a task needs supporting files (especially shared context referenced by more than one task) | Invoke `cortex-kb` to author `knowledge/<slug>.md` (workspace-scoped, for context shared across tasks) or `workbench/<slug>.md` (session-scoped). Reference the entry from the relevant task bodies with `[[knowledge/<slug>]]`. |
-| After any write to `tasks/*.md` or `SUMMARY.md` | Run `commit_push.sh "<track: ... message>"`. |
-| `pull.sh` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
-| On session close (after archive move) | Run `commit_push.sh "track: archive session <slug>"`. |
-| User says "close the day" / "see you tomorrow" / `/cortex:close-day` | Run the **Closing the Day** routine: snapshot via `close_day.sh`, propose updates, confirm once, write + `commit_push.sh`, sign off. Never archive. |
+| After any write to `tasks/*.md` or `SUMMARY.md` | Run `cortex sync push "<track: ... message>"`. |
+| `cortex sync pull` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
+| On session close (after archive move) | Run `cortex sync push "track: archive session <slug>"`. |
+| User says "close the day" / "see you tomorrow" / `/cortex:close-day` | Run the **Closing the Day** routine: snapshot via `close_day.sh`, propose updates, confirm once, write + `cortex sync push`, sign off. Never archive. |
 
-All `cortex-sync/scripts/*` no-op when sync is unavailable, so checkpoints call them unconditionally. Full path: `$HOME/.claude/skills/cortex-sync/scripts/`.
+The `cortex sync` subcommands no-op when sync is unavailable, so checkpoints call them unconditionally.
 
 ## Closing the Day
 
@@ -107,7 +107,7 @@ Routine:
 3. Present the batch and get a SINGLE confirmation.
 4. On confirm: write `tasks/*.md` and update `SUMMARY.md` (bump `last_updated`);
    create/update knowledge notes via `cortex kb`; then run
-   `bash "$HOME/.claude/skills/cortex-sync/scripts/commit_push.sh" "track: close day — <session-slug>"`
+   `cortex sync push "track: close day <session-slug>"`
    (this is the commit+push path; it no-ops when sync is unavailable).
 5. Sign off using `NEXT_DAY`: "Saved and synced. See you tomorrow." / "… See you
    Monday." If sync is unavailable, say "Saved." instead of "Saved and synced."
@@ -139,7 +139,7 @@ If a session's SUMMARY.md has a `github: <owner>/<repo>` frontmatter field, invo
 
 ## Sync (optional)
 
-First-run bootstrap only: if `~/.claude/skills/cortex-sync/` is installed and `~/.work/` is neither a git repo nor contains a `.sync-disabled` sentinel, invoke `setup.sh` once. The user picks clone / create / skip; subsequent invocations trust the recorded state.
+First-run bootstrap only: if the `cortex` CLI is installed and `~/.cortex/` is neither a git repo nor contains a `.sync-disabled` sentinel, run `cortex sync setup` once. The user picks clone / create / skip; subsequent invocations trust the recorded state.
 
 See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 

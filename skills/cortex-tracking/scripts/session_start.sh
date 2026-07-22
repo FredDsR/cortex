@@ -24,7 +24,6 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ -d "$HOME/.work" ] && [ ! -d "$HOME/.cortex" ]; then
     echo "cortex: legacy ~/.work store detected. Run: cortex migrate-store --write" >&2
 fi
-sync_dir="$HOME/.claude/skills/tracking-work-sync"
 
 # 1. Workspace slug. Pass through exit 2 (collision); stderr goes to stderr.
 slug="$(bash "$script_dir/resolve_workspace.sh" "$cwd")"
@@ -42,11 +41,11 @@ rm -f "$src_tmp"
 # 3. Sweep stale active pointers (best-effort, never fail the bootstrap).
 bash "$script_dir/sweep_active.sh" "$HOME/.cortex/workspaces/$slug" 7 >/dev/null 2>&1 || true
 
-# 4. Conditionally pull sync. The sub-skill's pull.sh self-gates when sync is
-#    disabled or unconfigured (exits 0 with no output).
+# 4. Conditionally pull sync via the cortex CLI. `cortex sync pull` self-gates
+#    when sync is disabled or unconfigured (exits 0 with no output).
 sync_state="not-installed"
-if [ -x "$sync_dir/scripts/pull.sh" ]; then
-  if pull_out="$(bash "$sync_dir/scripts/pull.sh" 2>&1)"; then
+if command -v cortex >/dev/null 2>&1; then
+  if pull_out="$(cortex sync pull 2>&1)"; then
     if echo "$pull_out" | grep -q "regenerate-needed"; then
       sync_state="regenerate-needed"
     else

@@ -73,7 +73,7 @@ localhost-only and never part of a static build.
 - Optimistic concurrency: if the file changed on disk since you opened it (sync
   pull, `cortex kb`, or an external editor), Save is refused and the browser
   reloads the current version so you can reapply your edit.
-- A successful save runs `cortex-sync`'s `commit_push.sh` when sync is
+- A successful save runs `cortex sync push` when sync is
   configured (no-op otherwise), mirroring `cortex kb`.
 
 ## Sync interaction

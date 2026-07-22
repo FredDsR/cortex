@@ -149,14 +149,12 @@ class EditHandler(http.server.SimpleHTTPRequestHandler):
     def _commit(self, cid: str) -> None:
         if not self.commit_on_save:
             return
-        script = os.path.expanduser(
-            "~/.claude/skills/cortex-tracking-sync/scripts/commit_push.sh")
-        if os.path.isfile(script) and os.access(script, os.X_OK):
-            try:
-                subprocess.run(["bash", script, f"track(viz): edit {cid}"],
-                               check=False, capture_output=True, timeout=60)
-            except Exception:
-                pass
+        # Best-effort: cortex.sync.push is a no-op when sync is not enabled.
+        try:
+            from cortex import sync
+            sync.push(f"track(viz): edit {cid}", home=os.path.expanduser("~"))
+        except Exception:
+            pass
 
     def log_message(self, *args):  # quiet server
         pass

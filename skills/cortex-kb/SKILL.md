@@ -128,8 +128,8 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
 
 - `cortex-viz` renders these docs (graph/tree/content) including the
   `type`/`title`/`description`/`updated` fields.
-- `cortex-sync` replicates the store; both write paths call its
-  `commit_push.sh`.
+- `cortex-sync` replicates the store; both write paths call
+  `cortex sync push`.
 - `cortex-migration` is a different thing entirely (session store moves),
   despite the surface similarity to `ingest`.
 
@@ -225,9 +225,8 @@ never misparsed. The viz uses real YAML for its own reads.
 
 ## Sync integration
 
-After a successful write, calls
-`$HOME/.claude/skills/cortex-sync/scripts/commit_push.sh` if
-present and executable. No-op if sync is not installed or disabled.
+After a successful write, calls `cortex sync push` in-process. No-op if sync is
+not installed or disabled.
 
 ## Tests
 
