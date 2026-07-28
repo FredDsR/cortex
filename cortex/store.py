@@ -40,6 +40,20 @@ def _active_targets(ws_root: Path) -> list[str]:
     return out
 
 
+def _meta_cwd(ws_root: Path) -> str | None:
+    """Read the `cwd:` field from a workspace's .meta, or None. Mirrors the bash
+    resolver's `awk -F': ' '$1=="cwd"{print $2}' | head -n1`: first match wins."""
+    try:
+        text = (ws_root / ".meta").read_text()
+    except OSError:
+        return None
+    for line in text.splitlines():
+        key, sep, value = line.partition(": ")
+        if sep and key == "cwd":
+            return value
+    return None
+
+
 def resolve_workspace(explicit_ws: str, *, home: Path, cwd: Path) -> Path:
     home = Path(home)
     if explicit_ws:
@@ -51,6 +65,15 @@ def resolve_workspace(explicit_ws: str, *, home: Path, cwd: Path) -> Path:
     if local is not None:
         return local
     root = home / ".cortex" / "workspaces"
+    # Step 2 of the bash resolver: an exact .meta cwd match. Without this, a cwd
+    # that names a workspace unambiguously still lost to the active-pointer scan
+    # below, which dies whenever any two workspaces hold stale .active.* files.
+    target = Path(cwd).resolve()
+    if root.is_dir():
+        for ws in sorted(p for p in root.iterdir() if p.is_dir()):
+            mcwd = _meta_cwd(ws)
+            if mcwd and Path(mcwd).resolve() == target:
+                return ws
     matches = []
     if root.is_dir():
         for ws in sorted(p for p in root.iterdir() if p.is_dir()):
