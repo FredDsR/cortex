@@ -81,6 +81,10 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 
 ## Install
 
+`install.sh` serves Claude Code, Codex, and Copilot CLI, symlinking each skill
+into the harness's own `skills/` directory. Antigravity installs itself from the
+repo and needs no symlinks. Claude Code additionally has a `/plugin` route.
+
 ### Quickest path: one-liner
 
 ```bash
@@ -107,7 +111,7 @@ curl -fsSL .../install.sh | CORTEX_DIR=~/src/cortex bash
 curl -fsSL .../install.sh | bash -s -- --project ~/some-repo
 ```
 
-### Primary path — symlink install (any harness)
+### From a clone
 
 Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`) and symlinks each skill into their respective `skills/` directories.
 
@@ -138,7 +142,22 @@ bash /path/to/cortex/install.sh --project ~/some-repo  # or explicit path
 
 Project-scoped install creates `<repo>/.claude/skills/`, `<repo>/.codex/skills/`, etc. as needed (but only for harnesses you already use globally, detected via presence of `$HOME/.<harness>/`). Re-run after `git pull` in the skills clone to refresh.
 
-### Antigravity
+### Claude Code: `/plugin` (experimental)
+
+Claude Code is covered by `install.sh` above. It also has a second option: a
+`.claude-plugin/marketplace.json` + `plugin.json` make this repo addable as a
+plugin marketplace.
+
+```
+/plugin marketplace add FredDsR/cortex
+/plugin install cortex
+```
+
+Some cross-skill invocations hardcode `$HOME/.claude/skills/<sub-skill>/...`,
+which only the symlink install produces, so that route stays the first-class
+one. Use `/plugin` if you prefer the UX; behavior is best-effort.
+
+### Antigravity: `agy plugin install`
 
 Antigravity installs from the repo directly, reading `skills/` out of the git
 URL. There is nothing to symlink, so `install.sh` does not target it:
@@ -149,25 +168,13 @@ agy plugin install https://github.com/FredDsR/cortex
 
 Re-running the same command updates it.
 
-Unlike Superpowers, cortex ships no session-start hook, so nothing auto-loads:
-the skills are discovered and invoked on demand. Turning on
-`cortex inject` gives you the injection, but it currently wires a
+cortex ships no session-start hook, so nothing auto-loads here: skills are
+discovered and invoked on demand. `cortex inject` adds injection, but wires a
 Claude Code hook only.
 
-**Unverified.** This follows Antigravity's documented `agy plugin install`
-behaviour but has not been run against a real `agy` install. If you try it,
-confirm the skills are discoverable before relying on it.
-
-### Alternate path — Claude Code `/plugin` (experimental)
-
-A `.claude-plugin/marketplace.json` + `plugin.json` are included so this repo is also addable as a Claude Code plugin marketplace:
-
-```
-/plugin marketplace add FredDsR/cortex
-/plugin install cortex
-```
-
-Note: some cross-skill invocations in the main skill hardcode `$HOME/.claude/skills/<sub-skill>/...` paths, so the symlink path is the first-class install. The plugin route is provided as a convenience for Claude-Code-only users who prefer the `/plugin` UX; behavior is best-effort.
+**Unverified.** This follows Antigravity's documented behavior but has not been
+run against a real `agy` install. Confirm the skills are discoverable before
+relying on it.
 
 ## Update
 
