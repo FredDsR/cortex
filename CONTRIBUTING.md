@@ -1,6 +1,6 @@
 # Contributing to cortex
 
-Thanks for considering it. cortex is plain markdown, bash, and one stdlib-only
+Thanks for considering it. cortex is plain markdown, bash, and one small
 Python package, so the setup is short.
 
 ## Setup
@@ -9,11 +9,15 @@ Python package, so the setup is short.
 git clone https://github.com/FredDsR/cortex.git ~/cortex
 cd ~/cortex
 python -m venv .venv && source .venv/bin/activate
-pip install pytest
+pip install pytest pyyaml
 git config core.hooksPath .githooks   # enables the commit message check
 ```
 
 `bash install.sh` symlinks the skills into your harness. It is safe to re-run.
+
+PyYAML is the one runtime dependency: `cortex/parser.py` imports it directly,
+so anything touching the graph (`query`, `viz`, `inject`) needs it. Everything
+else is stdlib.
 
 ## Running the tests
 
