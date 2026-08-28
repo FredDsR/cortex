@@ -81,6 +81,29 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 
 ## Install
 
+### Quickest path: one-liner
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FredDsR/cortex/main/bootstrap.sh | bash
+```
+
+`bootstrap.sh` clones the repo to `~/cortex` and then runs `install.sh` from it.
+Re-running the same command updates an existing checkout instead of cloning
+again. Set `CORTEX_DIR` to clone elsewhere, and pass `install.sh` flags through
+with `bash -s --`:
+
+```bash
+curl -fsSL .../bootstrap.sh | CORTEX_DIR=~/src/cortex bash
+curl -fsSL .../bootstrap.sh | bash -s -- --project ~/some-repo
+```
+
+If `~/cortex` already exists and is not a cortex checkout, the script stops
+rather than writing over it.
+
+Note that piping `install.sh` itself will not work. It symlinks *into* the repo,
+so the repo has to exist on disk first; that is the whole job `bootstrap.sh`
+does before handing off.
+
 ### Primary path — symlink install (any harness)
 
 Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`, `~/.gemini/`) and symlinks each skill into their respective `skills/` directories.
