@@ -3,15 +3,66 @@
 # Default: global install (symlinks each skill into $HOME/.<harness>/skills/).
 # --project [path]: project-local install (symlinks into <path>/.<harness>/skills/).
 # Idempotent. Safe to re-run after `git pull`.
+#
+# Runs two ways. From a clone it installs directly. Piped, it has no repo to
+# symlink into, so it clones one first and re-runs itself from there:
+#
+#   curl -fsSL https://raw.githubusercontent.com/FredDsR/cortex/main/install.sh | bash
+#   curl -fsSL .../install.sh | bash -s -- --project ~/some-repo
+#
+# CORTEX_DIR   where to clone when piped (default: ~/cortex)
+# CORTEX_REPO  which repo to clone (default: the canonical one)
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS_SRC="$REPO_DIR/skills"
-
-if [[ ! -d "$SKILLS_SRC" ]]; then
-    echo "error: $SKILLS_SRC not found" >&2
-    exit 1
+# Empty when piped (`curl | bash`), since there is no script file on disk.
+SELF="${BASH_SOURCE[0]:-}"
+REPO_DIR=""
+if [[ -n "$SELF" ]]; then
+    REPO_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 fi
+
+# --- bootstrap: acquire a repo when we were piped ---------------------------
+# Guarded by CORTEX_BOOTSTRAPPED so a clone that somehow lacks skills/ fails
+# loudly instead of cloning and re-execing forever.
+if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR/skills" ]]; then
+    if [[ -n "${CORTEX_BOOTSTRAPPED:-}" ]]; then
+        echo "error: bootstrapped checkout has no skills/ directory." >&2
+        exit 1
+    fi
+
+    CORTEX_DIR="${CORTEX_DIR:-$HOME/cortex}"
+    CORTEX_REPO="${CORTEX_REPO:-https://github.com/FredDsR/cortex.git}"
+
+    command -v git >/dev/null 2>&1 || {
+        echo "error: git is required but not on PATH." >&2; exit 1; }
+
+    # Recognise an existing checkout by shape, not by remote URL, so forks,
+    # renames, and ssh-vs-https all count as "already installed here".
+    if [[ -e "$CORTEX_DIR" ]]; then
+        if [[ -d "$CORTEX_DIR/.git" && -f "$CORTEX_DIR/install.sh" && -d "$CORTEX_DIR/skills" ]]; then
+            echo "cortex: updating existing checkout at $CORTEX_DIR"
+            git -C "$CORTEX_DIR" pull --ff-only || {
+                echo "error: could not fast-forward $CORTEX_DIR. Resolve it by hand, then re-run." >&2
+                exit 1; }
+        else
+            # Never clobber a directory we did not create. Piped installers are
+            # exactly the case where nobody read the script first.
+            echo "error: $CORTEX_DIR exists and is not a cortex checkout." >&2
+            echo "  Move it aside, or choose another location:" >&2
+            echo "    curl -fsSL <url> | CORTEX_DIR=~/somewhere-else bash" >&2
+            exit 1
+        fi
+    else
+        echo "cortex: cloning $CORTEX_REPO into $CORTEX_DIR"
+        git clone --depth 1 "$CORTEX_REPO" "$CORTEX_DIR" || {
+            echo "error: clone failed." >&2; exit 1; }
+    fi
+
+    echo ""
+    CORTEX_BOOTSTRAPPED=1 exec bash "$CORTEX_DIR/install.sh" "$@"
+fi
+
+SKILLS_SRC="$REPO_DIR/skills"
 
 usage() {
     cat <<EOF
@@ -49,11 +100,13 @@ case "${1:-}" in
 esac
 
 # harness → skills-dir-under-<root>
+# Harnesses that discover skills from a directory we can symlink into.
+# Antigravity is deliberately absent: `agy plugin install` reads skills/ from
+# the repo itself, so there is nothing here to link. See the README.
 HARNESSES=(
     "claude-code:.claude/skills"
     "codex:.codex/skills"
     "copilot-cli:.copilot/skills"
-    "gemini-cli:.gemini/skills"
 )
 
 install_into() {
