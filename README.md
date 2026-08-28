@@ -88,8 +88,8 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`, `~/.gemini/`) and symlinks each skill into their respective `skills/` directories.
 
 ```bash
-git clone git@github.com:FredDsR/cortex-skills.git ~/cortex-skills
-bash ~/cortex-skills/install.sh
+git clone git@github.com:FredDsR/cortex.git ~/cortex
+bash ~/cortex/install.sh
 ```
 
 Put the clone anywhere you like — `install.sh` uses its own directory as the source, so symlinks will always point at wherever you cloned.
@@ -108,8 +108,8 @@ bash install.sh
 
 # Project-scoped — only this repo's agent sessions see them
 cd ~/some-repo
-bash /path/to/cortex-skills/install.sh --project            # defaults to $PWD
-bash /path/to/cortex-skills/install.sh --project ~/some-repo  # or explicit path
+bash /path/to/cortex/install.sh --project            # defaults to $PWD
+bash /path/to/cortex/install.sh --project ~/some-repo  # or explicit path
 ```
 
 Project-scoped install creates `<repo>/.claude/skills/`, `<repo>/.codex/skills/`, etc. as needed (but only for harnesses you already use globally, detected via presence of `$HOME/.<harness>/`). Re-run after `git pull` in the skills clone to refresh.
@@ -119,7 +119,7 @@ Project-scoped install creates `<repo>/.claude/skills/`, `<repo>/.codex/skills/`
 A `.claude-plugin/marketplace.json` + `plugin.json` are included so this repo is also addable as a Claude Code plugin marketplace:
 
 ```
-/plugin marketplace add FredDsR/cortex-skills
+/plugin marketplace add FredDsR/cortex
 /plugin install cortex
 ```
 
@@ -184,11 +184,13 @@ These skills are the **code**. Your actual session/task data lives in `~/.cortex
 The suite was renamed from `tracking-work` to **cortex** (skills `cortex-*`,
 plugin id `cortex`, store `~/.cortex`). To upgrade an existing install:
 
-1. **Repo remote.** After the GitHub repo is renamed `tracking-work-skills` to
-   `cortex-skills`, point your clone at the new URL:
+1. **Repo remote.** The GitHub repo was renamed from `tracking-work-skills` to
+   `cortex`. Point your clone at the new URL:
    ```bash
-   git -C <your-clone> remote set-url origin git@github.com:FredDsR/cortex-skills.git
+   git -C <your-clone> remote set-url origin git@github.com:FredDsR/cortex.git
    ```
+   GitHub redirects the old path for now, so an un-updated clone keeps working
+   until someone claims the old name.
 2. **Reinstall.** Re-run `install.sh`. It creates the `cortex-*` symlinks and
    removes the stale `tracking-work*` ones automatically.
    ```bash

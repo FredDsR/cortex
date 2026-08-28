@@ -29,7 +29,7 @@ try:
     from cortex.frontmatter import CANON, split_lines
 except ModuleNotFoundError:
     sys.exit("migrate_kb_frontmatter: cannot import the cortex engine. "
-             "Run this script from within the cortex-skills repo.")
+             "Run this script from within the cortex repo.")
 STALE = re.compile(r"\bwork-(kb|viz)\b")
 _KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):")
 

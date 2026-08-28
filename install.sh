@@ -85,6 +85,15 @@ install_into() {
         skill_name=$(basename "$skill_dir")
         local dest="$dest_root/$skill_name"
 
+        # A skill is a directory with a SKILL.md. Renames can leave behind a
+        # husk holding only gitignored build artifacts (__pycache__,
+        # .pytest_cache); without this guard the glob would re-link it right
+        # after the stale-symlink cleanup above removed it.
+        if [[ ! -f "$skill_dir/SKILL.md" ]]; then
+            echo "[$harness] skipping $skill_name (no SKILL.md)"
+            continue
+        fi
+
         if [[ -L "$dest" ]]; then
             ln -sfn "$skill_dir" "$dest"
             echo "[$harness] relinked $skill_name → $dest"
