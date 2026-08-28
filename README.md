@@ -4,7 +4,7 @@
 
 # cortex
 
-Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Gemini CLI.
+Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Antigravity.
 
 One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author knowledge), `cortex viz` (visualize), `cortex query neighbors <slug>` (explore a doc's links), `cortex inject` (opt-in session-start injection), `cortex sync` (cross-device sync of the store), and `cortex migrate-store` (move a legacy `~/.work` store to `~/.cortex`). Every verb runs through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired.
 
@@ -84,29 +84,32 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 ### Quickest path: one-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FredDsR/cortex/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/FredDsR/cortex/main/install.sh | bash
 ```
 
-`bootstrap.sh` clones the repo to `~/cortex` and then runs `install.sh` from it.
-Re-running the same command updates an existing checkout instead of cloning
-again. Set `CORTEX_DIR` to clone elsewhere, and pass `install.sh` flags through
-with `bash -s --`:
-
-```bash
-curl -fsSL .../bootstrap.sh | CORTEX_DIR=~/src/cortex bash
-curl -fsSL .../bootstrap.sh | bash -s -- --project ~/some-repo
-```
-
-If `~/cortex` already exists and is not a cortex checkout, the script stops
+Piped, `install.sh` has no repo to symlink into, so it clones one to `~/cortex`
+and re-runs itself from there. Re-running updates that checkout instead of
+cloning again. If `~/cortex` exists and is not a cortex checkout, it stops
 rather than writing over it.
 
-Note that piping `install.sh` itself will not work. It symlinks *into* the repo,
-so the repo has to exist on disk first; that is the whole job `bootstrap.sh`
-does before handing off.
+| Setting | Effect |
+|---------|--------|
+| `CORTEX_DIR` | Where to clone (default `~/cortex`) |
+| `CORTEX_REPO` | Which repo to clone, for forks |
+| `--project [path]` | Install into `<path>/.<harness>/skills/` instead of `$HOME` (defaults to `$PWD`) |
+| `-h`, `--help` | `install.sh` usage |
+
+`CORTEX_*` are environment variables; the flags belong to `install.sh` and reach
+it through `bash -s --`:
+
+```bash
+curl -fsSL .../install.sh | CORTEX_DIR=~/src/cortex bash
+curl -fsSL .../install.sh | bash -s -- --project ~/some-repo
+```
 
 ### Primary path — symlink install (any harness)
 
-Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`, `~/.gemini/`) and symlinks each skill into their respective `skills/` directories.
+Clone anywhere, then run `install.sh`. It detects which agent harnesses you have on this device (by probing `~/.claude/`, `~/.codex/`, `~/.copilot/`) and symlinks each skill into their respective `skills/` directories.
 
 ```bash
 git clone git@github.com:FredDsR/cortex.git ~/cortex
@@ -134,6 +137,26 @@ bash /path/to/cortex/install.sh --project ~/some-repo  # or explicit path
 ```
 
 Project-scoped install creates `<repo>/.claude/skills/`, `<repo>/.codex/skills/`, etc. as needed (but only for harnesses you already use globally, detected via presence of `$HOME/.<harness>/`). Re-run after `git pull` in the skills clone to refresh.
+
+### Antigravity
+
+Antigravity installs from the repo directly, reading `skills/` out of the git
+URL. There is nothing to symlink, so `install.sh` does not target it:
+
+```bash
+agy plugin install https://github.com/FredDsR/cortex
+```
+
+Re-running the same command updates it.
+
+Unlike Superpowers, cortex ships no session-start hook, so nothing auto-loads:
+the skills are discovered and invoked on demand. Turning on
+`cortex inject` gives you the injection, but it currently wires a
+Claude Code hook only.
+
+**Unverified.** This follows Antigravity's documented `agy plugin install`
+behaviour but has not been run against a real `agy` install. If you try it,
+confirm the skills are discoverable before relying on it.
 
 ### Alternate path — Claude Code `/plugin` (experimental)
 
@@ -177,15 +200,12 @@ bash install.sh   # only if a new skill / harness / vendor asset
 
 ## Uninstall
 
-`uninstall.sh` is the counterpart to `install.sh` and removes everything the
-installer created: the skill symlinks in each harness, the `close-day` slash
-command, and `~/.cortex/bin/cortex`. If the session-start hook is wired, it is
-unwired first, so nothing is left pointing at a deleted binary.
+`uninstall.sh` removes what the installer created: the skill symlinks in each
+harness, the `close-day` slash command, and `~/.cortex/bin/cortex`. A wired
+session-start hook is unwired first.
 
 ```bash
-bash uninstall.sh              # global
-bash uninstall.sh --dry-run    # show what would go, change nothing
-bash uninstall.sh --project    # remove a project-scoped install
+bash uninstall.sh
 ```
 
 | Flag | Effect |
@@ -195,15 +215,11 @@ bash uninstall.sh --project    # remove a project-scoped install
 | `--purge-store` | **Also delete your work data** in `~/.cortex/`. Requires typed confirmation |
 | `--yes` | Skip that confirmation. Refused without sync unless passed twice |
 
-**Your work data is never touched without `--purge-store`.** The default run
-leaves `~/.cortex/workspaces/`, `archive/`, and `knowledge/` exactly as they
-were, and says so on the way out.
+**Your work data is never touched without `--purge-store`.**
 
-Only symlinks pointing into this repo are removed. A real directory, or a
-symlink into a different checkout, is reported and left alone. That means a
-second cortex install survives, and so does any `.bak` directory the installer
-set aside.
-Removing the `PATH` line from your shell rc is the one manual step left.
+Only symlinks pointing into this repo are removed; a real directory, or a
+symlink into another checkout, is reported and left in place. Removing the
+`PATH` line from your shell rc is the one manual step left.
 
 ## Opt-in session-start injection
 

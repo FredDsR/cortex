@@ -151,6 +151,59 @@ test_purge_dry_run_deletes_nothing() {
   teardown_tmp
 }
 
+# --- piped install (curl | bash): install.sh clones, then re-runs on disk ----
+
+test_piped_install_clones_and_installs() {
+  setup_claude_only
+  # Clone source is this repo's committed state; enough to prove the handoff.
+  cat "$INSTALL" | CORTEX_DIR="$TEST_HOME/cortex" CORTEX_REPO="file://$REPO" \
+    bash >/dev/null 2>&1
+  assert_file_exists "$TEST_HOME/cortex/install.sh"
+  assert_file_exists "$TEST_HOME/.claude/skills/cortex-tracking"
+  teardown_tmp
+}
+
+test_piped_install_refuses_foreign_directory() {
+  setup_claude_only
+  mkdir -p "$TEST_HOME/notcortex"
+  echo "important" > "$TEST_HOME/notcortex/thesis.txt"
+
+  out="$(cat "$INSTALL" | CORTEX_DIR="$TEST_HOME/notcortex" \
+    CORTEX_REPO="file://$REPO" bash 2>&1)"
+  rc=$?
+  assert_eq "$rc" "1" "should refuse to clobber"
+  assert_contains "$out" "not a cortex checkout"
+  assert_file_exists "$TEST_HOME/notcortex/thesis.txt"
+  teardown_tmp
+}
+
+test_piped_install_updates_existing_checkout() {
+  setup_claude_only
+  cat "$INSTALL" | CORTEX_DIR="$TEST_HOME/cortex" CORTEX_REPO="file://$REPO" \
+    bash >/dev/null 2>&1
+  out="$(cat "$INSTALL" | CORTEX_DIR="$TEST_HOME/cortex" \
+    CORTEX_REPO="file://$REPO" bash 2>&1)"
+  assert_contains "$out" "updating existing checkout"
+  teardown_tmp
+}
+
+# --- docs -------------------------------------------------------------------
+
+test_readme_documents_antigravity_install() {
+  # CI-safe: asserts the command is documented without requiring `agy`.
+  readme="$REPO/README.md"
+  assert_contains "$(cat "$readme")" "agy plugin install"
+  assert_contains "$(cat "$readme")" "### Antigravity"
+}
+
+test_readme_one_liner_matches_real_script() {
+  # The documented curl URL must name a script that exists in the repo.
+  readme="$(cat "$REPO/README.md")"
+  assert_contains "$readme" "main/install.sh | bash"
+  assert_not_contains "$readme" "bootstrap.sh"
+  assert_file_exists "$REPO/install.sh"
+}
+
 run_test test_project_install_then_uninstall
 run_test test_uninstall_is_idempotent
 run_test test_real_directory_is_never_deleted
@@ -161,4 +214,9 @@ run_test test_store_data_survives_default_uninstall
 run_test test_purge_without_sync_refuses_single_yes
 run_test test_purge_deletes_store_when_double_confirmed
 run_test test_purge_dry_run_deletes_nothing
+run_test test_piped_install_clones_and_installs
+run_test test_piped_install_refuses_foreign_directory
+run_test test_piped_install_updates_existing_checkout
+run_test test_readme_documents_antigravity_install
+run_test test_readme_one_liner_matches_real_script
 report
