@@ -204,6 +204,39 @@ test_readme_one_liner_matches_real_script() {
   assert_file_exists "$REPO/install.sh"
 }
 
+test_docs_exist_and_are_linked() {
+  # The README's docs table must point at files that exist.
+  readme="$(cat "$REPO/README.md")"
+  for d in README concepts skills cli store hooks-and-plugins; do
+    assert_file_exists "$REPO/docs/$d.md"
+    assert_contains "$readme" "docs/$d.md"
+  done
+}
+
+test_docs_cli_verbs_are_real() {
+  # Guards against documenting a verb that no longer exists, the way the
+  # README once advertised `cortex viz --watch` after it was removed.
+  cli="$(cat "$REPO/docs/cli.md")"
+  for verb in "cortex kb new" "cortex kb ingest" "cortex viz build" \
+              "cortex query neighbors" "cortex inject here" "cortex sync push"; do
+    assert_contains "$cli" "$verb"
+  done
+  assert_not_contains "$cli" "--watch"
+  assert_not_contains "$(cat "$REPO/README.md")" "--watch"
+}
+
+test_docs_mermaid_blocks_are_closed() {
+  # Every ```mermaid fence must have a closing fence, or GitHub renders the
+  # rest of the file as one code block.
+  for f in "$REPO"/docs/*.md; do
+    opens=$(grep -c '^```mermaid$' "$f" || true)
+    total=$(grep -c '^```' "$f" || true)
+    if [ "$opens" -gt 0 ]; then
+      assert_eq "$(( total % 2 ))" "0" "unbalanced fences in $(basename "$f")"
+    fi
+  done
+}
+
 run_test test_project_install_then_uninstall
 run_test test_uninstall_is_idempotent
 run_test test_real_directory_is_never_deleted
@@ -219,4 +252,7 @@ run_test test_piped_install_refuses_foreign_directory
 run_test test_piped_install_updates_existing_checkout
 run_test test_readme_documents_antigravity_install
 run_test test_readme_one_liner_matches_real_script
+run_test test_docs_exist_and_are_linked
+run_test test_docs_cli_verbs_are_real
+run_test test_docs_mermaid_blocks_are_closed
 report

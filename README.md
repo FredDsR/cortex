@@ -24,6 +24,34 @@ One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author
   <img src="assets/screenshots/viz-dark.png" alt="cortex viz dashboard, dark theme: tree, graph, and content panes" width="900">
 </p>
 
+## Concepts
+
+Five nouns carry the model:
+
+| Concept | Scope | Lifetime |
+|---------|-------|----------|
+| **Workspace** | One project, resolved from your git remote or directory name | Permanent |
+| **Session** | A stretch of related work | Weeks, then archived |
+| **Task** | One piece of that work, with a status | Days |
+| **Knowledge note** | The workspace | Outlives every session |
+| **Workbench note** | One session | Dies with the session |
+
+A **workspace** contains **sessions**; a session contains **tasks** plus its
+**workbench** notes; **knowledge** notes sit at the workspace level so every
+session can reach them.
+
+The distinction that earns its keep is the last two. **Workbench** is the
+low-stakes place to think out loud, and it stops mattering when the session
+closes. **Knowledge** is what you want to still have three months from now. When
+a workbench note turns out to matter, promote it.
+
+Task status is one of `Open`, `In Progress`, `Blocked`, `Resolved`. There is
+deliberately no "won't do": abandoned work is archived with its tasks still
+`Open`, so the archive records what happened rather than a completion that never
+occurred.
+
+Full treatment in [docs/concepts.md](docs/concepts.md).
+
 ## Skills in this repo
 
 | Skill | Purpose |
@@ -32,9 +60,70 @@ One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author
 | `cortex-github` | Optional PR/commit drift detection via the `gh` CLI, invoked by the main skill when a session has `github:` frontmatter. |
 | `cortex-migration` | Move a session between the global store (`~/.cortex/`) and a repo-local store. |
 | `cortex-sync` | Optional cross-device sync of `~/.cortex/` via a private GitHub repo. See `skills/cortex-sync/docs/` for design. |
-| `cortex-viz` | Browser-based viewer for `~/.cortex/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
+| `cortex-viz` | Browser-based viewer for `~/.cortex/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with `build` and `serve` (plus opt-in `serve --edit`). |
 | `cortex-kb` | Author and bulk-ingest knowledge/workbench docs (`cortex kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `cortex-viz`, replicated by `cortex-sync`. |
 | `cortex-inject` | Optional, off-by-default session-start context injection (`cortex inject` CLI). The single exception to the otherwise pull-based, no-auto-injection design. |
+
+Only `cortex-tracking`, `cortex-kb`, and `cortex-viz` are ones you trigger. The
+rest are sub-skills the main skill invokes when it needs them. See
+[docs/skills.md](docs/skills.md).
+
+## The `cortex` CLI
+
+One command fronts the family, installed at `~/.cortex/bin/cortex`.
+
+It exists for two reasons, both about what an agent would otherwise do instead.
+
+**It standardizes the environment.** Without it, every skill would describe its
+own file paths, frontmatter rules, and slug resolution in prose, and each agent
+would reimplement them slightly differently. One binary means one definition of
+where a workspace lives, how a slug resolves, and what valid frontmatter is. A
+skill says `cortex kb new knowledge <slug>` instead of explaining a directory
+layout and hoping the agent gets it right.
+
+**It optimizes token usage.** Every verb is designed so the agent reads a small
+bounded artifact rather than a large unbounded one. `cortex kb index` returns a
+one-line-per-document table of contents instead of the documents. `cortex query
+neighbors` returns a document's links with one-line summaries instead of the
+linked files. `cortex inject here` emits a byte-bounded block. The pattern is
+the same everywhere: answer the question at hand with the smallest artifact
+that can answer it, and let the agent open the full file only when it decides
+to.
+
+The alternative is the agent globbing directories, reading whole files to find
+one field, and re-deriving the layout every session. The CLI turns that into
+one call with a bounded response.
+
+| Verb | Does |
+|------|------|
+| `cortex kb` | Author knowledge / workbench docs (`new`, `update`, `index`, `ingest`) |
+| `cortex viz` | Build and serve the dashboard (`build`, `serve`) |
+| `cortex query` | Explore a doc's links and backlinks (`neighbors`) |
+| `cortex inject` | Opt-in session-start injection (`enable`, `disable`, `status`, `here`) |
+| `cortex sync` | Replicate the store to a private repo (`push`, `pull`, `setup`, `status`) |
+| `cortex migrate-store` | Move a legacy `~/.work` store to `~/.cortex` |
+
+Workspace and session are resolved from the active session pointer, so most
+commands need no arguments:
+
+```bash
+cortex kb new knowledge token-expiry --type Gotcha --description "TTL is 15m"
+cortex query neighbors token-expiry
+cortex viz serve
+```
+
+Full reference in [docs/cli.md](docs/cli.md).
+
+## Documentation
+
+| Guide | Covers |
+|-------|--------|
+| [docs/README.md](docs/README.md) | Start here: the idea, and a first-session walkthrough |
+| [docs/concepts.md](docs/concepts.md) | Workspace, session, task, knowledge, workbench |
+| [docs/skills.md](docs/skills.md) | All seven skills and how they connect |
+| [docs/cli.md](docs/cli.md) | Every `cortex` verb and flag |
+| [docs/store.md](docs/store.md) | File layout, frontmatter, and typed links |
+| [docs/hooks-and-plugins.md](docs/hooks-and-plugins.md) | The opt-in hook, plugin manifests, `/close-day` |
 
 ## Knowledge base
 
@@ -78,6 +167,77 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 - `cortex kb ingest` reads a codebase and writes into a KB workspace. It is
   unrelated to `cortex-migration`, which **moves a session** between the
   global and local stores. Different verbs, opposite direction, different data.
+
+## Ingesting a codebase
+
+A knowledge base that starts empty tends to stay empty. `cortex kb ingest`
+bootstraps one by reading a codebase and writing knowledge docs from what it
+finds.
+
+```bash
+cortex kb ingest --from ~/some-service              # dry run: report only
+cortex kb ingest --from ~/some-service --write      # actually write
+cortex kb ingest --from ~/some-service --only sql   # narrow the extractors
+```
+
+It splits sources by whether a parser can be trusted with them.
+
+**Deterministic extraction**, done by real parsers rather than model judgment:
+
+| Source | Produces |
+|--------|----------|
+| OpenAPI / Swagger (`openapi*.yaml\|json`, `swagger*`) | One doc per schema, with fields and types preserved exactly |
+| SQL DDL (`*.sql`) | One doc per `CREATE TABLE`, columns and types intact |
+
+`$ref` targets become `[[schema-<slug>]]` links, so the extracted docs arrive
+already cross-referenced rather than as a flat pile.
+
+**An agent worklist** for everything a parser should not guess at: `*.prisma`
+schemas, `README*.md` files carrying an `## API` or `## Schema` section, and
+`runbook*` files. These are reported, never auto-written. The agent decides what
+they mean.
+
+Two safety properties worth knowing. It is **dry-run by default**, and `--write`
+is the only gate. And it **never overwrites**: a doc that already exists is
+skipped and reported, so re-running after adding sources only fills gaps.
+
+### Compared to Karpathy's LLM Wiki
+
+In April 2026 Andrej Karpathy published
+[llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f),
+an idea file arguing that instead of retrieving from raw documents at query
+time, an LLM should incrementally build and maintain a persistent markdown
+wiki, and queries should go to the wiki rather than the sources. His framing:
+knowledge is "compiled once and then _kept current_, not re-derived on every
+query," and the reason it works is division of labor, since "the tedious part of
+maintaining a knowledge base is not the reading or the thinking, it's the
+bookkeeping."
+
+cortex's knowledge base is the same bet. Raw sources stay immutable, the agent
+owns a directory of markdown, and `knowledge/INDEX.md` is the catalog you read
+to find out what exists. Where the two differ is instructive in both directions.
+
+| | Karpathy's llm-wiki | cortex |
+|---|---|---|
+| Ingest | LLM reads the source and writes pages | Parsers handle OpenAPI and SQL exactly; only ambiguous sources go to the agent |
+| Index | `index.md`, LLM-maintained | `INDEX.md`, derived and regenerated by `cortex kb index --write` |
+| Links | Cross-references between pages | Typed `[[wikilinks]]`, with unresolved ones surviving as visible ghost nodes |
+| Change log | `log.md`, append-only, grep-able | No wiki-level equivalent; sessions keep their own day log |
+| Lint | A named operation: contradictions, stale claims, orphans | **Not implemented** |
+| Scope | Knowledge only | Knowledge plus work tracking: sessions, tasks, blockers |
+
+**Where cortex is stronger.** Deterministic extraction means an OpenAPI schema
+is transcribed rather than paraphrased, which matters because the failure mode
+of LLM ingestion is a plausible field name that does not exist. A derived index
+cannot drift from the filesystem the way a hand-maintained one can. And ghost
+links make the gaps in a knowledge base visible instead of silent.
+
+**Where it is not.** Karpathy names **lint** as a first-class operation, the
+periodic sweep for contradictions, stale claims, and orphan pages. cortex has no
+equivalent, and a knowledge base without one accumulates confidently-worded
+statements that stopped being true. His `log.md` is also a real idea cortex
+lacks at the knowledge layer: an append-only, grep-able record of what changed
+when.
 
 ## Install
 
