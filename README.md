@@ -8,8 +8,6 @@ Portable bundle of file-based work-tracking skills for AI coding agents. Designe
 
 One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author knowledge), `cortex viz` (visualize), `cortex query neighbors <slug>` (explore a doc's links), `cortex inject` (opt-in session-start injection), `cortex sync` (cross-device sync of the store), and `cortex migrate-store` (move a legacy `~/.work` store to `~/.cortex`). Every verb runs through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired.
 
-> **Upgrading from `tracking-work`?** See [Upgrading from tracking-work](#upgrading-from-tracking-work) below: rename the repo remote, re-run `install.sh`, and run `cortex migrate-store --write` to move `~/.work` to `~/.cortex`.
-
 ## The dashboard
 
 `cortex viz` builds a static, browser-based view of every workspace, session, and task: a collapsible tree, a hub-and-spoke graph of typed links, and a rendered-markdown content pane. Read-only by default; theme-aware (light + dark).
@@ -178,28 +176,3 @@ its otherwise pull-based, no-auto-injection design.
 ## State data vs skill code
 
 These skills are the **code**. Your actual session/task data lives in `~/.cortex/` on each machine. If you enable `cortex-sync`, that data is synced via a separate private repo (created by `cortex sync setup`). This repo contains no personal work data.
-
-## Upgrading from tracking-work
-
-The suite was renamed from `tracking-work` to **cortex** (skills `cortex-*`,
-plugin id `cortex`, store `~/.cortex`). To upgrade an existing install:
-
-1. **Repo remote.** The GitHub repo was renamed from `tracking-work-skills` to
-   `cortex`. Point your clone at the new URL:
-   ```bash
-   git -C <your-clone> remote set-url origin git@github.com:FredDsR/cortex.git
-   ```
-   GitHub redirects the old path for now, so an un-updated clone keeps working
-   until someone claims the old name.
-2. **Reinstall.** Re-run `install.sh`. It creates the `cortex-*` symlinks and
-   removes the stale `tracking-work*` ones automatically.
-   ```bash
-   bash <your-clone>/install.sh
-   ```
-3. **Move the store.** Migrate your data from `~/.work` to `~/.cortex`:
-   ```bash
-   cortex migrate-store            # dry-run: shows what would move
-   cortex migrate-store --write    # perform the move (idempotent, conflict-safe)
-   ```
-   If you use `cortex-sync`, the git remote is unchanged; only the local path
-   moves.
