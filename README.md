@@ -32,9 +32,47 @@ One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author
 | `cortex-github` | Optional PR/commit drift detection via the `gh` CLI, invoked by the main skill when a session has `github:` frontmatter. |
 | `cortex-migration` | Move a session between the global store (`~/.cortex/`) and a repo-local store. |
 | `cortex-sync` | Optional cross-device sync of `~/.cortex/` via a private GitHub repo. See `skills/cortex-sync/docs/` for design. |
-| `cortex-viz` | Browser-based viewer for `~/.cortex/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with one-shot, `--watch`, `serve`, and `--workspace=all` modes. |
+| `cortex-viz` | Browser-based viewer for `~/.cortex/`: three-pane tree + Cytoscape graph + rendered markdown, plus a cross-workspace dashboard. Ships a `cortex viz` CLI with `build` and `serve` (plus opt-in `serve --edit`). |
 | `cortex-kb` | Author and bulk-ingest knowledge/workbench docs (`cortex kb` CLI): structured frontmatter, a pull-based index, and codebase ingestion. Rendered by `cortex-viz`, replicated by `cortex-sync`. |
 | `cortex-inject` | Optional, off-by-default session-start context injection (`cortex inject` CLI). The single exception to the otherwise pull-based, no-auto-injection design. |
+
+Only `cortex-tracking`, `cortex-kb`, and `cortex-viz` are ones you trigger. The
+rest are sub-skills the main skill invokes when it needs them. See
+[docs/skills.md](docs/skills.md).
+
+## The `cortex` CLI
+
+One command fronts the family, installed at `~/.cortex/bin/cortex`:
+
+| Verb | Does |
+|------|------|
+| `cortex kb` | Author knowledge / workbench docs (`new`, `update`, `index`, `ingest`) |
+| `cortex viz` | Build and serve the dashboard (`build`, `serve`) |
+| `cortex query` | Explore a doc's links and backlinks (`neighbors`) |
+| `cortex inject` | Opt-in session-start injection (`enable`, `disable`, `status`, `here`) |
+| `cortex sync` | Replicate the store to a private repo (`push`, `pull`, `setup`, `status`) |
+| `cortex migrate-store` | Move a legacy `~/.work` store to `~/.cortex` |
+
+Workspace and session are resolved from the active session pointer, so most
+commands need no arguments:
+
+```bash
+cortex kb new knowledge token-expiry --type Gotcha --description "TTL is 15m"
+cortex query neighbors token-expiry
+cortex viz serve
+```
+
+Full reference in [docs/cli.md](docs/cli.md).
+
+## Documentation
+
+| Guide | Covers |
+|-------|--------|
+| [docs/README.md](docs/README.md) | Start here: the idea, and a first-session walkthrough |
+| [docs/skills.md](docs/skills.md) | All seven skills and how they connect |
+| [docs/cli.md](docs/cli.md) | Every `cortex` verb and flag |
+| [docs/store.md](docs/store.md) | File layout, frontmatter, and typed links |
+| [docs/hooks-and-plugins.md](docs/hooks-and-plugins.md) | The opt-in hook, plugin manifests, `/close-day` |
 
 ## Knowledge base
 
