@@ -83,11 +83,32 @@ pointer, so concurrent sessions do not collide.
 
 **One piece of work inside a session**, with a status from a fixed vocabulary:
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Open: task created
+    Open --> InProgress: picked up
+    InProgress --> Resolved: done
+    Resolved --> [*]
+
+    Open --> Blocked: "blocked on X"
+    InProgress --> Blocked: "blocked on X"
+    Blocked --> Open: blocker clears
+    Blocked --> InProgress: blocker clears
+
+    InProgress: In Progress
+    Blocked: Blocked<br/><i>also listed in SUMMARY Blockers</i>
+
+    note right of Resolved
+        Archiving a session asks about
+        every task that is not Resolved.
+    end note
 ```
-Open  →  In Progress  →  Resolved
-             ↕
-          Blocked
-```
+
+Nothing enforces these transitions: the four values are labels an agent writes,
+not a state machine the code validates. The arrows show the usual path, not a
+rule.
+
 
 That list is fixed in `cortex/model.py`. There is deliberately **no "dropped" or
 "won't do"** status. Work that gets abandoned is archived with its tasks still
