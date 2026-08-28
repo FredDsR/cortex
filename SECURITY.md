@@ -4,7 +4,7 @@
 
 Report privately through
 [GitHub security advisories](https://github.com/FredDsR/cortex/security/advisories/new),
-or by email to frederico.reckziegel@osf.digital. Please do not open a public
+or by email to freddalsoglio@gmail.com. Please do not open a public
 issue for a security problem.
 
 Expect an acknowledgement within a week. This is a personal project, not a
