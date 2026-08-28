@@ -1,0 +1,38 @@
+name: e2e
+
+# Manual only. The suite drives a real browser and takes minutes, which is too
+# slow to block every pull request.
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: bun install
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run e2e
+        run: bash e2e/run-e2e.sh
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            e2e/run.log
+            e2e/server.log
