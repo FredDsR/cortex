@@ -24,6 +24,34 @@ One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author
   <img src="assets/screenshots/viz-dark.png" alt="cortex viz dashboard, dark theme: tree, graph, and content panes" width="900">
 </p>
 
+## Concepts
+
+Five nouns carry the model:
+
+| Concept | Scope | Lifetime |
+|---------|-------|----------|
+| **Workspace** | One project, resolved from your git remote or directory name | Permanent |
+| **Session** | A stretch of related work | Weeks, then archived |
+| **Task** | One piece of that work, with a status | Days |
+| **Knowledge note** | The workspace | Outlives every session |
+| **Workbench note** | One session | Dies with the session |
+
+A **workspace** contains **sessions**; a session contains **tasks** plus its
+**workbench** notes; **knowledge** notes sit at the workspace level so every
+session can reach them.
+
+The distinction that earns its keep is the last two. **Workbench** is the
+low-stakes place to think out loud, and it stops mattering when the session
+closes. **Knowledge** is what you want to still have three months from now. When
+a workbench note turns out to matter, promote it.
+
+Task status is one of `Open`, `In Progress`, `Blocked`, `Resolved`. There is
+deliberately no "won't do": abandoned work is archived with its tasks still
+`Open`, so the archive records what happened rather than a completion that never
+occurred.
+
+Full treatment in [docs/concepts.md](docs/concepts.md).
+
 ## Skills in this repo
 
 | Skill | Purpose |
@@ -69,6 +97,7 @@ Full reference in [docs/cli.md](docs/cli.md).
 | Guide | Covers |
 |-------|--------|
 | [docs/README.md](docs/README.md) | Start here: the idea, and a first-session walkthrough |
+| [docs/concepts.md](docs/concepts.md) | Workspace, session, task, knowledge, workbench |
 | [docs/skills.md](docs/skills.md) | All seven skills and how they connect |
 | [docs/cli.md](docs/cli.md) | Every `cortex` verb and flag |
 | [docs/store.md](docs/store.md) | File layout, frontmatter, and typed links |

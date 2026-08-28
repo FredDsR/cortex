@@ -11,6 +11,7 @@ Python CLI.
 
 | Guide | Covers |
 |-------|--------|
+| [concepts.md](concepts.md) | The five nouns: workspace, session, task, knowledge note, workbench note |
 | [skills.md](skills.md) | All seven skills: what triggers each, and which ones you invoke versus which get invoked for you |
 | [cli.md](cli.md) | The `cortex` command: `kb`, `viz`, `query`, `inject`, `sync`, `migrate-store` |
 | [store.md](store.md) | The file layout: workspaces, sessions, tasks, knowledge, and the frontmatter each uses |

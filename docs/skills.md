@@ -149,21 +149,32 @@ Covered in full in [hooks-and-plugins.md](hooks-and-plugins.md).
 
 ## How they connect
 
-```
-                      you
-                       |
-                cortex-tracking  ...... the entry point
-                 /     |      \
-                /      |       \
-        cortex-kb  cortex-github  cortex-migration
-            |          |
-            |      (gh CLI, only with a github: field)
-            |
-            +--> knowledge/ + workbench/ files
-                       |
-                 cortex-viz  ...... renders them
-                       |
-                 cortex-sync  ...... replicates the whole store
+```mermaid
+flowchart TD
+    you([you]) --> tracking
+
+    tracking["<b>cortex-tracking</b><br/>the entry point"]
+
+    tracking -->|knowledge checkpoints| kb["cortex-kb"]
+    tracking -->|only with a github: field| gh["cortex-github"]
+    tracking -->|on request| mig["cortex-migration"]
+
+    kb --> files[("knowledge/ + workbench/<br/>files on disk")]
+    gh -.->|gh CLI| prs([GitHub PRs])
+    mig -.->|moves a session| stores([global store &lt;-&gt; local store])
+
+    files --> viz["cortex-viz<br/><i>renders</i>"]
+    files --> sync["cortex-sync<br/><i>replicates the whole store</i>"]
+    files -.->|opt-in, off by default| inj["cortex-inject<br/><i>injects at session start</i>"]
+
+    classDef entry fill:#2d6cdf,stroke:#1b4a9c,color:#fff
+    classDef sub fill:#e8eef9,stroke:#2d6cdf,color:#12233f
+    classDef data fill:#fff5e0,stroke:#d19a00,color:#3d2c00
+    classDef ext fill:#f2f2f2,stroke:#999,color:#333
+    class tracking entry
+    class kb,gh,mig,viz,sync,inj sub
+    class files data
+    class prs,stores,you ext
 ```
 
 The connections that actually matter:

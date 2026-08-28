@@ -21,9 +21,20 @@ independent steps.
 
 ### Both guards are required
 
-```
-1. The harness session-start hook is wired      (per harness, global, one-time)
-2. The workspace has a .inject-enabled sentinel (per workspace)
+```mermaid
+flowchart LR
+    start([session starts]) --> g1{"hook wired?<br/><i>per harness, global</i>"}
+    g1 -->|no| none[/"nothing injected"/]
+    g1 -->|yes| g2{".inject-enabled?<br/><i>per workspace</i>"}
+    g2 -->|no| none
+    g2 -->|yes| inject[/"&lt;cortex-index&gt; block<br/>knowledge + workbench + open tasks"/]
+
+    classDef guard fill:#fff5e0,stroke:#d19a00,color:#3d2c00
+    classDef off fill:#f2f2f2,stroke:#999,color:#333
+    classDef on fill:#e3f3e6,stroke:#2e8b45,color:#123d1f
+    class g1,g2 guard
+    class none off
+    class inject on
 ```
 
 Either alone injects nothing. That is what keeps it off by default even after
