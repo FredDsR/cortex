@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      # The install/uninstall suite exercises paths that shell out to git.
+      # Runners have no global identity, so give them one.
+      - name: Configure git identity
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.com"
+
+      - name: Python suite
+        run: python -m pytest -q
+
+      - name: Tracking script suite
+        run: bash skills/cortex-tracking/scripts/tests/run.sh
+
+      - name: Cortex CLI suite
+        run: bash skills/cortex-tracking/tests/test_cortex.sh
+
+      - name: Install / uninstall round trip
+        run: bash tests/test_install_uninstall.sh
+
+      - name: Conventional hook suite
+        run: bash tests/test_conventional.sh
+
+  pr-title:
+    # Squash-merge makes the PR title the commit message that lands on main,
+    # so this is the gate that actually protects history.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # .conventional-types is the single source of truth, shared with the
+      # local commit-msg hook, so the two can never drift.
+      - id: types
+        run: |
+          {
+            echo 'list<<CORTEX_EOF'
+            grep -v '^#' .conventional-types | sed '/^[[:space:]]*$/d'
+            echo 'CORTEX_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: ${{ steps.types.outputs.list }}
+
+      # Advisory only. Fork contributors routinely name a branch before
+      # reading any guidelines, and the name never reaches main's history.
+      - name: Check branch name (warning only)
+        run: |
+          branch="${{ github.head_ref }}"
+          types="$(grep -v '^#' .conventional-types | sed '/^[[:space:]]*$/d' | paste -sd '|' -)"
+          if [[ ! "$branch" =~ ^(${types})/[a-z0-9._-]+$ ]]; then
+            echo "::warning::Branch '$branch' is not <type>/<short-description>. Not blocking."
+          else
+            echo "Branch name OK: $branch"
+          fi

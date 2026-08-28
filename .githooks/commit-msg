@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Local conventional-commit check. Developer experience, not a gate: CI is the
+# real boundary and `git commit --no-verify` bypasses this by design.
+#
+# Types come from .conventional-types, the same file the PR title workflow
+# reads, so the two cannot drift. CORTEX_TYPES_FILE overrides for tests.
+set -uo pipefail
+
+MSG_FILE="${1:?usage: commit-msg <file>}"
+
+if [[ -n "${CORTEX_TYPES_FILE:-}" ]]; then
+    TYPES_FILE="$CORTEX_TYPES_FILE"
+else
+    root="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+    TYPES_FILE="$root/.conventional-types"
+fi
+
+[[ -f "$TYPES_FILE" ]] || exit 0   # no vocabulary, nothing to enforce
+
+# First line that is neither a comment nor blank.
+header="$(grep -v '^#' "$MSG_FILE" 2>/dev/null | sed '/^[[:space:]]*$/d' | head -1)"
+
+# git's own machinery and in-progress commits are none of our business.
+case "$header" in
+    Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
+esac
+
+types=()
+while IFS= read -r line; do
+    line="${line%%$'\r'}"
+    case "$line" in ''|\#*) continue ;; esac
+    types+=("$line")
+done < "$TYPES_FILE"
+
+fail() {
+    echo "commit-msg: $1" >&2
+    echo "" >&2
+    echo "  Expected: type(scope)?: subject      (header at most 72 chars)" >&2
+    echo "  Types:    ${types[*]}" >&2
+    echo "  Example:  fix(kb): stop dropping unknown frontmatter" >&2
+    echo "" >&2
+    echo "  Got:      ${header:-<empty>}" >&2
+    exit 1
+}
+
+[[ -n "$header" ]] || fail "commit message is empty"
+
+joined="$(IFS='|'; echo "${types[*]}")"
+if [[ ! "$header" =~ ^(${joined})(\([a-z0-9._-]+\))?!?:[[:space:]].+ ]]; then
+    fail "header does not match the conventional format"
+fi
+
+(( ${#header} <= 72 )) || fail "header is ${#header} characters; the limit is 72"
+
+[[ "$header" != *. ]] || fail "header must not end with a period"
+
+exit 0

@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest a capability
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you unable to do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: |
+        Concretely: a CLI verb, a file, a frontmatter field. A vague
+        recommendation is harder to act on than none.
+    validations:
+      required: true
+  - type: checkboxes
+    id: philosophy
+    attributes:
+      label: Design fit
+      description: |
+        cortex is file-based, harness-agnostic, and pull-based. Nothing is
+        auto-injected except one opt-in hook.
+      options:
+        - label: This needs no database or server
+        - label: This works outside Claude Code
+        - label: This does not force content into an agent's context

@@ -1,0 +1,39 @@
+name: Bug report
+description: Something behaves differently than documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste real `~/.cortex/` contents. It holds actual
+        workspace and client names. Reproduce with a temporary `HOME` or the
+        fixtures in `cortex/tests/fixtures/`.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The exact commands, ideally against a throwaway store.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: harness
+    attributes:
+      label: Harness
+      placeholder: Claude Code / Codex / Copilot CLI / Antigravity / plain shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+      description: Output of `git -C <your clone> rev-parse --short HEAD`
+    validations:
+      required: true

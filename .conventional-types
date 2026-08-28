@@ -1,0 +1,12 @@
+# Conventional commit types. Single source of truth: the commit-msg hook and
+# the PR title workflow both read this file. One type per line.
+feat
+fix
+docs
+refactor
+test
+chore
+perf
+ci
+build
+revert
