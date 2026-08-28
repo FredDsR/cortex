@@ -154,15 +154,33 @@ bash install.sh   # only if a new skill / harness / vendor asset
 
 ## Uninstall
 
-Remove the symlinks in each harness's skills directory:
+`uninstall.sh` is the counterpart to `install.sh` and removes everything the
+installer created: the skill symlinks in each harness, the `close-day` slash
+command, and `~/.cortex/bin/cortex`. If the session-start hook is wired, it is
+unwired first, so nothing is left pointing at a deleted binary.
 
 ```bash
-for h in ~/.claude ~/.codex ~/.copilot ~/.gemini; do
-    rm -f "$h/skills/cortex-tracking" "$h/skills/cortex-github" \
-          "$h/skills/cortex-kb" "$h/skills/cortex-viz" "$h/skills/cortex-sync" \
-          "$h/skills/cortex-migration" "$h/skills/cortex-inject"
-done
+bash uninstall.sh              # global
+bash uninstall.sh --dry-run    # show what would go, change nothing
+bash uninstall.sh --project    # remove a project-scoped install
 ```
+
+| Flag | Effect |
+|------|--------|
+| `--project [path]` | Remove a project-scoped install (defaults to `$PWD`) |
+| `--dry-run` | Print every action; change nothing |
+| `--purge-store` | **Also delete your work data** in `~/.cortex/`. Requires typed confirmation |
+| `--yes` | Skip that confirmation. Refused without sync unless passed twice |
+
+**Your work data is never touched without `--purge-store`.** The default run
+leaves `~/.cortex/workspaces/`, `archive/`, and `knowledge/` exactly as they
+were, and says so on the way out.
+
+Only symlinks pointing into this repo are removed. A real directory, or a
+symlink into a different checkout, is reported and left alone. That means a
+second cortex install survives, and so does any `.bak` directory the installer
+set aside.
+Removing the `PATH` line from your shell rc is the one manual step left.
 
 ## Opt-in session-start injection
 

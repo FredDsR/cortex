@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# Round-trip coverage for install.sh + uninstall.sh.
+# Every test runs against a temp HOME, so nothing touches the real install.
+set -u
+cd "$(dirname "$0")"
+. ../skills/cortex-tracking/scripts/tests/lib.sh
+
+REPO="$(cd .. && pwd)"
+INSTALL="$REPO/install.sh"
+UNINSTALL="$REPO/uninstall.sh"
+
+# install.sh treats "$HOME/.<harness>/ exists" as "user uses this harness", so
+# creating only .claude keeps every assertion to one harness.
+setup_claude_only() {
+  setup_tmp
+  mkdir -p "$TEST_HOME/.claude"
+}
+
+skills_dir() { echo "$1/.claude/skills"; }
+
+test_project_install_then_uninstall() {
+  setup_claude_only
+  proj="$TEST_HOME/proj"; mkdir -p "$proj"
+
+  bash "$INSTALL" --project "$proj" >/dev/null 2>&1
+  assert_file_exists "$(skills_dir "$proj")/cortex-tracking"
+  assert_file_exists "$(skills_dir "$proj")/cortex-viz"
+
+  out="$(bash "$UNINSTALL" --project "$proj" 2>&1)"
+  assert_contains "$out" "removed cortex-tracking"
+  assert_file_absent "$(skills_dir "$proj")/cortex-tracking"
+  assert_file_absent "$(skills_dir "$proj")/cortex-viz"
+  teardown_tmp
+}
+
+test_uninstall_is_idempotent() {
+  setup_claude_only
+  proj="$TEST_HOME/proj"; mkdir -p "$proj"
+  bash "$INSTALL" --project "$proj" >/dev/null 2>&1
+  bash "$UNINSTALL" --project "$proj" >/dev/null 2>&1
+  out="$(bash "$UNINSTALL" --project "$proj" 2>&1)"
+  assert_contains "$out" "0 item(s) removed"
+  teardown_tmp
+}
+
+test_real_directory_is_never_deleted() {
+  setup_claude_only
+  proj="$TEST_HOME/proj"; mkdir -p "$proj"
+  bash "$INSTALL" --project "$proj" >/dev/null 2>&1
+
+  # Someone else's real skill directory sitting where ours was.
+  d="$(skills_dir "$proj")/cortex-kb"
+  rm -f "$d"; mkdir -p "$d"; echo "mine" > "$d/SKILL.md"
+
+  out="$(bash "$UNINSTALL" --project "$proj" 2>&1)"
+  assert_file_exists "$d/SKILL.md"
+  assert_contains "$out" "not a symlink"
+  teardown_tmp
+}
+
+test_foreign_symlink_is_never_deleted() {
+  setup_claude_only
+  proj="$TEST_HOME/proj"; mkdir -p "$proj"
+  bash "$INSTALL" --project "$proj" >/dev/null 2>&1
+
+  # A symlink of the same name pointing at some other checkout.
+  other="$TEST_HOME/other-cortex/skills/cortex-sync"
+  mkdir -p "$other"
+  ln -sfn "$other" "$(skills_dir "$proj")/cortex-sync"
+
+  out="$(bash "$UNINSTALL" --project "$proj" 2>&1)"
+  assert_file_exists "$(skills_dir "$proj")/cortex-sync"
+  assert_contains "$out" "points outside this repo"
+  teardown_tmp
+}
+
+test_dry_run_changes_nothing() {
+  setup_claude_only
+  proj="$TEST_HOME/proj"; mkdir -p "$proj"
+  bash "$INSTALL" --project "$proj" >/dev/null 2>&1
+
+  out="$(bash "$UNINSTALL" --project "$proj" --dry-run 2>&1)"
+  assert_contains "$out" "would remove cortex-tracking"
+  assert_contains "$out" "DRY RUN"
+  assert_file_exists "$(skills_dir "$proj")/cortex-tracking"
+  teardown_tmp
+}
+
+test_global_uninstall_removes_bin_and_command() {
+  setup_claude_only
+  bash "$INSTALL" >/dev/null 2>&1
+  assert_file_exists "$TEST_HOME/.cortex/bin/cortex"
+  assert_file_exists "$TEST_HOME/.claude/commands/close-day.md"
+
+  bash "$UNINSTALL" >/dev/null 2>&1
+  assert_file_absent "$TEST_HOME/.cortex/bin/cortex"
+  assert_file_absent "$TEST_HOME/.claude/commands/close-day.md"
+  teardown_tmp
+}
+
+test_store_data_survives_default_uninstall() {
+  setup_claude_only
+  bash "$INSTALL" >/dev/null 2>&1
+  ws="$TEST_HOME/.cortex/workspaces/demo/sessions/s1"
+  mkdir -p "$ws"
+  echo "precious" > "$ws/SUMMARY.md"
+
+  out="$(bash "$UNINSTALL" 2>&1)"
+  assert_file_exists "$ws/SUMMARY.md"
+  assert_contains "$out" "work data is untouched"
+  teardown_tmp
+}
+
+test_purge_without_sync_refuses_single_yes() {
+  setup_claude_only
+  bash "$INSTALL" >/dev/null 2>&1
+  ws="$TEST_HOME/.cortex/workspaces/demo"
+  mkdir -p "$ws"
+  echo "precious" > "$ws/note.md"
+
+  out="$(bash "$UNINSTALL" --purge-store --yes 2>&1)"
+  rc=$?
+  assert_eq "$rc" "1" "should refuse"
+  assert_file_exists "$ws/note.md"
+  assert_contains "$out" "--yes --yes"
+  teardown_tmp
+}
+
+test_purge_deletes_store_when_double_confirmed() {
+  setup_claude_only
+  bash "$INSTALL" >/dev/null 2>&1
+  ws="$TEST_HOME/.cortex/workspaces/demo"
+  mkdir -p "$ws"
+  echo "precious" > "$ws/note.md"
+
+  bash "$UNINSTALL" --purge-store --yes --yes >/dev/null 2>&1
+  assert_file_absent "$ws/note.md"
+  teardown_tmp
+}
+
+test_purge_dry_run_deletes_nothing() {
+  setup_claude_only
+  bash "$INSTALL" >/dev/null 2>&1
+  ws="$TEST_HOME/.cortex/workspaces/demo"
+  mkdir -p "$ws"
+  echo "precious" > "$ws/note.md"
+
+  out="$(bash "$UNINSTALL" --purge-store --dry-run 2>&1)"
+  assert_file_exists "$ws/note.md"
+  assert_contains "$out" "would delete"
+  teardown_tmp
+}
+
+run_test test_project_install_then_uninstall
+run_test test_uninstall_is_idempotent
+run_test test_real_directory_is_never_deleted
+run_test test_foreign_symlink_is_never_deleted
+run_test test_dry_run_changes_nothing
+run_test test_global_uninstall_removes_bin_and_command
+run_test test_store_data_survives_default_uninstall
+run_test test_purge_without_sync_refuses_single_yes
+run_test test_purge_deletes_store_when_double_confirmed
+run_test test_purge_dry_run_deletes_nothing
+report
