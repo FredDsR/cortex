@@ -397,6 +397,13 @@ workbench, and open tasks at session start. Per-workspace opt-in via a sentinel;
 `skills/cortex-inject/SKILL.md`. This is the family's single exception to
 its otherwise pull-based, no-auto-injection design.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, how to run the five test
+suites, and the commit conventions. Note that PR titles are gated on
+[Conventional Commits](https://www.conventionalcommits.org/), because this repo
+squash-merges and the title becomes the commit on `main`.
+
 ## State data vs skill code
 
 These skills are the **code**. Your actual session/task data lives in `~/.cortex/` on each machine. If you enable `cortex-sync`, that data is synced via a separate private repo (created by `cortex sync setup`). This repo contains no personal work data.
