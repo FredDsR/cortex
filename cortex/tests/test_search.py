@@ -127,3 +127,48 @@ def test_len_counts_added_documents():
     idx.add("d1", ["a"])
     idx.add("d2", ["b"])
     assert len(idx) == 2
+
+
+# --- RRF ---
+
+def test_rrf_beats_a_naive_score_merge():
+    # `big` tops a corpus whose scores run large; `small` tops a corpus whose
+    # scores run tiny. A naive merge on raw score would rank `runner_up`
+    # (40.0, second place) above `small` (0.9, first place). RRF sees only rank,
+    # so both list winners come first.
+    loud = [("big", 100.0), ("runner_up", 40.0)]
+    quiet = [("small", 0.9), ("small_2", 0.4)]
+    fused = [key for key, _ in search.rrf([loud, quiet])]
+    assert set(fused[:2]) == {"big", "small"}
+    assert set(fused[2:]) == {"runner_up", "small_2"}
+
+
+def test_rrf_score_is_the_sum_of_reciprocal_ranks():
+    a = [("shared", 9.0), ("only_a", 1.0)]
+    b = [("only_b", 5.0), ("shared", 2.0)]
+    fused = dict(search.rrf([a, b], k=60))
+    assert fused["shared"] == _approx(1 / 61 + 1 / 62)
+    assert fused["only_a"] == _approx(1 / 62)
+    assert fused["only_b"] == _approx(1 / 61)
+
+
+def test_rrf_promotes_a_document_ranked_by_both_lists():
+    a = [("x", 9.0), ("shared", 8.0)]
+    b = [("y", 9.0), ("shared", 8.0)]
+    assert [key for key, _ in search.rrf([a, b])][0] == "shared"
+
+
+def test_rrf_degrades_when_one_list_is_empty():
+    a = [("x", 1.0), ("y", 0.5)]
+    assert [key for key, _ in search.rrf([a, []])] == ["x", "y"]
+
+
+def test_rrf_of_nothing_is_nothing():
+    assert search.rrf([]) == []
+    assert search.rrf([[], []]) == []
+
+
+def test_rrf_breaks_ties_on_key():
+    a = [("zeta", 1.0)]
+    b = [("alpha", 1.0)]
+    assert [key for key, _ in search.rrf([a, b])] == ["alpha", "zeta"]

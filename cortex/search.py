@@ -89,3 +89,24 @@ class Index:
                 scores[key] = scores.get(key, 0.0) + idf * freq * (self.k1 + 1) / denom
         ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
         return ranked if max is None else ranked[:max]
+
+
+# Reciprocal Rank Fusion's conventional constant. It damps the gap between the
+# top ranks, so a first place is worth meaningfully more than a second but not
+# so much that a document ranked well by both lists cannot overtake it.
+RRF_K = 60
+
+
+def rrf(ranked_lists: list, k: int = RRF_K) -> list:
+    """Fuse ranked `(key, score)` lists by Reciprocal Rank Fusion:
+    `score(d) = sum over lists of 1 / (k + rank(d))`, rank 1-based.
+
+    Only rank position is used. BM25 scores from two different corpora are not
+    on a common scale, so a naive merge would let whichever index happens to
+    produce larger magnitudes dominate regardless of relevance. This also
+    degrades gracefully: a list that returns nothing contributes nothing."""
+    scores: dict = {}
+    for ranked in ranked_lists:
+        for rank, (key, _score) in enumerate(ranked, start=1):
+            scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+    return sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
