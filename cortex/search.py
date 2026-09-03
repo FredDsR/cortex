@@ -24,6 +24,9 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from cortex.model import Doc, DocId, World
+from cortex.sanitize import sanitize
+
 # Okapi BM25's conventional defaults. k1 controls term-frequency saturation,
 # b how strongly document length normalizes.
 K1 = 1.5
@@ -110,3 +113,128 @@ def rrf(ranked_lists: list, k: int = RRF_K) -> list:
         for rank, (key, _score) in enumerate(ranked, start=1):
             scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
     return sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+PROSE_KINDS = ("knowledge", "workbench")
+TASK_KINDS = ("task",)
+_INDEXED_KINDS = PROSE_KINDS + TASK_KINDS
+
+# Fields are concatenated with repetition rather than scored per-field BM25F.
+# Repetition is the standard cheap approximation, and BM25's own `b` length
+# normalization absorbs the length inflation it causes. The slug is weighted
+# because it is how a doc is addressed and cited, so a search for
+# `atomic-write-port-pitfalls` should return that doc rather than its citers.
+_PROSE_WEIGHTS = (("slug", 3), ("title", 3), ("description", 2), ("type", 2))
+_TASK_WEIGHTS = (("slug", 3), ("title", 3), ("description", 2), ("status", 1))
+
+SNIPPET_WIDTH = 96
+_WS_RE = re.compile(r"\s+")
+
+
+@dataclass
+class Hit:
+    doc_id: DocId
+    kind: str
+    address: str
+    snippet: str
+    score: float
+
+
+@dataclass
+class SearchResult:
+    """`hits` is bounded by the caller's `max`; `total` is how many matched.
+    Same pair as `query.NeighborResult`'s `outgoing` / `outgoing_total`, and for
+    the same reason: the CLI needs to say how many results it did not print."""
+    hits: list
+    total: int
+
+
+def _field(doc: Doc, name: str):
+    return doc.id.slug if name == "slug" else getattr(doc, name, None)
+
+
+def _doc_tokens(doc: Doc, weights) -> list:
+    tokens = []
+    for name, weight in weights:
+        tokens.extend(tokenize(_field(doc, name)) * weight)
+    tokens.extend(tokenize(doc.body))
+    return tokens
+
+
+def _clip(text: str) -> str:
+    flat = _WS_RE.sub(" ", sanitize(text)).strip()
+    return flat if len(flat) <= SNIPPET_WIDTH else flat[:SNIPPET_WIDTH] + "..."
+
+
+def _snippet(doc: Doc, query_tokens) -> str:
+    """The first body line sharing a token with the query, else the
+    description, else the title.
+
+    Sanitized because a knowledge body can carry ingested text from a codebase
+    nobody here wrote, and this line prints straight to a terminal. That is the
+    same exposure `cortex/sanitize.py` was added for."""
+    wanted = set(query_tokens)
+    for line in doc.body.splitlines():
+        if wanted & set(tokenize(line)):
+            return _clip(line)
+    return _clip(doc.description or doc.title or "(no summary)")
+
+
+def _indexable(world: World, *, names, include_archive) -> dict:
+    """Canonical id -> Doc for every in-scope searchable doc. Workspaces and
+    sessions are containers rather than documents, and a ghost is the unwritten
+    target of a link, so neither is indexed."""
+    out = {}
+    for key, doc in world.docs.items():
+        if doc.id.kind not in _INDEXED_KINDS or doc.ghost:
+            continue
+        if not include_archive and doc.archived:
+            continue
+        if names is not None and doc.id.workspace not in names:
+            continue
+        out[key] = doc
+    return out
+
+
+def _build(docs: dict):
+    prose, tasks = Index(), Index()
+    for key, doc in docs.items():
+        if doc.id.kind in PROSE_KINDS:
+            prose.add(key, _doc_tokens(doc, _PROSE_WEIGHTS))
+        else:
+            tasks.add(key, _doc_tokens(doc, _TASK_WEIGHTS))
+    return prose, tasks
+
+
+def build_indexes(world: World, *, names=None, include_archive: bool = False):
+    """`(prose, tasks)`. Two indexes, not one: knowledge prose and task files
+    differ in length, in fields, and in what a query about them means, so a
+    merged corpus would let BM25's length normalization systematically favour
+    one kind over the other."""
+    return _build(_indexable(world, names=names,
+                             include_archive=include_archive))
+
+
+def search(world: World, terms, *, kind: str = "all", names=None,
+           include_archive: bool = False, max: int = 10) -> SearchResult:
+    """Ranked hits for TERMS. `kind` is one of knowledge / workbench / task /
+    all; `all` runs both indexes and fuses them with RRF."""
+    query_tokens = tokenize(terms if isinstance(terms, str) else " ".join(terms))
+    if not query_tokens:
+        return SearchResult(hits=[], total=0)
+    docs = _indexable(world, names=names, include_archive=include_archive)
+    prose, tasks = _build(docs)
+    if kind == "all":
+        ranked = rrf([prose.search(query_tokens), tasks.search(query_tokens)])
+    elif kind in PROSE_KINDS:
+        # knowledge and workbench share one index on purpose (same length
+        # profile, same fields, same intent), so a single kind is a filter over
+        # its results rather than an index of its own.
+        ranked = [(key, score) for key, score in prose.search(query_tokens)
+                  if docs[key].id.kind == kind]
+    else:
+        ranked = tasks.search(query_tokens)
+    hits = [Hit(doc_id=docs[key].id, kind=docs[key].id.kind, address=key,
+                snippet=_snippet(docs[key], query_tokens), score=score)
+            for key, score in ranked[:max]]
+    return SearchResult(hits=hits, total=len(ranked))

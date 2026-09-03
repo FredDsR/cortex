@@ -3,6 +3,7 @@ import math
 import pytest
 
 from cortex import search
+from cortex.model import Doc, DocId, World
 
 
 def _approx(value):
@@ -172,3 +173,195 @@ def test_rrf_breaks_ties_on_key():
     a = [("zeta", 1.0)]
     b = [("alpha", 1.0)]
     assert [key for key, _ in search.rrf([a, b])] == ["alpha", "zeta"]
+
+
+# --- World-level search ---
+
+def _doc(kind, slug, *, body="", title="", description=None, type=None,
+         status=None, workspace="ws", session="s1", archived=False):
+    did = DocId(kind=kind, workspace=workspace,
+                session=None if kind == "knowledge" else session, slug=slug)
+    return Doc(id=did, title=title or slug, body=body, frontmatter={},
+               rel_path=None, status=status, archived=archived,
+               type=type, description=description)
+
+
+def _world(*docs):
+    root = Doc(id=DocId(kind="root"), title="/", body="", frontmatter={},
+               rel_path=None)
+    return World(root=root, docs={d.id.canonical(): d for d in docs})
+
+
+def test_search_finds_a_term_in_a_knowledge_body():
+    w = _world(_doc("knowledge", "retry-policy",
+                    body="Exponential backoff on 5xx retries."))
+    res = search.search(w, "backoff")
+    assert [h.address for h in res.hits] == ["ws/knowledge/retry-policy"]
+    assert res.hits[0].kind == "knowledge"
+    assert res.total == 1
+
+
+def test_slug_match_outranks_a_body_only_match():
+    w = _world(
+        _doc("knowledge", "atomic-writes", body="Unrelated prose entirely."),
+        _doc("knowledge", "other-note", body="atomic " * 3),
+    )
+    ranked = [h.address for h in search.search(w, "atomic writes").hits]
+    assert ranked[0] == "ws/knowledge/atomic-writes"
+
+
+def test_description_and_type_are_searchable():
+    w = _world(_doc("knowledge", "n1", description="mkstemp mode pitfalls",
+                    type="Gotcha"))
+    assert search.search(w, "mkstemp").hits
+    assert search.search(w, "gotcha").hits
+
+
+def test_task_status_is_searchable():
+    w = _world(_doc("task", "t1", status="Blocked", body="waiting"))
+    hits = search.search(w, "blocked").hits
+    assert [h.address for h in hits] == ["ws/s1/task/t1"]
+
+
+def test_kind_filter_selects_one_kind():
+    w = _world(
+        _doc("knowledge", "k1", body="retry"),
+        _doc("workbench", "wb1", body="retry"),
+        _doc("task", "t1", body="retry"),
+    )
+
+    def kinds(kind):
+        return {h.kind for h in search.search(w, "retry", kind=kind).hits}
+
+    assert kinds("knowledge") == {"knowledge"}
+    assert kinds("workbench") == {"workbench"}
+    assert kinds("task") == {"task"}
+    assert kinds("all") == {"knowledge", "workbench", "task"}
+
+
+def test_kind_filter_reports_its_own_total():
+    # `total` must count the filtered list, not the whole prose index, or the
+    # "(+N more)" line would promise hits the filter already removed.
+    w = _world(
+        _doc("knowledge", "k1", body="retry"),
+        _doc("workbench", "wb1", body="retry"),
+    )
+    assert search.search(w, "retry", kind="knowledge").total == 1
+
+
+def test_all_kind_fuses_so_each_index_winner_surfaces():
+    # One long task and one short knowledge doc: whichever corpus produces the
+    # larger raw BM25 magnitude must not monopolize the top of the fused list.
+    w = _world(
+        _doc("knowledge", "k1", body="retry"),
+        _doc("task", "t1", body="retry " + "filler " * 40),
+        _doc("task", "t2", body="retry"),
+    )
+    kinds = [h.kind for h in search.search(w, "retry", kind="all").hits][:2]
+    assert set(kinds) == {"knowledge", "task"}
+
+
+def test_archived_docs_are_excluded_by_default():
+    w = _world(
+        _doc("knowledge", "live", body="retry"),
+        _doc("knowledge", "dead", body="retry", archived=True),
+    )
+    assert [h.address for h in search.search(w, "retry").hits] == [
+        "ws/knowledge/live"]
+    both = {h.address
+            for h in search.search(w, "retry", include_archive=True).hits}
+    assert both == {"ws/knowledge/live", "ws/knowledge/dead"}
+
+
+def test_names_filter_scopes_to_named_workspaces():
+    w = _world(
+        _doc("knowledge", "k1", body="retry", workspace="wsa"),
+        _doc("knowledge", "k2", body="retry", workspace="wsb"),
+    )
+    hits = search.search(w, "retry", names=["wsa"]).hits
+    assert [h.address for h in hits] == ["wsa/knowledge/k1"]
+
+
+def test_ghost_docs_are_never_indexed():
+    # A ghost is an unwritten target of a [[...]] link, not a document.
+    w = _world(_doc("knowledge", "real", body="retry"))
+    ghost = _doc("knowledge", "ghosted", body="")
+    ghost.ghost = True
+    w.docs[ghost.id.canonical()] = ghost
+    assert [h.address for h in search.search(w, "ghosted").hits] == []
+
+
+def test_non_linkable_kinds_are_never_indexed():
+    # A session's SUMMARY.md is a container, not a searchable document.
+    root = Doc(id=DocId(kind="root"), title="/", body="", frontmatter={},
+               rel_path=None)
+    sess = Doc(id=DocId(kind="session", workspace="ws", session="s1"),
+               title="s1", body="retry retry retry", frontmatter={},
+               rel_path=None)
+    w = World(root=root, docs={sess.id.canonical(): sess})
+    assert search.search(w, "retry").hits == []
+
+
+def test_snippet_is_the_first_matching_body_line():
+    w = _world(_doc("knowledge", "k1",
+                    body="# Heading\n\nUnrelated opening line.\n\n"
+                         "The retry path fsyncs the directory.\n"))
+    assert search.search(w, "retry").hits[0].snippet == (
+        "The retry path fsyncs the directory.")
+
+
+def test_snippet_falls_back_to_description_then_title():
+    w = _world(_doc("knowledge", "retry-note", description="Retry semantics"))
+    assert search.search(w, "retry").hits[0].snippet == "Retry semantics"
+    w2 = _world(_doc("knowledge", "retry-note", title="Retry Note"))
+    assert search.search(w2, "retry").hits[0].snippet == "Retry Note"
+
+
+def test_snippet_is_sanitized_and_whitespace_collapsed():
+    w = _world(_doc("knowledge", "k1",
+                    body="retry‮ reversed​ text\t\tspaced"))
+    snippet = search.search(w, "retry").hits[0].snippet
+    assert "‮" not in snippet and "​" not in snippet
+    assert "\t" not in snippet
+    assert snippet == "retry reversed text spaced"
+
+
+def test_snippet_is_truncated():
+    w = _world(_doc("knowledge", "k1", body="retry " + "x" * 400))
+    snippet = search.search(w, "retry").hits[0].snippet
+    assert len(snippet) == search.SNIPPET_WIDTH + 3
+    assert snippet.endswith("...")
+
+
+def test_max_bounds_the_hits_but_not_the_total():
+    w = _world(*[_doc("knowledge", f"k{i}", body="retry") for i in range(5)])
+    res = search.search(w, "retry", max=2)
+    assert len(res.hits) == 2
+    assert res.total == 5
+
+
+def test_no_match_returns_an_empty_result():
+    w = _world(_doc("knowledge", "k1", body="retry"))
+    res = search.search(w, "nonexistent")
+    assert res.hits == [] and res.total == 0
+
+
+def test_punctuation_only_query_returns_an_empty_result():
+    w = _world(_doc("knowledge", "k1", body="retry"))
+    assert search.search(w, "...").total == 0
+
+
+def test_terms_accept_a_list_as_well_as_a_string():
+    w = _world(_doc("knowledge", "k1", body="exponential backoff"))
+    assert search.search(w, ["exponential", "backoff"]).total == 1
+
+
+def test_build_indexes_partitions_prose_from_tasks():
+    w = _world(
+        _doc("knowledge", "k1", body="retry"),
+        _doc("workbench", "wb1", body="retry"),
+        _doc("task", "t1", body="retry"),
+    )
+    prose, tasks = search.build_indexes(w)
+    assert len(prose) == 2
+    assert len(tasks) == 1
