@@ -122,6 +122,18 @@ def test_unknown_lines_keeps_block_style_continuations():
     assert fm.unknown_lines(block) == ["tags:", "  - alpha", "  - beta"]
 
 
+def test_unknown_lines_keeps_column_zero_comments_wherever_they_sit():
+    block = ("title: Probe\n# why the ticket is here\nticket: PROJ-123\n"
+             "description: d\n# a trailing note")
+    assert fm.unknown_lines(block) == [
+        "# why the ticket is here", "ticket: PROJ-123", "# a trailing note"]
+
+
+def test_unknown_lines_keeps_indented_comment_with_its_key():
+    block = "author: agent\ntags:\n  # inline note\n  - alpha\ncreated: 2026-08-01"
+    assert fm.unknown_lines(block) == ["tags:", "  # inline note", "  - alpha"]
+
+
 def test_emit_appends_extra_lines_verbatim_after_canon():
     doc = fm.emit(
         {"title": "T", "author": "agent", "created": "2026-01-01",

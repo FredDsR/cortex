@@ -187,6 +187,12 @@ description: <optional, from --description>
 <body>
 ```
 
+Those are the only fields cortex writes. Any other key already in the file
+(a relation such as `blocked_by:`, ingest provenance, a ticket, a hand-added
+note) survives `update`: it is carried through verbatim and re-emitted after
+the block above, so non-scalar values keep their shape instead of being quoted
+into strings.
+
 The slug is the filename stem; no `slug:` field. Body is written verbatim after
 the frontmatter. `updated` equals `created` on `new` and is bumped to today by
 `update`. When no `--title` is given, the viz falls back to the body's first

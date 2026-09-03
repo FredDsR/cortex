@@ -15,7 +15,7 @@ CANON = ["title", "type", "author", "created", "updated", "description"]
 _SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./() -]*\Z")
 
 # A frontmatter line that opens a key. Anything else (a list item, a nested
-# mapping, a comment) continues whichever key preceded it.
+# mapping, an indented comment) continues whichever key preceded it.
 _KEY = re.compile(r"^([A-Za-z0-9_][A-Za-z0-9_.-]*):")
 
 
@@ -29,7 +29,7 @@ def scalar(v: str) -> str:
     return f'"{v}"'
 
 
-def unknown_lines(fm_block: str) -> list:
+def unknown_lines(fm_block: str) -> list[str]:
     """Return the raw lines of FM_BLOCK belonging to keys outside CANON, in
     their original order and bytes (continuation lines follow their key).
 
@@ -39,18 +39,23 @@ def unknown_lines(fm_block: str) -> list:
     scalar() would quote it into a string. Feed the result to emit(extra=...)."""
     if not fm_block:
         return []
-    out = []
-    keep = True     # lines before the first key (comments) are not ours to drop
+    out: list[str] = []
+    keep = True     # lines before the first key are not ours to drop
     for line in fm_block.split("\n"):
         m = _KEY.match(line)
         if m:
             keep = m.group(1) not in CANON
+        elif line.startswith("#"):
+            # A column-0 comment is nobody's value (block scalars are indented),
+            # so it is never ours to drop, whichever key it happens to follow.
+            out.append(line)
+            continue
         if keep:
             out.append(line)
     return out
 
 
-def emit(fields: dict, body: str, extra=None) -> str:
+def emit(fields: dict, body: str, extra: list[str] | None = None) -> str:
     """Build a full doc (`---` frontmatter + blank line + body), matching
     work-kb emit_doc byte layout. `author`/`created`/`updated` must be present;
     `title`/`type`/`description` are emitted only when truthy.
