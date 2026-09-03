@@ -71,7 +71,8 @@ Then decide:
 | User says "blocked on X" | Add to SUMMARY.md **Blockers**, set task frontmatter `status: Blocked`. |
 | Blocker resolves | Remove from **Blockers**, unset **Blocked** on dependents. |
 | User asks to move a session between stores | Invoke `cortex-migration`. |
-| User wants to capture a durable note, an unresolved `[[knowledge/...]]` / `[[workbench/...]]` ghost link needs a real entry, spec/plan/brainstorm output should be recorded, or a task needs supporting files (especially shared context referenced by more than one task) | Invoke `cortex-kb` to author `knowledge/<slug>.md` (workspace-scoped, for context shared across tasks) or `workbench/<slug>.md` (session-scoped). Reference the entry from the relevant task bodies with `[[knowledge/<slug>]]`. |
+| User asks what the store knows about a topic, or you are about to author a knowledge entry | Run `cortex query search <terms>`. It ranks docs by content, so it finds a note nobody can name; `kb index` only lists descriptions. Searching first is what keeps the store from accumulating two docs about one thing. |
+| User wants to capture a durable note, an unresolved `[[knowledge/...]]` / `[[workbench/...]]` ghost link needs a real entry, spec/plan/brainstorm output should be recorded, or a task needs supporting files (especially shared context referenced by more than one task) | **Search first** (`cortex query search`), then invoke `cortex-kb` to author `knowledge/<slug>.md` (workspace-scoped, for context shared across tasks) or `workbench/<slug>.md` (session-scoped). Reference the entry from the relevant task bodies with `[[knowledge/<slug>]]`. |
 | After any write to `tasks/*.md` or `SUMMARY.md` | Run `cortex sync push "<track: ... message>"`. |
 | `cortex sync pull` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
 | On session close (after archive move) | Run `cortex sync push "track: archive session <slug>"`. |
@@ -101,8 +102,9 @@ Routine:
    `tasks/*.md` / `SUMMARY.md`:
    - Task status / Notes updates inferred from `COMMITS`, `UNCOMMITTED`, and the
      conversation.
-   - Candidate knowledge notes worth capturing — author via `cortex-kb`
-     (`cortex kb`).
+   - Candidate knowledge notes worth capturing. Check each against
+     `cortex query search <terms>` before proposing it as new, then author via
+     `cortex-kb` (`cortex kb`); an existing doc usually wants updating instead.
    - Whether sync will run (configured vs. not).
 3. Present the batch and get a SINGLE confirmation.
 4. On confirm: write `tasks/*.md` and update `SUMMARY.md` (bump `last_updated`);
@@ -159,4 +161,4 @@ See the sub-skill's SKILL.md for invocation contracts at each checkpoint.
 - `templates/` — starter SUMMARY.md and task.md
 - `scripts/manifest.sh`: one-row-per-task TSV; cheap snapshot for status questions.
 - `scripts/migrate_to_frontmatter.py`: one-shot legacy bold-pair to YAML frontmatter migrator.
-- `../cortex-kb/scripts/migrate_kb_frontmatter.py`: one-shot migrator for existing knowledge/workbench docs (backfills `updated`, canonical field order, regenerates `INDEX.md` banners, reports stale `work-kb`/`work-viz` references). Dry-run by default; `--write` to apply. The family's unified CLI is `cortex` (`cortex kb ...`, `cortex viz ...`).
+- `../cortex-kb/scripts/migrate_kb_frontmatter.py`: one-shot migrator for existing knowledge/workbench docs (backfills `updated`, canonical field order, regenerates `INDEX.md` banners, reports stale `work-kb`/`work-viz` references). Dry-run by default; `--write` to apply. The family's unified CLI is `cortex` (`cortex kb ...`, `cortex viz ...`, `cortex query ...`).
