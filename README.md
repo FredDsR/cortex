@@ -6,7 +6,8 @@
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Antigravity.
 
-One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author knowledge), `cortex viz` (visualize), `cortex query neighbors <slug>` (explore a doc's links), `cortex inject` (opt-in session-start injection), `cortex sync` (cross-device sync of the store), and `cortex migrate-store` (move a legacy `~/.work` store to `~/.cortex`). Every verb runs through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired.
+One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author knowledge), `cortex viz` (visualize), `cortex query` (`neighbors` to explore a doc's links, `search` for BM25 keyword
+search), `cortex inject` (opt-in session-start injection), `cortex sync` (cross-device sync of the store), and `cortex migrate-store` (move a legacy `~/.work` store to `~/.cortex`). Every verb runs through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired.
 
 ## The dashboard
 
@@ -85,7 +86,8 @@ layout and hoping the agent gets it right.
 bounded artifact rather than a large unbounded one. `cortex kb index` returns a
 one-line-per-document table of contents instead of the documents. `cortex query
 neighbors` returns a document's links with one-line summaries instead of the
-linked files. `cortex inject here` emits a byte-bounded block. The pattern is
+linked files. `cortex query search` returns ranked one-line hits instead of the
+matching documents. `cortex inject here` emits a byte-bounded block. The pattern is
 the same everywhere: answer the question at hand with the smallest artifact
 that can answer it, and let the agent open the full file only when it decides
 to.
@@ -98,7 +100,7 @@ one call with a bounded response.
 |------|------|
 | `cortex kb` | Author and audit knowledge / workbench docs (`new`, `update`, `index`, `ingest`, `lint`) |
 | `cortex viz` | Build and serve the dashboard (`build`, `serve`) |
-| `cortex query` | Explore a doc's links and backlinks (`neighbors`) |
+| `cortex query` | Explore a doc's links and backlinks (`neighbors`), search its content (`search`) |
 | `cortex inject` | Opt-in session-start injection (`enable`, `disable`, `status`, `here`) |
 | `cortex sync` | Replicate the store to a private repo (`push`, `pull`, `setup`, `status`) |
 | `cortex migrate-store` | Move a legacy `~/.work` store to `~/.cortex` |
@@ -109,6 +111,7 @@ commands need no arguments:
 ```bash
 cortex kb new knowledge token-expiry --type Gotcha --description "TTL is 15m"
 cortex query neighbors token-expiry
+cortex query search token expiry
 cortex viz serve
 ```
 

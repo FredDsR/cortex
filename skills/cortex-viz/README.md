@@ -110,7 +110,11 @@ The suite covers the address grammar, parser (typed-relation extraction, mention
 ## Limitations
 
 - Knowledge and workbench docs are authored via the `cortex-kb` CLI (`cortex kb`) or, for existing docs, the `serve --edit` mode. Unresolved `knowledge/*` or `workbench/*` references still render as ghost nodes until the target file exists.
-- No search across the world (Spec B).
+- The viz's own search is per-scope and client-side (MiniSearch, over one fused
+  index of every doc kind). Cross-world search lives in the CLI instead:
+  `cortex query search <terms> --workspace all`. The two are not backed by the
+  same index, so their rankings can differ; the CLI's is BM25 over two indexes
+  fused with RRF.
 - No graph algorithm beyond the built-in hierarchical and `cose` layouts.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).
 - Opening `out/index.html` via `file://` works for graph + tree but the content pane needs a server because browsers block `fetch` on `file://`. Use `cortex viz serve` or `python -m http.server` from inside `out/`.

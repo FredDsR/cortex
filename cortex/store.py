@@ -151,3 +151,20 @@ def resolve_session(ws_root: Path, explicit_sess: str) -> str:
     _validate_name("session", sess)
     _assert_under(sessions, sessions / sess, "session", sess)
     return sess
+
+
+def resolve_scope(explicit_ws: str, *, home: Path, cwd: Path) -> tuple[Path, list[str]]:
+    """(workspaces root to parse, workspace names to act on).
+
+    The root is the resolved workspace's parent so one expression covers both
+    stores: the global `~/.cortex/workspaces`, and a repo-local `<repo>/.cortex`
+    whose parent is the repo. Names filter what gets acted on, so the extra
+    workspaces a global parse pulls in are only used for link resolution, which
+    is what makes a cross-workspace reference resolvable at all."""
+    if explicit_ws == "all":
+        root = Path(home) / ".cortex" / "workspaces"
+        names = (sorted(p.name for p in root.iterdir() if p.is_dir())
+                 if root.is_dir() else [])
+        return root, names
+    ws_root = resolve_workspace(explicit_ws, home=home, cwd=cwd)
+    return ws_root.parent, [ws_root.name]

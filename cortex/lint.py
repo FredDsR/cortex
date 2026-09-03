@@ -455,20 +455,10 @@ def _parse_checks(raw: str) -> tuple:
 
 
 def _scope(args) -> tuple[Path, list]:
-    """(workspaces root to parse, workspace names to lint).
-
-    The root is the resolved workspace's parent so one expression covers both
-    stores: the global `~/.cortex/workspaces`, and a repo-local `<repo>/.cortex`
-    whose parent is the repo. Names filter what gets linted, so the extra
-    workspaces a global parse pulls in are only used for link resolution --
-    which is what makes a cross-workspace reference resolvable at all."""
-    if args.workspace == "all":
-        root = _home() / ".cortex" / "workspaces"
-        names = (sorted(p.name for p in root.iterdir() if p.is_dir())
-                 if root.is_dir() else [])
-        return root, names
-    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
-    return ws_root.parent, [ws_root.name]
+    """Thin adapter: unpack argparse and hand off to the shared resolver.
+    `cortex query search` needs the identical (root, names) pair, so the logic
+    lives in `store`, beside every other piece of workspace resolution."""
+    return store.resolve_scope(args.workspace, home=_home(), cwd=Path.cwd())
 
 
 def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:

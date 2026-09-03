@@ -29,6 +29,12 @@ cortex kb update knowledge api-versioning
 cortex kb index                 # stdout
 cortex kb index --write         # (re)generate derived knowledge/INDEX.md
 
+# Search the content, not just the descriptions. Run this BEFORE `kb new`:
+# it is the cheapest way to avoid a second doc about something already covered.
+cortex query search api versioning              # ranked hits, prose + tasks
+cortex query search versioning --kind knowledge # one kind only
+cortex query search versioning --workspace all  # every workspace
+
 # Bulk-ingest a codebase into the KB. --from reads the codebase, --workspace
 # writes the KB. Dry-run first (plans, writes nothing), then --write.
 cortex kb ingest --from ./my-service --workspace my-ws          # dry-run plan

@@ -10,6 +10,7 @@ from cortex import kb
 from cortex import ingest
 from cortex import lint
 from cortex import query
+from cortex import search as search_mod
 from cortex import inject
 from cortex import migrate_store
 from cortex import sync
@@ -72,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Visualize the work tree (build, serve)")
     vp.add_argument("args", nargs=argparse.REMAINDER)
 
-    qp = groups.add_parser("query", help="Query the work graph (neighbors)")
+    qp = groups.add_parser("query", help="Query the work graph (neighbors, search)")
     qcmds = qp.add_subparsers(dest="cmd", required=True)
     nb = qcmds.add_parser("neighbors",
                           help="Show a doc's links, backlinks, and ghost refs")
@@ -81,6 +82,16 @@ def build_parser() -> argparse.ArgumentParser:
     nb.add_argument("--session", default="")
     nb.add_argument("--kind", choices=["task", "knowledge", "workbench"], default="")
     nb.add_argument("--max", default="20")
+
+    se = qcmds.add_parser("search",
+                          help="BM25 keyword search over knowledge and tasks")
+    se.add_argument("terms", nargs="+")
+    se.add_argument("--workspace", default="")     # "all" searches every workspace
+    se.add_argument("--kind",
+                    choices=["knowledge", "workbench", "task", "all"],
+                    default="all")
+    se.add_argument("--max", default="10")
+    se.add_argument("--archive", action="store_true")
 
     ip = groups.add_parser("inject", help="Opt-in session-start injection")
     icmds = ip.add_subparsers(dest="cmd", required=True)
@@ -129,7 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
 _VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
                 "--description", "--body", "--body-from", "--from", "--only", "--max",
                 "--format", "--wire-hook", "--unwire-hook", "--repo", "--check",
-                "--stale-days"}
+                "--stale-days", "--kind"}
 
 
 def _glue_flag_values(argv):
@@ -155,6 +166,7 @@ _KB_DISPATCH = {
 
 _QUERY_DISPATCH = {
     "neighbors": query.cmd_neighbors,
+    "search": search_mod.cmd_search,
 }
 
 _INJECT_DISPATCH = {
