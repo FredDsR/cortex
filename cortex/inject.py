@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 
 from cortex import frontmatter as fm
+from cortex import atomic
 from cortex import kb
 from cortex import store
 from cortex.errors import CortexError
@@ -212,7 +213,7 @@ class ClaudeCodeAdapter(Adapter):
             "hooks": [{"type": "command", "command": self._cortex_command(home)}],
         })
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        atomic.write_text(path, json.dumps(data, indent=2) + "\n", encoding="utf-8")
         return True
 
     def unwire(self, *, home: Path, project_path: Path | None = None) -> bool:
@@ -225,7 +226,7 @@ class ClaudeCodeAdapter(Adapter):
         if len(kept) == len(entries):
             return False
         data["hooks"]["SessionStart"] = kept
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        atomic.write_text(path, json.dumps(data, indent=2) + "\n", encoding="utf-8")
         return True
 
     def is_wired(self, *, home: Path, project_path: Path | None = None) -> bool:
@@ -286,7 +287,7 @@ def cmd_enable(args) -> int:
             print(f"no workspace resolved; nothing opted in.{wired_note}")
             return 0
         raise
-    _sentinel(ws_root).write_text("on\n", encoding="utf-8")
+    atomic.write_text(_sentinel(ws_root), "on\n", encoding="utf-8")
     print(f"injection enabled for workspace '{ws_root.name}'.{wired_note}")
     return 0
 

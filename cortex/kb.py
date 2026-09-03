@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from cortex import atomic
 from cortex import frontmatter as fm
 from cortex import model
 from cortex import store
@@ -108,7 +109,7 @@ def cmd_new(args) -> int:
     fields = {"title": args.title or "", "type": args.type or "", "author": author,
               "created": d, "updated": d, "description": args.description or ""}
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(fm.emit(fields, body), encoding="utf-8")
+    atomic.write_text(path, fm.emit(fields, body), encoding="utf-8")
     print(path)
     sync_after("new", args.kind, args.slug)
     _maybe_open(args, path)
@@ -192,7 +193,7 @@ def cmd_index(args) -> int:
                 "regenerate with: cortex kb index --workspace=all --write -->",
                 "# Knowledge index (all workspaces)", "",
             ] + lines
-            (root_kdir / "INDEX.md").write_text("\n".join(out) + "\n", encoding="utf-8")
+            atomic.write_text(root_kdir / "INDEX.md", "\n".join(out) + "\n", encoding="utf-8")
             print(root_kdir / "INDEX.md")
             sync_after("index", "knowledge", "INDEX")
             return 0
@@ -209,7 +210,7 @@ def cmd_index(args) -> int:
             "# Knowledge index", "", "## knowledge",
         ]
         lines += _render_section(kdir, max_n)
-        (kdir / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        atomic.write_text(kdir / "INDEX.md", "\n".join(lines) + "\n", encoding="utf-8")
         print(kdir / "INDEX.md")
         sync_after("index", "knowledge", "INDEX")
         return 0
@@ -263,7 +264,7 @@ def cmd_update(args) -> int:
     body = _read_body(args, allow_stdin=True) if _body_set(args) else ex_body
     fields = {"title": title, "type": typ, "author": author,
               "created": created, "updated": today(), "description": desc}
-    path.write_text(fm.emit(fields, body), encoding="utf-8")
+    atomic.write_text(path, fm.emit(fields, body), encoding="utf-8")
     print(path)
     sync_after("update", args.kind, args.slug)
     _maybe_open(args, path)
