@@ -208,3 +208,36 @@ def test_blank_active_pointer_means_no_active_session(tmp_path):
     (ws / ".active.testid").write_text("\n")
     with pytest.raises(store.StoreError, match="no active session"):
         store.resolve_session(ws, "")
+
+
+def test_resolve_scope_all_lists_every_workspace(tmp_path):
+    root = tmp_path / ".cortex" / "workspaces"
+    for name in ("wsb", "wsa"):
+        (root / name).mkdir(parents=True)
+    (root / "loose.txt").write_text("not a workspace\n")
+    parsed, names = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
+    assert parsed == root
+    assert names == ["wsa", "wsb"]          # sorted, files excluded
+
+
+def test_resolve_scope_all_on_empty_home(tmp_path):
+    parsed, names = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
+    assert parsed == tmp_path / ".cortex" / "workspaces"
+    assert names == []
+
+
+def test_resolve_scope_explicit_returns_parent_and_one_name(tmp_path):
+    root = tmp_path / ".cortex" / "workspaces"
+    (root / "wsa").mkdir(parents=True)
+    parsed, names = store.resolve_scope("wsa", home=tmp_path, cwd=tmp_path)
+    assert parsed == root                    # the parent, so siblings stay parseable
+    assert names == ["wsa"]
+
+
+def test_resolve_scope_local_store_root_is_the_repo(tmp_path):
+    # A repo-local store is `<repo>/.cortex`, so its parent is the repo itself.
+    repo = tmp_path / "proj"
+    (repo / ".cortex").mkdir(parents=True)
+    parsed, names = store.resolve_scope("", home=tmp_path, cwd=repo)
+    assert parsed == repo
+    assert names == [".cortex"]
