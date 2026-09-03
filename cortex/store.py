@@ -5,6 +5,7 @@ resolve_session / find_local_store, including their die-on-ambiguity semantics
 from __future__ import annotations
 import re
 from pathlib import Path
+from typing import NamedTuple
 
 
 class StoreError(Exception):
@@ -153,18 +154,74 @@ def resolve_session(ws_root: Path, explicit_sess: str) -> str:
     return sess
 
 
-def resolve_scope(explicit_ws: str, *, home: Path, cwd: Path) -> tuple[Path, list[str]]:
-    """(workspaces root to parse, workspace names to act on).
+class Scope(NamedTuple):
+    """What a verb operating over workspaces needs: the root to parse, the
+    workspace names to act on, and any note about what the scope left out.
+
+    A three-field tuple rather than a return value plus a lookup, because the
+    note is only derivable from the same three inputs the scope came from and
+    would otherwise be recomputed per verb."""
+    root: Path
+    names: list[str]
+    notes: list[str]
+
+
+def _tilde(path: Path, home: Path) -> str:
+    """Render a path home-relative when it is under home. `~/.cortex/workspaces`
+    is how the docs spell the global store, so a note that says the same thing
+    reads as the same place; a long absolute path reads as a different one."""
+    try:
+        return "~/" + str(Path(path).resolve().relative_to(Path(home).resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _all_notes(root: Path, names: list[str], *, home: Path, cwd: Path) -> list[str]:
+    """What `--workspace all` did not cover, in words.
+
+    `all` means every workspace in the global store, which is not every store: a
+    repo-local `<repo>/.cortex` is deliberately excluded, because
+    `kb index --workspace=all --write` derives a cross-workspace brain and a
+    per-repo store is not part of anybody's brain (skills/cortex-kb/SKILL.md).
+
+    Excluding it silently is the defect. `names=[]` prints exactly what
+    "searched everything, found nothing" prints, and a populated global store
+    prints a complete-looking answer over a corpus that omits the store the user
+    is standing in. Neither case is fixed by widening the scope; both are fixed
+    by the scope saying what it covered."""
+    local = find_local_store(Path(cwd), Path(home))
+    where = _tilde(root, home)
+    if not names:
+        if local is not None:
+            return [f"--workspace all found no workspaces in the global store "
+                    f"({where}), and does not cover the repo-local store at "
+                    f"{_tilde(local, home)}; omit --workspace to use that store"]
+        return [f"--workspace all found no workspaces in the global "
+                f"store ({where})"]
+    if local is not None:
+        return [f"--workspace all covers the global store ({where}) only; the "
+                f"repo-local store at {_tilde(local, home)} was not included. "
+                f"Omit --workspace to use that store"]
+    return []
+
+
+def resolve_scope(explicit_ws: str, *, home: Path, cwd: Path) -> Scope:
+    """(workspaces root to parse, workspace names to act on, notes to surface).
 
     The root is the resolved workspace's parent so one expression covers both
     stores: the global `~/.cortex/workspaces`, and a repo-local `<repo>/.cortex`
     whose parent is the repo. Names filter what gets acted on, so the extra
     workspaces a global parse pulls in are only used for link resolution, which
-    is what makes a cross-workspace reference resolvable at all."""
+    is what makes a cross-workspace reference resolvable at all.
+
+    Notes are non-fatal and only ever produced by `all`; see `_all_notes`. They
+    belong here rather than in a verb because one scoping rule backs three, so a
+    per-verb explanation would be the same sentence written three times and kept
+    in sync by hand."""
     if explicit_ws == "all":
         root = Path(home) / ".cortex" / "workspaces"
         names = (sorted(p.name for p in root.iterdir() if p.is_dir())
                  if root.is_dir() else [])
-        return root, names
+        return Scope(root, names, _all_notes(root, names, home=home, cwd=cwd))
     ws_root = resolve_workspace(explicit_ws, home=home, cwd=cwd)
-    return ws_root.parent, [ws_root.name]
+    return Scope(ws_root.parent, [ws_root.name], [])

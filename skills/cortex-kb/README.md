@@ -33,7 +33,9 @@ cortex kb index --write         # (re)generate derived knowledge/INDEX.md
 # it is the cheapest way to avoid a second doc about something already covered.
 cortex query search api versioning              # ranked hits, prose + tasks
 cortex query search versioning --kind knowledge # one kind only
-cortex query search versioning --workspace all  # every workspace
+cortex query search versioning --workspace all  # every global workspace;
+                                                # a repo-local store is
+                                                # named, not included
 
 # Bulk-ingest a codebase into the KB. --from reads the codebase, --workspace
 # writes the KB. Dry-run first (plans, writes nothing), then --write.

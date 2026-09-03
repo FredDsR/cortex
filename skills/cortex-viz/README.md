@@ -114,7 +114,8 @@ The suite covers the address grammar, parser (typed-relation extraction, mention
   index of every doc kind). Cross-world search lives in the CLI instead:
   `cortex query search <terms> --workspace all`. The two are not backed by the
   same index, so their rankings can differ; the CLI's is BM25 over two indexes
-  fused with RRF.
+  fused with RRF, and its `all` is the global store only (it names a repo-local
+  store it skipped rather than omitting it silently).
 - No graph algorithm beyond the built-in hierarchical and `cose` layouts.
 - No persistence of chip state in localStorage (it lives in the URL fragment, so it travels with shared URLs but is lost when typing a new URL).
 - Opening `out/index.html` via `file://` works for graph + tree but the content pane needs a server because browsers block `fetch` on `file://`. Use `cortex viz serve` or `python -m http.server` from inside `out/`.
