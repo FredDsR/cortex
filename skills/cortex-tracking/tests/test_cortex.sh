@@ -26,6 +26,14 @@ qout="$(HOME="$home" "$bindir/cortex" query neighbors qn --workspace ws-a 2>&1)"
     || fail "cortex query neighbors nonzero"
 printf '%s\n' "$qout" | grep -qi "Ghost references" || fail "query neighbors output missing sections"
 
+# kb lint routing: reports sections, and --strict exits 1 on a finding
+lout="$(HOME="$home" "$bindir/cortex" kb lint --workspace ws-a 2>&1)" \
+    || fail "cortex kb lint nonzero"
+printf '%s\n' "$lout" | grep -q "## summary" || fail "kb lint output missing summary"
+set +e; HOME="$home" "$bindir/cortex" kb lint --workspace ws-a --check orphan --strict \
+    >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 1 ] || fail "kb lint --strict exit $rc (want 1 with findings)"
+
 # top-level help lists all groups, exit 0
 hout="$(HOME="$home" "$bindir/cortex" --help 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] || fail "cortex --help exit $rc"

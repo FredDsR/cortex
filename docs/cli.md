@@ -30,6 +30,8 @@ cortex kb new    knowledge|workbench <slug> [flags]
 cortex kb update knowledge|workbench <slug> [flags]
 cortex kb index  [--workspace W] [--session S] [--max N] [--write]
 cortex kb ingest [--from SRC] [--workspace W] [--write] [--only openapi|sql] [--max N]
+cortex kb lint   [--workspace W|all] [--repo PATH] [--check C,...] [--stale-days N]
+                 [--max N] [--archive] [--fix] [--strict]
 ```
 
 **`new` is create-only** and errors with `already exists` if the file is there.
@@ -66,6 +68,61 @@ until you pass `--write`.
 **`ingest`** reads a source (a codebase, an OpenAPI spec, SQL schemas) and
 writes knowledge entries into a workspace. Also dry-run by default; `--only`
 narrows the extractors, `--max` bounds how much it writes.
+
+**`lint`** is the health check for a store that has been accumulating. A
+knowledge base collects statements that were true when written and quietly
+stopped being true, and neither the index nor the graph notices. Report-only
+unless you pass `--fix`.
+
+Five deterministic checks, one line per finding, grouped under a `## <check>`
+header:
+
+| Check | Fires when |
+|-------|-----------|
+| `broken-ref` | A reference resolves to no doc. Marked `(repairable)` when the slug it names exists elsewhere under exactly one address |
+| `dead-ref` | A backticked path, symbol, or `--flag` in a doc body appears nowhere in the repo |
+| `orphan` | A knowledge doc has no authored backlink (`contains` does not count) |
+| `stale` | `updated` is older than `--stale-days` (default 180), missing, or unparseable |
+| `missing-description` | No `description:`, which is the field the index and graph display |
+
+Then an `## agent worklist (needs judgment)` section, in the same spirit as
+`ingest`'s: pairs of same-typed docs whose summaries overlap enough to be worth
+reading, phrased as candidates because a contradiction and two legitimately
+distinct notes look identical from outside. It is selectable as `overlap`, but
+it is not a check: its pairs never count toward the tally and never affect
+`--strict`.
+
+| Flag | Default | Notes |
+|------|---------|-------|
+| `--workspace <ws>\|all` | active session pointer | `all` lints every workspace in the global store |
+| `--repo <path>` | the `cwd:` in the workspace `.meta`, or the repo itself for a repo-local store | What `dead-ref` checks against; the check is skipped with a note when none resolves |
+| `--check <c,...>` | everything | Comma-separated subset of the five checks plus `overlap` (the worklist) |
+| `--stale-days <n>` | `180` | Age past which `updated` counts as stale |
+| `--max <n>` | `50` | Per-section cap, with a `... K more` notice |
+| `--archive` | off | Also lint archived sessions. Archives are always *resolved* against, so a link into one is never reported broken |
+| `--fix` | off | Rewrite repairable `broken-ref` addresses in place |
+| `--strict` | off | Exit 1 when findings remain, for CI |
+
+```bash
+cortex kb lint                                   # everything, current workspace
+cortex kb lint --check broken-ref,orphan         # just the graph checks
+cortex kb lint --check broken-ref --fix          # repair mistyped addresses
+cortex kb lint --strict                          # gate a commit or a CI job
+```
+
+**What `--fix` deliberately will not do.** It rewrites a reference only when
+the slug it names belongs to exactly one doc in the store, so the edit changes
+an address and never a claim. It does not delete a dangling link, because a
+link to a doc nobody has written yet is authoring intent and is what the viz
+renders as a ghost node. It does not bump `updated`, because that would erase
+the signal the `stale` check reads. Everything else is yours to decide.
+
+**On `dead-ref` precision.** It only reads inline code spans outside fenced
+blocks, on the theory that a backtick is the author saying "this is code", and
+it ignores attribute access (`args.max`), placeholders (`<slug>.md`), and
+home- or env-relative paths. It still cannot know that a doc is *about* another
+project, so a note comparing cortex to something else will report that other
+project's symbols as dead. Narrow with `--check` when that is the doc you have.
 
 ---
 

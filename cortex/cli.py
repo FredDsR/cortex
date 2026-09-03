@@ -1,4 +1,4 @@
-"""cortex CLI: `cortex kb {new,update,index,ingest}` (+ viz/query in later phases).
+"""cortex CLI: `cortex kb {new,update,index,ingest,lint}` (+ viz/query/inject/sync).
 
 Invoked as `python -m cortex.cli <group> <cmd> ...` by the cortex dispatcher.
 """
@@ -8,6 +8,7 @@ import sys
 
 from cortex import kb
 from cortex import ingest
+from cortex import lint
 from cortex import query
 from cortex import inject
 from cortex import migrate_store
@@ -44,6 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     idx.add_argument("--session", default="")
     idx.add_argument("--max", default="100")          # validated in cmd (exit 1, bash parity)
     idx.add_argument("--write", action="store_true")
+
+    lp = kbcmds.add_parser("lint")
+    lp.add_argument("--workspace", default="")        # "all" lints every workspace
+    lp.add_argument("--repo", default="")             # dead-ref target; default: .meta cwd
+    lp.add_argument("--check", default="")            # comma list; "" = every check
+    lp.add_argument("--stale-days", dest="stale_days", default=str(lint.DEFAULT_STALE_DAYS))
+    lp.add_argument("--max", default="50")
+    lp.add_argument("--archive", action="store_true")
+    lp.add_argument("--fix", action="store_true")
+    lp.add_argument("--strict", action="store_true")  # exit 1 when findings remain
 
     ing = kbcmds.add_parser("ingest")
     ing.add_argument("--from", dest="src", default=".")
@@ -117,7 +128,8 @@ def build_parser() -> argparse.ArgumentParser:
 # matching the bash parser which stored $2 verbatim.
 _VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
                 "--description", "--body", "--body-from", "--from", "--only", "--max",
-                "--format", "--wire-hook", "--unwire-hook"}
+                "--format", "--wire-hook", "--unwire-hook", "--repo", "--check",
+                "--stale-days"}
 
 
 def _glue_flag_values(argv):
@@ -138,6 +150,7 @@ _KB_DISPATCH = {
     "update": kb.cmd_update,
     "index": kb.cmd_index,
     "ingest": ingest.cmd_ingest,
+    "lint": lint.cmd_lint,
 }
 
 _QUERY_DISPATCH = {

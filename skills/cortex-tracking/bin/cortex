@@ -8,7 +8,7 @@ usage() {
     cat >&2 <<'EOF'
 Usage:
   cortex kb    <command> [args...]  Author/query knowledge & workbench docs
-                                     (new, update, index, ingest)
+                                     (new, update, index, ingest, lint)
   cortex viz   <command> [args...]  Visualize the work tree (build, serve)
   cortex query  <command> [args...]  Query the work graph (neighbors)
   cortex inject <command> [args...]  Opt-in session-start injection

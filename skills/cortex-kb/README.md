@@ -34,6 +34,11 @@ cortex kb index --write         # (re)generate derived knowledge/INDEX.md
 cortex kb ingest --from ./my-service --workspace my-ws          # dry-run plan
 cortex kb ingest --from ./my-service --workspace my-ws --write  # create docs
 
+# Audit the store: broken refs, dead code references, orphans, stale dates,
+# missing descriptions. Report-only; --fix repairs mistyped addresses only.
+cortex kb lint                              # every check, current workspace
+cortex kb lint --check broken-ref --fix     # repair addresses that resolve elsewhere
+
 # Explicit workspace when ambiguous.
 cortex kb new knowledge cross-project-note --workspace personal
 ```
