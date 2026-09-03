@@ -232,8 +232,12 @@ def search(world: World, terms, *, kind: str = "all", names=None,
         # its results rather than an index of its own.
         ranked = [(key, score) for key, score in prose.search(query_tokens)
                   if docs[key].id.kind == kind]
-    else:
+    elif kind in TASK_KINDS:
         ranked = tasks.search(query_tokens)
+    else:
+        # Named explicitly rather than falling through to the task index: an
+        # unrecognized kind returning task hits reads as a working search.
+        raise ValueError(f"unknown search kind: {kind!r}")
     hits = [Hit(doc_id=docs[key].id, kind=docs[key].id.kind, address=key,
                 snippet=_snippet(docs[key], query_tokens), score=score)
             for key, score in ranked[:max]]
@@ -271,6 +275,6 @@ def cmd_search(args) -> int:
     # stays a filter rather than a second walk of the store.
     world = parse_world(root, include_archive=True)
     res = search(world, args.terms, kind=args.kind, names=names,
-                 include_archive=bool(args.archive), max=max_n)
+                 include_archive=args.archive, max=max_n)
     _print_result(res, max_n)
     return 0

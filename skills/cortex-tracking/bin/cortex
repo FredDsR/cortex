@@ -10,7 +10,7 @@ Usage:
   cortex kb    <command> [args...]  Author/query knowledge & workbench docs
                                      (new, update, index, ingest, lint)
   cortex viz   <command> [args...]  Visualize the work tree (build, serve)
-  cortex query  <command> [args...]  Query the work graph (neighbors)
+  cortex query  <command> [args...]  Query the work graph (neighbors, search)
   cortex inject <command> [args...]  Opt-in session-start injection
                                      (enable, disable, status, here)
   cortex sync  <command> [args...]  Sync the ~/.cortex store to a private repo

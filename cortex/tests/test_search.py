@@ -356,6 +356,14 @@ def test_terms_accept_a_list_as_well_as_a_string():
     assert search.search(w, ["exponential", "backoff"]).total == 1
 
 
+def test_unknown_kind_raises_rather_than_returning_task_hits():
+    # Argparse `choices` shields the CLI, so this guards a library caller: a
+    # plausible-looking task ranking is worse than an error.
+    w = _world(_doc("task", "t1", body="retry"))
+    with pytest.raises(ValueError, match="unknown search kind"):
+        search.search(w, "retry", kind="Task")
+
+
 def test_build_indexes_partitions_prose_from_tasks():
     w = _world(
         _doc("knowledge", "k1", body="retry"),
