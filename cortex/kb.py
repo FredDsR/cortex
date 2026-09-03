@@ -35,10 +35,12 @@ def _validate_slug(slug: str) -> None:
         raise CortexError(f"invalid slug: '{slug}' (must match [a-z0-9][a-z0-9-]*)")
 
 
-def parse_max(value) -> int:
-    """Validate --max like bash did (^[0-9]+$ or die, exit 1)."""
+def parse_max(value, flag: str = "--max") -> int:
+    """Validate --max like bash did (^[0-9]+$ or die, exit 1). `flag` names the
+    option in the error, so a caller reusing this for another numeric flag does
+    not report a bad --stale-days as a bad --max."""
     if not re.fullmatch(r"[0-9]+", str(value)):
-        raise CortexError("--max must be a non-negative integer")
+        raise CortexError(f"{flag} must be a non-negative integer")
     return int(value)
 
 

@@ -48,6 +48,12 @@ DEFAULT_STALE_DAYS = 180
 # replacement so `task-foo` never matches inside `task-foobar`.
 _ADDR_CHAR = r"[A-Za-z0-9/_-]"
 _FENCE = re.compile(r"^\s*```")
+# The lines on which an unbracketed slug is a reference rather than a word:
+# the parser's own typed body labels, and the frontmatter relation keys. Kept in
+# the same order and spelling as cortex/parser.py's _BODY_REL_RE / _FM_KEY_TO_KIND.
+_REL_LINE = re.compile(
+    r"^\s*(?:Blocked by|Related to|Follows)\s*:|^(?:blocked_by|related_to|follows)\s*:",
+    re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -80,11 +86,18 @@ class RepoIndex:
     text. Membership is the only question asked, so an over-broad corpus (a
     binary decoded with errors="replace", a generated file) can only suppress a
     finding, never invent one. Erring toward silence is the right direction for
-    a check whose false positives each cost a human a look."""
+    a check whose false positives each cost a human a look. The one gap in that
+    argument is a corpus with holes -- see `partial`."""
     root: Path
     paths: set = field(default_factory=set)
     basenames: set = field(default_factory=set)
     tokens: set = field(default_factory=set)
+    # True when some file's text was not read (too large, or past the total
+    # budget). Membership then has a hole, and a hole in `tokens` is the
+    # one way this index can invent a finding: a symbol that lives only in a
+    # skipped file reads as dead. Surfaced as a note so the reader knows the
+    # symbol and flag rows are not authoritative for this repo.
+    partial: bool = False
 
     def has_path(self, rel: str) -> bool:
         # `.exists()` as the fallback so a path under a pruned directory
@@ -113,12 +126,16 @@ def index_repo(repo: Path) -> RepoIndex:
             idx.paths.add(f.relative_to(repo).as_posix())
             idx.basenames.add(fn)
             if total >= _MAX_TOTAL_BYTES:
+                idx.partial = True
                 continue
             try:
                 size = f.stat().st_size
             except OSError:
                 continue
-            if size > _MAX_FILE_BYTES or f.is_symlink():
+            if f.is_symlink():
+                continue                       # its target is indexed on its own
+            if size > _MAX_FILE_BYTES:
+                idx.partial = True
                 continue
             try:
                 text = f.read_text(encoding="utf-8", errors="replace")
@@ -354,16 +371,36 @@ def _overlaps(docs: list) -> list:
 # ---- --fix ----
 
 def _replace_outside_fences(text: str, pairs) -> tuple[str, int]:
-    pats = [(re.compile(rf"(?<!{_ADDR_CHAR}){re.escape(raw)}(?!{_ADDR_CHAR})"), fix)
+    """Rewrite each `raw` as `fix` where the text is structurally a reference.
+
+    Two forms, and only two. Inside brackets anywhere (`[task-foo]`,
+    `[[knowledge/foo]]`), and bare on a line that is a relation: a body
+    `Related to:` / `Blocked by:` / `Follows:` line, or a frontmatter
+    `related_to:` / `blocked_by:` / `follows:` key, which is where the parser
+    reads a comma-separated list of unbracketed slugs.
+
+    Anchoring matters. A slug is also an ordinary noun phrase, so an
+    unrestricted bounded replacement rewrites prose: a doc holding both
+    `[retry-policy]` and the sentence "the retry-policy changed" would come
+    back saying "the knowledge/retry-policy changed". Rewriting an address is
+    the contract; rewriting a sentence is not."""
+    bracketed = [(re.compile(rf"\[{re.escape(raw)}\]"), fix) for raw, fix in pairs]
+    bare = [(re.compile(rf"(?<!{_ADDR_CHAR}){re.escape(raw)}(?!{_ADDR_CHAR})"), fix)
             for raw, fix in pairs]
     out, in_fence, total = [], False, 0
     for line in text.split("\n"):
         if _FENCE.match(line):
             in_fence = not in_fence
-        elif not in_fence:
-            for pat, fix in pats:
-                line, n = pat.subn(fix, line)
+            out.append(line)
+            continue
+        if not in_fence:
+            for pat, fix in bracketed:
+                line, n = pat.subn(lambda _m, f=fix: f"[{f}]", line)
                 total += n
+            if _REL_LINE.match(line):
+                for pat, fix in bare:
+                    line, n = pat.subn(lambda _m, f=fix: f, line)
+                    total += n
         out.append(line)
     return "\n".join(out), total
 
@@ -371,11 +408,15 @@ def _replace_outside_fences(text: str, pairs) -> tuple[str, int]:
 def apply_fixes(findings: list) -> tuple[list, list]:
     """Rewrite repairable references in place. Returns (applied, files written).
 
-    The replacement is bounded by address characters rather than anchored to a
-    bracket, so it lands on every authored form -- `[task-foo]`,
-    `blocked_by: [task-foo]`, a bare `task-foo` on a `Related to:` line -- and
-    on none of `task-foobar`. Fenced blocks are skipped for the same reason the
-    scanner skips them: what is in one is an example, not a reference."""
+    The replacement lands on the authored forms and nowhere else: bracketed
+    anywhere, bare only on a relation line (see _replace_outside_fences).
+    Fenced blocks are skipped for the same reason the scanner skips them: what
+    is in one is an example, not a reference.
+
+    One reference at a time, so `applied` names the references that were really
+    rewritten. Grouping the whole file into a single pass would report a
+    reference as fixed on the strength of a sibling's replacement -- and with
+    `--strict` that turns a still-broken reference into exit 0."""
     by_path: dict = {}
     for f in findings:
         if f.check == "broken-ref" and f.fix and f.path is not None:
@@ -386,12 +427,17 @@ def apply_fixes(findings: list) -> tuple[list, list]:
             text = path.read_text(encoding="utf-8")
         except OSError as e:
             raise CortexError(f"cannot read {path}: {e}")
-        new, n = _replace_outside_fences(text, [(f.raw, f.fix) for f in group])
-        if n == 0 or new == text:
+        new = text
+        done = []
+        for f in group:
+            new, n = _replace_outside_fences(new, [(f.raw, f.fix)])
+            if n:
+                done.append(f)
+        if not done or new == text:
             continue
         atomic.write_text(path, new, encoding="utf-8")
         written.append(path)
-        applied.extend(group)
+        applied.extend(done)
     return applied, written
 
 
@@ -436,6 +482,13 @@ def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:
         p = Path(recorded).expanduser()
         if p.is_dir():
             return p
+    # A repo-local store is `<repo>/.cortex`, so `_scope`'s root IS the repo it
+    # documents. Without this, `cortex kb lint` in a repo with a local store
+    # skips dead-ref and asks for a --repo that is the directory it is standing
+    # in. Guarded on the root as well as the name, since a global workspace may
+    # itself be called `.cortex` and its root is not anybody's repo.
+    if ws == ".cortex" and root.resolve() != (_home() / ".cortex" / "workspaces").resolve():
+        return root
     return None
 
 
@@ -492,7 +545,7 @@ def cmd_lint(args) -> int:
     selected = _parse_checks(args.check)
     checks = tuple(c for c in selected if c in CHECKS)
     max_n = parse_max(args.max)
-    stale_days = parse_max(args.stale_days)
+    stale_days = parse_max(args.stale_days, "--stale-days")
     root, names = _scope(args)
 
     # Archives are always parsed, never always linted: a live task pointing at
@@ -510,6 +563,11 @@ def cmd_lint(args) -> int:
                              f"(pass --repo, or set cwd: in the workspace .meta)")
             else:
                 repos[ws] = index_repo(repo)
+                if repos[ws].partial:
+                    notes.append(f"dead-ref read only part of {repo.name}'s text "
+                                 f"(files over {_MAX_FILE_BYTES >> 20} MiB, or past "
+                                 f"{_MAX_TOTAL_BYTES >> 20} MiB total): a symbol or "
+                                 f"flag living only in a skipped file reads as dead")
 
     findings = collect(world, names=names, checks=checks, repos=repos,
                        today=datetime.date.today(), stale_days=stale_days,

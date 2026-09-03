@@ -151,6 +151,25 @@ def test_fix_respects_token_boundaries_and_skips_fenced_examples(home, capsys):
     assert after.count("[wrong/task-b]") == 1          # the fenced one survives
 
 
+def test_fix_reports_only_the_references_it_actually_rewrote(home, capsys):
+    """A file whose fence state differs from the parser's (a ``` inside a
+    frontmatter block scalar) can leave one of two repairable references
+    untouched. It has to stay a finding: reporting it as fixed on the strength
+    of its sibling's replacement would make --strict exit 0 on a broken ref."""
+    _task(home, "ws-a", "s1", "task-b", "b")
+    _task(home, "ws-a", "s2", "task-c", "c")
+    p = _task(home, "ws-a", "s1", "task-a", "Related to: [nowhere/task-c]",
+              extra_fm=("related_to: [wrong/task-b]", "notes: |", "  ```"))
+    assert _run("--workspace", "ws-a", "--check", "broken-ref",
+                "--fix", "--strict") == 1
+    out = capsys.readouterr().out
+    assert "fixed 1 reference in 1 doc" in out
+    after = p.read_text()
+    assert "related_to: [task-b]" in after
+    assert "Related to: [nowhere/task-c]" in after      # not rewritten...
+    assert "nowhere/task-c" in out.split("## fixed")[0]  # ...so still a finding
+
+
 def test_fix_is_a_no_op_when_nothing_is_repairable(home, capsys):
     p = _task(home, "ws-a", "s1", "task-a", "Related to: [task-gone]")
     before = p.read_text()
@@ -387,8 +406,37 @@ def test_classify(word, expected):
     assert lint._classify(word) == expected
 
 
-def test_replace_outside_fences_is_boundary_safe():
-    text = "a task-foo b\ntask-foobar\n```\ntask-foo\n```\ntask-foo"
-    new, n = lint._replace_outside_fences(text, [("task-foo", "s/task-foo")])
-    assert n == 2
-    assert new == ("a s/task-foo b\ntask-foobar\n```\ntask-foo\n```\ns/task-foo")
+def test_replace_outside_fences_only_touches_reference_positions():
+    text = "\n".join([
+        "related_to: [task-foo, task-bar]",   # frontmatter relation: bare counts
+        "Related to: task-foo",               # body relation: bare counts
+        "See [task-foo] for context.",        # bracketed anywhere: counts
+        "The task-foo migration is done.",    # prose: a word, not a reference
+        "task-foobar",                        # not the same slug
+        "```",
+        "Related to: task-foo",               # fenced: an example
+        "```",
+    ])
+    new, n = lint._replace_outside_fences(text, [("task-foo", "s2/task-foo")])
+    assert n == 3
+    assert new.split("\n") == [
+        "related_to: [s2/task-foo, task-bar]",
+        "Related to: s2/task-foo",
+        "See [s2/task-foo] for context.",
+        "The task-foo migration is done.",
+        "task-foobar",
+        "```",
+        "Related to: task-foo",
+        "```",
+    ]
+
+
+def test_fix_does_not_rewrite_a_slug_used_as_prose(home, capsys):
+    """A slug is also a noun phrase. `--fix` corrects addresses, not sentences."""
+    _kb(home, "ws-a", "retry-policy", "target", desc="d")
+    p = _kb(home, "ws-a", "note",
+            "See [retry-policy].\nThe retry-policy changed last week.", desc="d")
+    _run("--workspace", "ws-a", "--check", "broken-ref", "--fix")
+    after = p.read_text()
+    assert "See [knowledge/retry-policy]." in after
+    assert "The retry-policy changed last week." in after

@@ -95,7 +95,7 @@ it is not a check: its pairs never count toward the tally and never affect
 | Flag | Default | Notes |
 |------|---------|-------|
 | `--workspace <ws>\|all` | active session pointer | `all` lints every workspace in the global store |
-| `--repo <path>` | the `cwd:` in the workspace `.meta` | What `dead-ref` checks against; the check is skipped with a note when neither resolves |
+| `--repo <path>` | the `cwd:` in the workspace `.meta`, or the repo itself for a repo-local store | What `dead-ref` checks against; the check is skipped with a note when none resolves |
 | `--check <c,...>` | everything | Comma-separated subset of the five checks plus `overlap` (the worklist) |
 | `--stale-days <n>` | `180` | Age past which `updated` counts as stale |
 | `--max <n>` | `50` | Per-section cap, with a `... K more` notice |

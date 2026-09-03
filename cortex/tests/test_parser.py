@@ -185,6 +185,23 @@ def test_markdown_link_to_a_task_still_resolves(workspaces_root):
     assert ("mentions", "task-foo") in refs
 
 
+def test_markdown_link_naming_its_own_target_is_a_reference():
+    """Task slugs are not required to start with `task-`, so the bare-mention
+    regex cannot be the only thing keeping markdown links alive. A link whose
+    href is the `.md` file the label names is a reference; one whose label is
+    just link text is not."""
+    from cortex.parser import _extract_raw_edges
+    refs = {(r.kind, r.raw_target) for r in
+            _extract_raw_edges({}, "See [corpus-dedup](corpus-dedup.md).\n"
+                                   "And [knowledge/foo](../knowledge/foo.md).\n"
+                                   "But [label](some/path.md) is link text.\n"
+                                   "And [docs](https://example.com/docs.md) is a URL.\n")}
+    assert ("mentions", "corpus-dedup") in refs
+    assert ("mentions", "knowledge/foo") in refs
+    assert ("mentions", "label") not in refs
+    assert ("mentions", "docs") not in refs
+
+
 def test_raw_refs_includes_unresolved_ghost_tokens(workspaces_root):
     from cortex import parser
     world = parser.parse_world(workspaces_root, include_archive=True)

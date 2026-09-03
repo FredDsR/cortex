@@ -20,10 +20,21 @@ _LABEL_TO_KIND = {"blocked by": "blocked", "related to": "related", "follows": "
 # `(?!\()` excludes a markdown link label: in `[label](path.md)` the bracketed
 # text names the link, not a doc, so `[text](...)` used as prose syntax was
 # producing `text` as a reference (a ghost node in the viz, and a broken-ref
-# finding in `kb lint`). A markdown link to a real task still resolves, since
-# _MENTION_BARE_RE matches the `task-` slug inside the label and the href.
+# finding in `kb lint`).
 _MENTION_BRACKET_RE = re.compile(r"\[([a-z0-9][a-z0-9/_\-]*)\](?!\()")
 _MENTION_BARE_RE = re.compile(r"\btask-[a-z0-9\-]+\b")
+# ...but a markdown link whose href is the local `.md` file the label names IS a
+# reference, and the commonest way to write one: `[corpus-dedup](corpus-dedup.md)`,
+# `[knowledge/foo](../knowledge/foo.md)`. Requiring the href's stem to equal the
+# label's last segment is what separates those from `[label](some/path.md)`,
+# where the label names the link text and nothing else. Without this, every
+# reference not spelled `task-<slug>` (the bare form) silently lost its edge.
+_MENTION_MD_LINK_RE = re.compile(
+    r"\[([a-z0-9][a-z0-9/_\-]*)\]\(([^)\s]+\.md)\)")
+# Inline code is an illustration, not a reference: `` `[label](path.md)` `` is
+# prose about markdown syntax. Blanked before the md-link scan only, so a
+# backticked `task-slug` keeps behaving as it always has.
+_CODE_SPAN_RE = re.compile(r"`[^`\n]*`")
 # GFM task-list checkbox at the start of a list item ("- [x] ", "* [ ] ").
 # Stripped before mention scanning so a checked box's `[x]` marker is not
 # mistaken for a `[slug]` reference.
@@ -105,6 +116,11 @@ def _extract_raw_edges(fm: dict, body: str) -> list[RawEdge]:
         if in_fence or i in typed_lines:
             continue
         line = _CHECKBOX_RE.sub("", line)
+        for label, href in _MENTION_MD_LINK_RE.findall(_CODE_SPAN_RE.sub(" ", line)):
+            if "://" in href:
+                continue
+            if href.rsplit("/", 1)[-1][:-3] == label.rsplit("/", 1)[-1]:
+                _add("mentions", label)
         for tok in _MENTION_BRACKET_RE.findall(line):
             _add("mentions", tok)
         for tok in _MENTION_BARE_RE.findall(line):
