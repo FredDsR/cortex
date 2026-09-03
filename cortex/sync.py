@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from cortex import atomic
+
 
 def _work_dir(home) -> Path:
     return Path(home) / ".cortex"
@@ -210,7 +212,7 @@ def setup(mode: str, *, home, url: str | None = None, name: str = "work-tracking
         if not (wd / ".git").is_dir():
             _git(["init", "-q", "-b", "main"], cwd=wd)
         if _TEMPLATE_GITIGNORE.exists():
-            (wd / ".gitignore").write_text(_TEMPLATE_GITIGNORE.read_text())
+            atomic.write_text(wd / ".gitignore", _TEMPLATE_GITIGNORE.read_text())
         # Configure identity if missing (fall back to global, then a default).
         if _git(["config", "user.email"], cwd=wd).returncode != 0:
             g = subprocess.run(["git", "config", "--global", "user.email"],

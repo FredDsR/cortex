@@ -11,10 +11,10 @@ import os
 import secrets
 import socketserver
 import subprocess
-import tempfile
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+from cortex import atomic
 from cortex.parser import parse_world
 from .generator import build, build_payload
 from cortex.address import abbreviate
@@ -135,16 +135,7 @@ class EditHandler(http.server.SimpleHTTPRequestHandler):
         })
 
     def _atomic_write(self, path: Path, content: str) -> None:
-        d = str(path.parent)
-        fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(content)
-            os.replace(tmp, str(path))
-        except Exception:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-            raise
+        atomic.write_text(path, content)
 
     def _commit(self, cid: str) -> None:
         if not self.commit_on_save:

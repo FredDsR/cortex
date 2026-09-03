@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from cortex import atomic
 from cortex import model
 from cortex.model import World, Doc, DocId, Edge
 
@@ -15,6 +16,13 @@ _VENDOR_SRC = _PACKAGE_DIR / "templates" / "vendor"
 _SHELL_TEMPLATE = (_PACKAGE_DIR / "templates" / "shell.html").read_text(encoding="utf-8")
 
 MANIFEST_NAME = ".cortex-build.json"
+
+
+def _write_out(path: Path, data: str) -> None:
+    """Build output is regenerated from source, so replace atomically (a partial
+    page would break the served site) but skip the fsyncs: `viz serve --edit`
+    rebuilds every page on every save."""
+    atomic.write_text(path, data, encoding="utf-8", durable=False)
 
 
 def _stage_vendor(out_dir: Path) -> None:
@@ -147,7 +155,7 @@ def _emit_root_index(world: World, out_dir: Path) -> None:
                 desc = model.format_description(d.description, raw_title)
                 lines.append(f"- [{d.id.slug} ({d.id.workspace})]({href}) - {desc}")
     lines.append("")
-    (out_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    _write_out(out_dir / "index.md", "\n".join(lines))
 
 
 def _emit_workspace_index(world: World, ws: Doc, out_dir: Path) -> None:
@@ -162,7 +170,7 @@ def _emit_workspace_index(world: World, ws: Doc, out_dir: Path) -> None:
         lines.append(f"- [{s.id.session}](sessions/{s.id.session}/index.html)")
     lines.extend(["", f"## Knowledge ({len(knowledge_docs)})", "",
                   "[Open knowledge folder](knowledge/index.md)", ""])
-    (ws_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    _write_out(ws_dir / "index.md", "\n".join(lines))
 
 
 def _emit_knowledge_index(world: World, ws: Doc, out_dir: Path) -> None:
@@ -177,7 +185,7 @@ def _emit_knowledge_index(world: World, ws: Doc, out_dir: Path) -> None:
     else:
         for d in docs:
             lines.append(f"- [{d.id.slug}]({d.id.slug}.md)")
-    (k_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    _write_out(k_dir / "index.md", "\n".join(lines))
 
 
 def _emit_session_index(world: World, sess: Doc, out_dir: Path) -> None:
@@ -205,7 +213,7 @@ def _emit_session_index(world: World, sess: Doc, out_dir: Path) -> None:
     if sess.body:
         excerpt = sess.body.strip()[:400]
         lines.extend(["", "## Summary excerpt", "", excerpt])
-    (sess_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    _write_out(sess_dir / "index.md", "\n".join(lines))
 
 
 def _emit_workbench_index(world: World, sess: Doc, out_dir: Path) -> None:
@@ -220,7 +228,7 @@ def _emit_workbench_index(world: World, sess: Doc, out_dir: Path) -> None:
     else:
         for d in docs:
             lines.append(f"- [{d.id.slug}]({d.id.slug}.md)")
-    (wb_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    _write_out(wb_dir / "index.md", "\n".join(lines))
 
 
 def _emit_tasks_index(world: World, sess: Doc, out_dir: Path) -> None:
@@ -235,7 +243,7 @@ def _emit_tasks_index(world: World, sess: Doc, out_dir: Path) -> None:
     else:
         for d in docs:
             lines.append(f"- [{d.id.slug}]({d.id.slug}.md) - {d.status or '(unstated)'}")
-    (tasks_dir / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    _write_out(tasks_dir / "index.md", "\n".join(lines))
 
 
 def _emit_all_indices(world: World, out_dir: Path) -> None:
@@ -322,8 +330,8 @@ def _search_docs(world: World) -> list:
 
 
 def _write_search_index(world: World, out_dir: Path) -> None:
-    (out_dir / "search-docs.json").write_text(
-        json.dumps(_search_docs(world), ensure_ascii=False), encoding="utf-8")
+    _write_out(out_dir / "search-docs.json",
+               json.dumps(_search_docs(world), ensure_ascii=False))
 
 
 def _node_dict(world: World, doc: Doc) -> dict:
@@ -552,35 +560,33 @@ def build_payload(world: World, scope: str, scope_id: str) -> dict:
 
 def _emit_html_pages(world: World, out_dir: Path) -> None:
     payload = build_payload(world, "root", "/")
-    (out_dir / "index.html").write_text(
-        _render_shell("root", "/", payload, _vendor_rel("root", "/"),
-                      "Your Cortex",
-                      title_line="Your Cortex",
-                      subtitle_line="all workspaces"),
-        encoding="utf-8")
+    _write_out(out_dir / "index.html",
+               _render_shell("root", "/", payload, _vendor_rel("root", "/"),
+                             "Your Cortex",
+                             title_line="Your Cortex",
+                             subtitle_line="all workspaces"))
 
     for ws in _children_of(world, "/", "workspace"):
         ws_scope_id = ws.id.canonical()
         payload = build_payload(world, "workspace", ws_scope_id)
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
-        ws_html.write_text(
-            _render_shell("workspace", ws_scope_id, payload,
-                          _vendor_rel("workspace", ws_scope_id),
-                          ws.id.workspace,
-                          title_line=ws.id.workspace,
-                          subtitle_line="workspace"),
-            encoding="utf-8")
+        _write_out(ws_html,
+                   _render_shell("workspace", ws_scope_id, payload,
+                                 _vendor_rel("workspace", ws_scope_id),
+                                 ws.id.workspace,
+                                 title_line=ws.id.workspace,
+                                 subtitle_line="workspace"))
         for sess in _children_of(world, ws_scope_id, "session"):
             sess_scope_id = sess.id.canonical()
             payload = build_payload(world, "session", sess_scope_id)
             sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
-            sess_html.write_text(
+            _write_out(
+                sess_html,
                 _render_shell("session", sess_scope_id, payload,
                               _vendor_rel("session", sess_scope_id),
                               f"{sess.id.session} - {ws.id.workspace}",
                               title_line=sess.id.session,
-                              subtitle_line=f"session in workspace {ws.id.workspace}"),
-                encoding="utf-8")
+                              subtitle_line=f"session in workspace {ws.id.workspace}"))
 
 
 def _write_manifest(out_dir: Path, workspaces_root: Optional[Path]) -> None:
@@ -589,8 +595,8 @@ def _write_manifest(out_dir: Path, workspaces_root: Optional[Path]) -> None:
         "workspacesRoot": str(workspaces_root) if workspaces_root else "",
         "builtAt": datetime.datetime.now().astimezone().isoformat(),
     }
-    (out_dir / MANIFEST_NAME).write_text(
-        json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    _write_out(out_dir / MANIFEST_NAME,
+               json.dumps(data, ensure_ascii=False))
 
 
 def build(world: World, out_dir: Path, workspaces_root: Optional[Path] = None) -> None:

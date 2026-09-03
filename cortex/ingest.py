@@ -10,6 +10,7 @@ import os
 import re
 from pathlib import Path
 
+from cortex import atomic
 from cortex import frontmatter as fm
 from cortex import store
 from cortex.errors import CortexError, UsageError
@@ -372,7 +373,7 @@ def cmd_ingest(args) -> int:
             fields = {"title": r["title"], "type": r["type"], "author": "agent",
                       "created": now, "updated": now, "description": r["description"]}
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(fm.emit(fields, body), encoding="utf-8")
+            atomic.write_text(target, fm.emit(fields, body), encoding="utf-8")
 
     print("## would create (deterministic)")
     for x in create_lines:

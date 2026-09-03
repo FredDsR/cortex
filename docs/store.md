@@ -157,3 +157,25 @@ viewer, so an agent can judge relevance without opening the file.
 Files using the old `**Field:** value` bold-pair convention are still parsed.
 `skills/cortex-tracking/scripts/migrate_to_frontmatter.py --apply` converts them
 in place, once.
+
+## Writes are atomic
+
+Every file write cortex's Python performs into the store, and into the harness
+settings, goes through `cortex/atomic.py`. It writes a temp file beside the
+target, fsyncs it, renames it over the target, then fsyncs the directory. A
+reader always sees either the old file or the new one, never a partial one.
+
+Two exclusions are worth knowing. Files an agent authors through the harness
+(`SUMMARY.md`, `tasks/*.md`, `workbench/*.md`) are written by the harness, not
+by cortex, so they carry whatever guarantee the harness gives. And `cortex viz`
+build output is replaced atomically but not fsynced, because it is regenerated
+from the store on every build.
+
+This matters because of what happens straight after a write. `cortex kb`
+follows each write with `sync_after()`, which stages, commits, and pushes, so a
+truncated file would not stay local: it would propagate to every other device.
+`cortex inject` writes the harness settings file that every session parses at
+startup, where invalid JSON breaks sessions that never touched cortex.
+
+The practical consequence: interrupting a `cortex` command is safe. The write
+either happened or it did not.

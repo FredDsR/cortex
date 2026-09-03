@@ -2,5 +2,8 @@
 .active.*
 .meta
 
+# atomic-write temp files orphaned by a SIGKILL or power loss
+*.tmp
+
 # cortex-viz output (regenerable via cortex viz + install.sh)
 viz/
