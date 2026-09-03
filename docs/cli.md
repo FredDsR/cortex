@@ -142,6 +142,46 @@ or reading whole files. `--max` defaults to 20.
 cortex query neighbors token-expiry
 ```
 
+```
+cortex query search <terms>... [--kind knowledge|workbench|task|all] [--workspace W|all] [--max N] [--archive]
+```
+
+Keyword search over the store, ranked by BM25. This is the headless counterpart
+to the viz's in-browser search: before it, an agent with no tab open could not
+answer "do we already know something about this". `cortex kb index` is a table
+of contents over `description:` fields, which answers a different question.
+
+| Flag | Default | Does |
+|------|---------|------|
+| `--kind` | `all` | `all` searches prose and tasks and fuses the two rankings; the others select one |
+| `--workspace` | resolved | `all` searches every workspace in the global store |
+| `--max` | `10` | Result ceiling; a truncated list reports how many more matched |
+| `--archive` | off | Include archived sessions |
+
+**Two indexes, fused.** Knowledge prose and task files differ in length, in
+fields, and in what a query about them means, so they are indexed separately;
+one merged corpus would let BM25's length normalization favour whichever kind
+runs longer. When a query spans both, the rankings fuse by Reciprocal Rank
+Fusion, which compares rank position rather than score, because BM25 scores
+from two corpora are not on a common scale. Workbench docs share the prose
+index with knowledge, since they match it on all three counts.
+
+**No stemming.** `retries` will not match `retry`. Search for the stem, or for
+a distinctive word from the passage you remember. Hyphens and underscores do
+split, so `active pointer` reaches `close-day-active-pointer` and `parse world`
+reaches `parse_world`.
+
+Output is one line per hit: rank, kind, canonical id, and the first body line
+matching the query. There is no score column, because under `--kind all` the
+number is an RRF score rather than a BM25 one and carries nothing a reader can
+act on. The canonical id passes straight to `cortex query neighbors`.
+
+```bash
+cortex query search atomic write            # ranked hits in this workspace
+cortex query search retry --kind task       # only task files
+cortex query search mkstemp --workspace all # across every workspace
+```
+
 ---
 
 ## cortex viz

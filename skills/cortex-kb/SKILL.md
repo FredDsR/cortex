@@ -24,6 +24,9 @@ tree.
   and the user asks to create the missing entry.
 - Spec, plan, or brainstorm output should be captured as a knowledge
   entry rather than dropped on the floor.
+- Before writing a new entry, to check whether one already covers the ground:
+  `cortex query search <terms>`. A duplicate doc is the failure that avoids,
+  and `kb index` only lists descriptions, not content.
 
 ## CLI surface
 
@@ -79,6 +82,24 @@ listing with `--max` (default 20). Works for `task`, `knowledge`, and
 ```
 cortex query neighbors <slug> [--workspace <ws>] [--session <sess>] [--max <N>]
 ```
+
+`cortex query search <terms>` ranks docs by BM25 over their content, so an agent
+can find a note it cannot name. Prose (`knowledge` + `workbench`) and `task`
+files are indexed separately, because they differ in length, in fields, and in
+what a query about them means; `--kind all` (the default) searches both and fuses
+the rankings by Reciprocal Rank Fusion, which compares rank position because
+BM25 scores from two corpora are not on a common scale. Narrow with `--kind`,
+widen with `--workspace all`, bound with `--max` (default 10). No stemming, so
+search for the stem; hyphens and underscores split, so `active pointer` reaches
+`close-day-active-pointer`.
+
+```
+cortex query search <terms>... [--kind knowledge|workbench|task|all]
+                               [--workspace <ws>|all] [--max <N>] [--archive]
+```
+
+**Run this before `cortex kb new`.** It is the cheapest way to avoid writing a
+second doc about something the store already knows.
 
 `new` and `update` share the same flags:
 
