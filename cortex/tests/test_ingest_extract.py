@@ -92,3 +92,45 @@ def test_json_openapi_parses_without_yaml(tmp_path):
     j.write_text('{"openapi":"3.0.0","paths":{"/x":{"get":{"summary":"X"}}}}')
     recs = ie.detect_and_extract(str(j))
     assert any(r["slug"] == "op-get-x" for r in recs)
+
+
+# ---- untrusted extracted text (issue #35) ----
+
+BIDI = "\u202e"          # RLO
+ZWSP = "\u200b"
+BOM = "\ufeff"
+
+
+def _no_invisibles(s):
+    return not any(c in s for c in (BIDI, ZWSP, BOM))
+
+
+def test_openapi_summary_description_is_sanitized():
+    import yaml
+    spec = yaml.safe_load(
+        "openapi: 3.0.0\npaths:\n  /x:\n    get:\n"
+        f'      summary: "List{ZWSP} {BIDI}users{BOM}"\n')
+    rec = _by_slug(ie.extract_openapi("openapi.yaml", spec))["op-get-x"]
+    assert rec["description"] == "List users"
+
+
+def test_openapi_path_and_schema_names_are_sanitized():
+    import yaml
+    spec = yaml.safe_load(
+        "openapi: 3.0.0\npaths:\n"
+        f'  "/users{BIDI}":\n    get: {{summary: S}}\n'
+        "components:\n  schemas:\n"
+        f'    "User{ZWSP}":\n      properties:\n        "id{BOM}": {{type: integer}}\n')
+    for rec in ie.extract_openapi("openapi.yaml", spec):
+        assert _no_invisibles(rec["title"]), rec["slug"]
+        assert _no_invisibles(rec["description"]), rec["slug"]
+        assert _no_invisibles(rec["body"]), rec["slug"]
+
+
+def test_sql_column_type_is_sanitized():
+    # The column name is already fenced in by the `[\w.]+` name match; the
+    # type is the rest of the definition, i.e. arbitrary text.
+    sql = f"CREATE TABLE accounts (id DEC{ZWSP}IMAL{BIDI}(10,2){BOM});"
+    rec = ie.extract_sql("s.sql", sql)[0]
+    assert "`DECIMAL(10,2)`" in rec["body"]
+    assert _no_invisibles(rec["body"])

@@ -65,3 +65,31 @@ def test_only_empty_string_runs_full_ingest(kbhome, repo, capsys):
     assert cli.main(["kb", "ingest", "--from", str(repo), "--workspace", "ws-a", "--only", ""]) == 0
     out = capsys.readouterr().out
     assert "table-accounts" in out and "op-get-users" in out
+
+
+# ---- untrusted extracted text (issue #35) ----
+
+INVISIBLES = ("‮", "​", "﻿")     # RLO, ZWSP, BOM
+
+
+def test_written_description_carries_no_invisibles(kbhome, tmp_path, capsys):
+    src = tmp_path / "hostile"
+    src.mkdir()
+    (src / "openapi.yaml").write_text(
+        "openapi: 3.0.0\npaths:\n"
+        '  "/pay‮":\n    get:\n'
+        '      summary: "Transfer​ ﻿funds"\n')
+    assert cli.main(["kb", "ingest", "--from", str(src),
+                     "--workspace", "ws-a", "--write"]) == 0
+    doc = (kbhome / ".cortex/workspaces/ws-a/knowledge/op-get-pay.md").read_text()
+    assert "description: Transfer funds" in doc
+    assert not any(bad in doc for bad in INVISIBLES)
+    # the dry-run line prints the same strings, so stdout is clean too
+    assert not any(bad in capsys.readouterr().out for bad in INVISIBLES)
+
+
+def test_worklist_header_marks_entries_untrusted(kbhome, repo, capsys):
+    cli.main(["kb", "ingest", "--from", str(repo), "--workspace", "ws-a"])
+    out = capsys.readouterr().out
+    header = next(l for l in out.splitlines() if l.startswith("## agent worklist"))
+    assert "untrusted" in header.lower()
