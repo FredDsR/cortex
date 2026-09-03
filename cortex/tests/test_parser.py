@@ -165,6 +165,26 @@ def test_raw_refs_exposes_authored_references(workspaces_root):
     assert ("follows", "other-ws/zeta/task-z") in refs
 
 
+def test_markdown_link_label_is_not_a_reference():
+    """`[label](path.md)` names a link, not a doc. Treating the label as a
+    reference turned prose about markdown syntax into ghost nodes."""
+    from cortex.parser import _extract_raw_edges
+    refs = {(r.kind, r.raw_target) for r in
+            _extract_raw_edges({}, "Write `[label](path.md)` to link.\n"
+                                   "But [real-note] is a reference.\n")}
+    assert ("mentions", "label") not in refs
+    assert ("mentions", "real-note") in refs
+
+
+def test_markdown_link_to_a_task_still_resolves(workspaces_root):
+    """A SUMMARY.md task list is written as markdown links; the bare `task-`
+    slug inside the label keeps the mention edge alive."""
+    from cortex.parser import _extract_raw_edges
+    refs = {(r.kind, r.raw_target) for r in
+            _extract_raw_edges({}, "- [task-foo](tasks/task-foo.md) - doing it\n")}
+    assert ("mentions", "task-foo") in refs
+
+
 def test_raw_refs_includes_unresolved_ghost_tokens(workspaces_root):
     from cortex import parser
     world = parser.parse_world(workspaces_root, include_archive=True)

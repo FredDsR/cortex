@@ -17,7 +17,12 @@ _FENCE_RE = re.compile(r"^\s*```")
 _BODY_REL_RE = re.compile(r"^\s*(Blocked by|Related to|Follows):\s*(.+)$", re.IGNORECASE)
 _FM_KEY_TO_KIND = {"blocked_by": "blocked", "related_to": "related", "follows": "follows"}
 _LABEL_TO_KIND = {"blocked by": "blocked", "related to": "related", "follows": "follows"}
-_MENTION_BRACKET_RE = re.compile(r"\[([a-z0-9][a-z0-9/_\-]*)\]")
+# `(?!\()` excludes a markdown link label: in `[label](path.md)` the bracketed
+# text names the link, not a doc, so `[text](...)` used as prose syntax was
+# producing `text` as a reference (a ghost node in the viz, and a broken-ref
+# finding in `kb lint`). A markdown link to a real task still resolves, since
+# _MENTION_BARE_RE matches the `task-` slug inside the label and the href.
+_MENTION_BRACKET_RE = re.compile(r"\[([a-z0-9][a-z0-9/_\-]*)\](?!\()")
 _MENTION_BARE_RE = re.compile(r"\btask-[a-z0-9\-]+\b")
 # GFM task-list checkbox at the start of a list item ("- [x] ", "* [ ] ").
 # Stripped before mention scanning so a checked box's `[x]` marker is not

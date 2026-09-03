@@ -11,7 +11,7 @@ Authors `knowledge/<slug>.md` (workspace-scoped) and `workbench/<slug>.md`
 `cortex-viz`, which renders the resulting files in the graph and
 tree.
 
-> The CLI is `cortex kb` (`cortex kb new|update|index|ingest`), implemented in
+> The CLI is `cortex kb` (`cortex kb new|update|index|ingest|lint`), implemented in
 > the `cortex` Python engine (top-level `cortex/` package). This skill dir is
 > now docs + the one-shot `scripts/migrate_kb_frontmatter.py`; there is no bash
 > `work-kb` bin anymore.
@@ -34,7 +34,38 @@ cortex kb update knowledge <slug> [flags]
 cortex kb update workbench <slug> [flags]
 cortex kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
 cortex kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
+cortex kb lint   [--workspace <ws>|all] [--repo <path>] [--check <c,...>]
+                 [--stale-days <N>] [--max <N>] [--archive] [--fix] [--strict]
 ```
+
+## Auditing the knowledge base
+
+`cortex kb lint` is the check to run before trusting what a store says, and
+after a stretch of work that moved code the notes describe. It reports and
+writes nothing unless `--fix` is passed.
+
+Deterministic checks, one line per finding: `broken-ref` (a reference resolving
+to no doc), `dead-ref` (a backticked path, symbol, or `--flag` that no longer
+exists in the repo), `orphan` (a knowledge doc nothing links to), `stale`
+(`updated` older than `--stale-days`, missing, or unparseable), and
+`missing-description`. Select a subset with `--check`.
+
+After them comes `## agent worklist (needs judgment)`, selectable as `overlap`:
+pairs of same-typed docs whose summaries overlap. **These are candidates, not
+findings** and never count toward the tally or `--strict`. Read both docs
+before concluding one contradicts or supersedes the other; two deliberately
+distinct notes look the same from outside. If one really has superseded the
+other, say so in the surviving doc via `cortex kb update` rather than deleting
+the other silently.
+
+`--fix` only rewrites a `broken-ref` marked `(repairable)`, meaning the slug it
+names belongs to exactly one doc in the store, so the edit corrects an address
+and never a claim. It will not delete a dangling link (that ghost is authoring
+intent, and a prompt to write the missing doc) and will not bump `updated`.
+Everything else is for you to fix by hand, with judgment.
+
+`dead-ref` needs a repo to check against: `--repo <path>`, else the `cwd:`
+recorded in the workspace `.meta`. Without either it is skipped with a note.
 
 ## Querying the graph
 
