@@ -269,12 +269,16 @@ def _print_result(res: SearchResult, max_n: int) -> None:
 
 def cmd_search(args) -> int:
     max_n = parse_max(args.max)
-    root, names = store.resolve_scope(args.workspace,
-                                      home=Path.home(), cwd=Path.cwd())
+    root, names, notes = store.resolve_scope(args.workspace,
+                                             home=Path.home(), cwd=Path.cwd())
     # Always parse the archive; `--archive` gates what gets indexed, so the flag
     # stays a filter rather than a second walk of the store.
     world = parse_world(root, include_archive=True)
     res = search(world, args.terms, kind=args.kind, names=names,
                  include_archive=args.archive, max=max_n)
     _print_result(res, max_n)
+    # After the hits, alongside the `(+N more)` line: both say what the ranking
+    # you just read does not include.
+    for note in notes:
+        print(f"# {note}")
     return 0

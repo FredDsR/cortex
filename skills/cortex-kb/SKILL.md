@@ -93,6 +93,12 @@ widen with `--workspace all`, bound with `--max` (default 10). No stemming, so
 search for the stem; hyphens and underscores split, so `active pointer` reaches
 `close-day-active-pointer`.
 
+`--workspace all` means the global store (`~/.cortex/workspaces`) and only that,
+the same scope `kb lint` and `kb index` use. When that leaves out a repo-local
+`<repo>/.cortex`, both `search` and `lint` print a trailing note naming it, so
+an empty result is never mistaken for "searched everything, found nothing". Omit
+`--workspace` to work in the repo-local store.
+
 ```
 cortex query search <terms>... [--kind knowledge|workbench|task|all]
                                [--workspace <ws>|all] [--max <N>] [--archive]
@@ -146,7 +152,9 @@ workspace (the "brain"). `--workspace=all --write` derives
 relate only through real `[[...]]` links and backlinks, which the viz root page
 renders as a graph. Scope is the global store (`~/.cortex/workspaces/*`) only;
 repo-local `<repo>/.cortex` stores are intentionally excluded (they are per-repo,
-not part of the cross-workspace brain). Type grouping is case-insensitive.
+not part of the cross-workspace brain). `lint` and `search` share that scope and
+say when it left a repo-local store out; `index` does not, because its output is
+the brain itself. Type grouping is case-insensitive.
 
 ### Bulk ingestion (`cortex kb ingest`)
 

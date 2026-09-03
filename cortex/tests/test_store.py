@@ -215,13 +215,13 @@ def test_resolve_scope_all_lists_every_workspace(tmp_path):
     for name in ("wsb", "wsa"):
         (root / name).mkdir(parents=True)
     (root / "loose.txt").write_text("not a workspace\n")
-    parsed, names = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
+    parsed, names, _notes = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
     assert parsed == root
     assert names == ["wsa", "wsb"]          # sorted, files excluded
 
 
 def test_resolve_scope_all_on_empty_home(tmp_path):
-    parsed, names = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
+    parsed, names, _notes = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
     assert parsed == tmp_path / ".cortex" / "workspaces"
     assert names == []
 
@@ -229,7 +229,7 @@ def test_resolve_scope_all_on_empty_home(tmp_path):
 def test_resolve_scope_explicit_returns_parent_and_one_name(tmp_path):
     root = tmp_path / ".cortex" / "workspaces"
     (root / "wsa").mkdir(parents=True)
-    parsed, names = store.resolve_scope("wsa", home=tmp_path, cwd=tmp_path)
+    parsed, names, _notes = store.resolve_scope("wsa", home=tmp_path, cwd=tmp_path)
     assert parsed == root                    # the parent, so siblings stay parseable
     assert names == ["wsa"]
 
@@ -238,6 +238,48 @@ def test_resolve_scope_local_store_root_is_the_repo(tmp_path):
     # A repo-local store is `<repo>/.cortex`, so its parent is the repo itself.
     repo = tmp_path / "proj"
     (repo / ".cortex").mkdir(parents=True)
-    parsed, names = store.resolve_scope("", home=tmp_path, cwd=repo)
+    parsed, names, _notes = store.resolve_scope("", home=tmp_path, cwd=repo)
     assert parsed == repo
     assert names == [".cortex"]
+
+
+def test_resolve_scope_all_notes_an_empty_global_store(tmp_path):
+    scope = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
+    assert scope.names == []
+    assert scope.notes == ["--workspace all found no workspaces in the global "
+                           "store (~/.cortex/workspaces)"]
+
+
+def test_resolve_scope_all_names_the_excluded_local_store(tmp_path):
+    repo = tmp_path / "proj"
+    (repo / ".cortex").mkdir(parents=True)
+    scope = store.resolve_scope("all", home=tmp_path, cwd=repo)
+    assert scope.names == []
+    assert len(scope.notes) == 1
+    assert "~/proj/.cortex" in scope.notes[0]
+    assert "does not cover" in scope.notes[0]
+
+
+def test_resolve_scope_all_notes_the_exclusion_even_when_global_is_populated(tmp_path):
+    (tmp_path / ".cortex" / "workspaces" / "wsa").mkdir(parents=True)
+    repo = tmp_path / "proj"
+    (repo / ".cortex").mkdir(parents=True)
+    scope = store.resolve_scope("all", home=tmp_path, cwd=repo)
+    assert scope.names == ["wsa"]            # scope itself is unchanged
+    assert len(scope.notes) == 1
+    assert "~/proj/.cortex" in scope.notes[0]
+
+
+def test_resolve_scope_all_is_silent_when_nothing_was_excluded(tmp_path):
+    (tmp_path / ".cortex" / "workspaces" / "wsa").mkdir(parents=True)
+    scope = store.resolve_scope("all", home=tmp_path, cwd=tmp_path)
+    assert scope.names == ["wsa"]
+    assert scope.notes == []
+
+
+def test_resolve_scope_explicit_never_notes(tmp_path):
+    repo = tmp_path / "proj"
+    (repo / ".cortex").mkdir(parents=True)
+    scope = store.resolve_scope("", home=tmp_path, cwd=repo)
+    assert scope.names == [".cortex"]
+    assert scope.notes == []

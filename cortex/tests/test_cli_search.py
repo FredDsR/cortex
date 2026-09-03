@@ -199,3 +199,44 @@ def test_search_is_listed_in_query_help(capsys):
     rc = cortex_cli.main(["query", "--help"])
     assert rc == 0
     assert "search" in capsys.readouterr().out
+
+
+def _repo_local_store(tmp_path, monkeypatch):
+    """A repo-local `<repo>/.cortex` store holding one knowledge doc, with the
+    cwd inside the repo and no global store at all."""
+    repo = tmp_path / "proj"
+    ws = repo / ".cortex" / "knowledge"
+    ws.mkdir(parents=True)
+    (ws / "retry-policy.md").write_text(
+        "---\ntype: Decision\ndescription: backoff rules\n---\n\n"
+        "# Retry policy\n\nExponential backoff on 5xx responses.\n")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(repo)
+    return repo
+
+
+def test_search_workspace_all_explains_the_excluded_local_store(tmp_path, monkeypatch, capsys):
+    _repo_local_store(tmp_path, monkeypatch)
+    rc = cortex_cli.main(["query", "search", "backoff", "--workspace", "all"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "(no matches)" in out          # the scope is unchanged
+    assert "~/proj/.cortex" in out        # but no longer silent about why
+    assert "omit --workspace" in out
+
+
+def test_search_without_workspace_still_finds_the_local_store(tmp_path, monkeypatch, capsys):
+    _repo_local_store(tmp_path, monkeypatch)
+    rc = cortex_cli.main(["query", "search", "backoff"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "retry-policy" in out
+    assert "--workspace all" not in out   # nothing was excluded; say nothing
+
+
+def test_search_workspace_all_is_quiet_with_no_local_store(tmp_path, monkeypatch, capsys):
+    _ws(tmp_path, monkeypatch)
+    rc = cortex_cli.main(["query", "search", "backoff", "--workspace", "all"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "--workspace all" not in out

@@ -454,10 +454,10 @@ def _parse_checks(raw: str) -> tuple:
     return tuple(c for c in SELECTABLE if c in picked)
 
 
-def _scope(args) -> tuple[Path, list]:
+def _scope(args) -> store.Scope:
     """Thin adapter: unpack argparse and hand off to the shared resolver.
-    `cortex query search` needs the identical (root, names) pair, so the logic
-    lives in `store`, beside every other piece of workspace resolution."""
+    `cortex query search` needs the identical scope, so the logic lives in
+    `store`, beside every other piece of workspace resolution."""
     return store.resolve_scope(args.workspace, home=_home(), cwd=Path.cwd())
 
 
@@ -536,7 +536,7 @@ def cmd_lint(args) -> int:
     checks = tuple(c for c in selected if c in CHECKS)
     max_n = parse_max(args.max)
     stale_days = parse_max(args.stale_days, "--stale-days")
-    root, names = _scope(args)
+    root, names, scope_notes = _scope(args)
 
     # Archives are always parsed, never always linted: a live task pointing at
     # an archived one is a resolved reference, and leaving archives out would
@@ -544,7 +544,8 @@ def cmd_lint(args) -> int:
     # not what exists.
     world = parser.parse_world(root, include_archive=True)
 
-    notes, repos = [], {}
+    # Scope notes lead: what the run covered frames every row under it.
+    notes, repos = list(scope_notes), {}
     if "dead-ref" in checks:
         for ws in names:
             repo = _repo_for(root, ws, args.repo)

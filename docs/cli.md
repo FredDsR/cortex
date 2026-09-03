@@ -94,7 +94,7 @@ it is not a check: its pairs never count toward the tally and never affect
 
 | Flag | Default | Notes |
 |------|---------|-------|
-| `--workspace <ws>\|all` | active session pointer | `all` lints every workspace in the global store |
+| `--workspace <ws>\|all` | active session pointer | `all` lints every workspace in the global store, and says so when that leaves out a repo-local one |
 | `--repo <path>` | the `cwd:` in the workspace `.meta`, or the repo itself for a repo-local store | What `dead-ref` checks against; the check is skipped with a note when none resolves |
 | `--check <c,...>` | everything | Comma-separated subset of the five checks plus `overlap` (the worklist) |
 | `--stale-days <n>` | `180` | Age past which `updated` counts as stale |
@@ -154,7 +154,7 @@ of contents over `description:` fields, which answers a different question.
 | Flag | Default | Does |
 |------|---------|------|
 | `--kind` | `all` | `all` searches prose and tasks and fuses the two rankings; the others select one |
-| `--workspace` | resolved | `all` searches every workspace in the global store |
+| `--workspace` | resolved | `all` searches every workspace in the global store, and says so when that leaves out a repo-local one |
 | `--max` | `10` | Result ceiling; a truncated list reports how many more matched |
 | `--archive` | off | Include archived sessions |
 
@@ -181,6 +181,14 @@ cortex query search atomic write            # ranked hits in this workspace
 cortex query search retry --kind task       # only task files
 cortex query search mkstemp --workspace all # across every workspace
 ```
+
+**What `all` covers.** The global store, `~/.cortex/workspaces`, and only that.
+A repo-local `<repo>/.cortex` is not in it: `all` exists to reach across
+workspaces, and a per-repo store belongs to one repo. `search` and `lint` both
+name the excluded store in a trailing note rather than returning a result that
+reads as complete, because `(no matches)` over an empty global store is
+otherwise indistinguishable from "searched everything, found nothing". Omit
+`--workspace` to work in the repo-local store.
 
 ---
 

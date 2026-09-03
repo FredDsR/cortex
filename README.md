@@ -205,6 +205,11 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
   assert. Report-only by default; `--strict` exits 1 for CI, and `--fix` is
   narrow on purpose: it repairs a reference whose target exists under a
   different unambiguous address, and touches nothing else.
+- **`--workspace all`**, on `lint` and `query search` as on `index`, is the
+  global store and only that. Where `index` stops there, `lint` and `search`
+  also name a repo-local `<repo>/.cortex` they skipped: a clean report or `(no
+  matches)` over a corpus that excluded the store you are standing in is
+  indistinguishable from a real answer. Omit `--workspace` to use that store.
 
 ### How the skills connect
 

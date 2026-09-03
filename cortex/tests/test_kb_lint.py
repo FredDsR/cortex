@@ -440,3 +440,40 @@ def test_fix_does_not_rewrite_a_slug_used_as_prose(home, capsys):
     after = p.read_text()
     assert "See [knowledge/retry-policy]." in after
     assert "The retry-policy changed last week." in after
+
+
+# ---- scope notes (#47) ----
+
+def test_workspace_all_names_the_local_store_it_skipped(home, monkeypatch, capsys):
+    """`all` is the global store, not every store. Keep the scope, drop the
+    silence: a repo-local store the run did not read gets named."""
+    proj = home / "proj"
+    (proj / ".cortex/knowledge").mkdir(parents=True)
+    monkeypatch.chdir(proj)
+    _kb(home, "ws-a", "a-blank", "x")
+    _run("--workspace", "all", "--check", "missing-description")
+    out = capsys.readouterr().out
+    assert "ws-a/knowledge/a-blank" in out          # scope unchanged
+    assert "## notes" in out
+    assert "~/proj/.cortex" in out
+
+
+def test_workspace_all_on_an_empty_global_store_says_so(home, monkeypatch, capsys):
+    empty = home.parent / "empty-home"
+    (empty / "proj/.cortex/knowledge").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(empty))
+    monkeypatch.chdir(empty / "proj")
+    assert _run("--workspace", "all") == 0
+    out = capsys.readouterr().out
+    assert "no findings" in out
+    assert "found no workspaces in the global store" in out
+    assert "~/proj/.cortex" in out
+
+
+def test_a_named_workspace_never_carries_a_scope_note(home, monkeypatch, capsys):
+    proj = home / "proj"
+    (proj / ".cortex/knowledge").mkdir(parents=True)
+    monkeypatch.chdir(proj)
+    _kb(home, "ws-a", "solo", "x", desc="d")
+    _run("--workspace", "ws-a", "--check", "missing-description")
+    assert "## notes" not in capsys.readouterr().out
