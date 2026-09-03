@@ -246,6 +246,9 @@ def cmd_update(args) -> int:
 
     ex = {k: fm.read_field(block, k) for k in
           ("title", "type", "description", "author", "created")}
+    # Keys this command does not model (ingest provenance, a ticket, anything a
+    # user added by hand) ride through untouched instead of being dropped.
+    extra = fm.unknown_lines(block)
 
     title = args.title if args.title is not None else ex["title"]
     typ = args.type if args.type is not None else ex["type"]
@@ -264,7 +267,7 @@ def cmd_update(args) -> int:
     body = _read_body(args, allow_stdin=True) if _body_set(args) else ex_body
     fields = {"title": title, "type": typ, "author": author,
               "created": created, "updated": today(), "description": desc}
-    atomic.write_text(path, fm.emit(fields, body), encoding="utf-8")
+    atomic.write_text(path, fm.emit(fields, body, extra=extra), encoding="utf-8")
     print(path)
     sync_after("update", args.kind, args.slug)
     _maybe_open(args, path)

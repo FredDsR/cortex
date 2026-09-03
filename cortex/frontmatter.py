@@ -14,6 +14,10 @@ CANON = ["title", "type", "author", "created", "updated", "description"]
 # matches just before a final newline, but bash ERE `$` is true end-of-string.
 _SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./() -]*\Z")
 
+# A frontmatter line that opens a key. Anything else (a list item, a nested
+# mapping, an indented comment) continues whichever key preceded it.
+_KEY = re.compile(r"^([A-Za-z0-9_][A-Za-z0-9_.-]*):")
+
 
 def scalar(v: str) -> str:
     """Render a value as a safe YAML scalar (plain when unambiguous, else a
@@ -25,10 +29,40 @@ def scalar(v: str) -> str:
     return f'"{v}"'
 
 
-def emit(fields: dict, body: str) -> str:
+def unknown_lines(fm_block: str) -> list[str]:
+    """Return the raw lines of FM_BLOCK belonging to keys outside CANON, in
+    their original order and bytes (continuation lines follow their key).
+
+    Lines are preserved verbatim rather than parsed into values: a non-scalar
+    the engine never authored (`blocked_by: [task-foo, task-bar]`, a block-style
+    list) survives a round trip unchanged, where re-rendering it through
+    scalar() would quote it into a string. Feed the result to emit(extra=...)."""
+    if not fm_block:
+        return []
+    out: list[str] = []
+    keep = True     # lines before the first key are not ours to drop
+    for line in fm_block.split("\n"):
+        m = _KEY.match(line)
+        if m:
+            keep = m.group(1) not in CANON
+        elif line.startswith("#"):
+            # A column-0 comment is nobody's value (block scalars are indented),
+            # so it is never ours to drop, whichever key it happens to follow.
+            out.append(line)
+            continue
+        if keep:
+            out.append(line)
+    return out
+
+
+def emit(fields: dict, body: str, extra: list[str] | None = None) -> str:
     """Build a full doc (`---` frontmatter + blank line + body), matching
     work-kb emit_doc byte layout. `author`/`created`/`updated` must be present;
-    `title`/`type`/`description` are emitted only when truthy."""
+    `title`/`type`/`description` are emitted only when truthy.
+
+    `extra` is an optional list of already-rendered frontmatter lines (from
+    unknown_lines()) written verbatim after the canonical block. Omitting it,
+    or passing an empty list, leaves the output byte-identical to emit_doc."""
     lines = ["---"]
     if fields.get("title"):
         lines.append(f"title: {scalar(fields['title'])}")
@@ -39,6 +73,8 @@ def emit(fields: dict, body: str) -> str:
     lines.append(f"updated: {fields['updated']}")
     if fields.get("description"):
         lines.append(f"description: {scalar(fields['description'])}")
+    if extra:
+        lines.extend(extra)
     lines.append("---")
     return "\n".join(lines) + "\n\n" + body
 

@@ -103,3 +103,69 @@ def test_split_lines_exact_by_default_tolerant_on_opt_in():
     fm_lines, body_lines, close = fm.split_lines(padded, tolerant=True)
     assert fm_lines == ["title: T", "author: agent"]
     assert close == 3
+
+
+def test_unknown_lines_returns_non_canonical_keys():
+    block = ("title: Probe\ntype: Gotcha\nauthor: human\ncreated: 2026-08-01\n"
+             "updated: 2026-08-01\ndescription: d\nticket: PROJ-123\npr: 42")
+    assert fm.unknown_lines(block) == ["ticket: PROJ-123", "pr: 42"]
+
+
+def test_unknown_lines_empty_for_canonical_only_block():
+    block = ("title: Probe\ntype: Gotcha\nauthor: human\n"
+             "created: 2026-08-01\nupdated: 2026-08-01\ndescription: d")
+    assert fm.unknown_lines(block) == []
+
+
+def test_unknown_lines_keeps_block_style_continuations():
+    block = "author: agent\ntags:\n  - alpha\n  - beta\ncreated: 2026-08-01"
+    assert fm.unknown_lines(block) == ["tags:", "  - alpha", "  - beta"]
+
+
+def test_unknown_lines_keeps_column_zero_comments_wherever_they_sit():
+    block = ("title: Probe\n# why the ticket is here\nticket: PROJ-123\n"
+             "description: d\n# a trailing note")
+    assert fm.unknown_lines(block) == [
+        "# why the ticket is here", "ticket: PROJ-123", "# a trailing note"]
+
+
+def test_unknown_lines_keeps_indented_comment_with_its_key():
+    block = "author: agent\ntags:\n  # inline note\n  - alpha\ncreated: 2026-08-01"
+    assert fm.unknown_lines(block) == ["tags:", "  # inline note", "  - alpha"]
+
+
+def test_emit_appends_extra_lines_verbatim_after_canon():
+    doc = fm.emit(
+        {"title": "T", "author": "agent", "created": "2026-01-01",
+         "updated": "2026-01-02", "description": "d"},
+        "body", extra=["ticket: PROJ-123", "blocked_by: [task-foo, task-bar]"])
+    assert doc == (
+        "---\n"
+        "title: T\n"
+        "author: agent\n"
+        "created: 2026-01-01\n"
+        "updated: 2026-01-02\n"
+        "description: d\n"
+        "ticket: PROJ-123\n"
+        "blocked_by: [task-foo, task-bar]\n"
+        "---\n"
+        "\n"
+        "body")
+
+
+def test_emit_byte_identical_when_extra_is_empty_or_absent():
+    fields = {"title": "T", "type": "Decision", "author": "agent",
+              "created": "2026-01-01", "updated": "2026-01-01", "description": "d"}
+    assert fm.emit(fields, "b") == fm.emit(fields, "b", extra=[])
+    assert fm.emit(fields, "b") == fm.emit(fields, "b", extra=None)
+
+
+def test_unknown_keys_survive_a_full_split_emit_round_trip():
+    original = ("---\ntitle: Probe\ntype: Gotcha\nauthor: human\n"
+                "created: 2026-08-01\nupdated: 2026-08-01\ndescription: d\n"
+                "ticket: PROJ-123\nblocked_by: [task-foo, task-bar]\n---\n\nbody\n")
+    block, body = fm.split(original)
+    fields = {k: fm.read_field(block, k) for k in fm.CANON}
+    # split() strips trailing body newlines (bash parity), so compare to the
+    # original minus that final "\n"; the frontmatter block itself is exact.
+    assert fm.emit(fields, body, extra=fm.unknown_lines(block)) == original.rstrip("\n")
