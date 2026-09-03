@@ -118,3 +118,74 @@ def test_resolve_session_multiline_pointer_is_ambiguous(tmp_path):
     (ws / ".active.testid").write_text("s1\ns2\n")   # one pointer, two lines
     with pytest.raises(store.StoreError):
         store.resolve_session(ws, "")
+
+
+# --- containment: workspace/session tokens are agent-supplied (issue #33) ---
+
+# Traversal first, then tokens the segment policy rejects for their own sake.
+# The empty string is deliberately absent: it means "not supplied" and selects
+# the auto-discovery branch, so it would pass this test for the wrong reason.
+BAD_TOKENS = ["..", ".", "demo/../../..", "../../../tmp", "a/b", "/etc",
+              "-x", ".hidden", "ws\n", "a b"]
+
+
+@pytest.mark.parametrize("token", BAD_TOKENS)
+def test_resolve_workspace_rejects_non_segment_tokens(tmp_path, token):
+    _mk_ws(tmp_path, "demo")
+    with pytest.raises(store.StoreError, match="invalid workspace name"):
+        store.resolve_workspace(token, home=tmp_path, cwd=tmp_path)
+
+
+@pytest.mark.parametrize("token", BAD_TOKENS)
+def test_resolve_session_rejects_non_segment_tokens(tmp_path, token):
+    ws = _mk_ws(tmp_path, "demo", sessions=["s1"])
+    with pytest.raises(store.StoreError, match="invalid session name"):
+        store.resolve_session(ws, token)
+
+
+def test_absolute_workspace_token_does_not_win_over_the_root(tmp_path):
+    # `root / "/etc"` is `/etc` in pathlib: an absolute token discards the root
+    # entirely, so it escapes even without a single `..`.
+    _mk_ws(tmp_path, "demo")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with pytest.raises(store.StoreError):
+        store.resolve_workspace(str(outside), home=tmp_path, cwd=tmp_path)
+
+
+def test_resolve_workspace_rejects_symlink_pointing_outside_root(tmp_path):
+    # Passes _validate_name; only the containment gate catches this.
+    _mk_ws(tmp_path, "demo")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = tmp_path / ".cortex" / "workspaces" / "sneaky"
+    link.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(store.StoreError, match="escapes the store root"):
+        store.resolve_workspace("sneaky", home=tmp_path, cwd=tmp_path)
+
+
+def test_resolve_session_rejects_symlink_pointing_outside_root(tmp_path):
+    ws = _mk_ws(tmp_path, "demo", sessions=["s1"])
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (ws / "sessions" / "sneaky").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(store.StoreError, match="escapes the store root"):
+        store.resolve_session(ws, "sneaky")
+
+
+def test_valid_names_are_still_accepted(tmp_path):
+    # Real slugs come from a git remote (`owner-repo`) or a cwd basename, so
+    # dots, underscores, dashes and uppercase all have to keep working.
+    for name in ["FredDsR-cortex", "ws_a", "v1.2", "a", "Repo.Name-2"]:
+        ws = _mk_ws(tmp_path, name, sessions=[name])
+        assert store.resolve_workspace(name, home=tmp_path, cwd=tmp_path) == ws
+        assert store.resolve_session(ws, name) == name
+
+
+def test_symlink_inside_root_is_allowed(tmp_path):
+    # Containment is about escaping, not about symlinks as such.
+    real = tmp_path / ".cortex" / "workspaces" / "real"
+    (real / "sessions").mkdir(parents=True)
+    link = tmp_path / ".cortex" / "workspaces" / "alias"
+    link.symlink_to(real, target_is_directory=True)
+    assert store.resolve_workspace("alias", home=tmp_path, cwd=tmp_path) == link

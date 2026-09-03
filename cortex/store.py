@@ -3,6 +3,7 @@ target workspace, and the active session. Ports work-kb's resolve_workspace /
 resolve_session / find_local_store, including their die-on-ambiguity semantics
 (raised here as StoreError, exit code 1)."""
 from __future__ import annotations
+import re
 from pathlib import Path
 
 
@@ -54,17 +55,42 @@ def _meta_cwd(ws_root: Path) -> str | None:
     return None
 
 
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+
+
+def _validate_name(kind: str, name: str) -> None:
+    """A workspace or session token is agent-supplied and gets joined onto the
+    store root, so it must be one plain path segment. The pattern rejects `..`
+    and `.` (a leading dot is not allowed), anything holding a separator, and
+    absolute paths -- which matter most, since `root / "/etc"` is `/etc`."""
+    if not _NAME.fullmatch(name):
+        raise StoreError(
+            f"invalid {kind} name: '{name}' "
+            f"(must match [A-Za-z0-9][A-Za-z0-9._-]*)")
+
+
+def _assert_under(root: Path, path: Path, kind: str, name: str) -> None:
+    """Second, independent gate: the target must resolve to a direct child of
+    `root`. Catches what the name pattern cannot, namely an entry under the
+    store that is a symlink pointing outside it. Mirrors the containment check
+    in cortex/viz/edit_backend.py::source_path_for."""
+    if path.resolve().parent != root.resolve():
+        raise StoreError(f"{kind} '{name}' escapes the store root")
+
+
 def resolve_workspace(explicit_ws: str, *, home: Path, cwd: Path) -> Path:
     home = Path(home)
+    root = home / ".cortex" / "workspaces"
     if explicit_ws:
-        ws = home / ".cortex" / "workspaces" / explicit_ws
+        _validate_name("workspace", explicit_ws)
+        ws = root / explicit_ws
+        _assert_under(root, ws, "workspace", explicit_ws)
         if not ws.is_dir():
             raise StoreError(f"workspace '{explicit_ws}' not found")
         return ws
     local = find_local_store(cwd, home)
     if local is not None:
         return local
-    root = home / ".cortex" / "workspaces"
     # Step 2 of the bash resolver: an exact .meta cwd match. Without this, a cwd
     # that names a workspace unambiguously still lost to the active-pointer scan
     # below, which dies whenever any two workspaces hold stale .active.* files.
@@ -90,7 +116,11 @@ def resolve_workspace(explicit_ws: str, *, home: Path, cwd: Path) -> Path:
 def resolve_session(ws_root: Path, explicit_sess: str) -> str:
     ws_root = Path(ws_root)
     if explicit_sess:
-        if not (ws_root / "sessions" / explicit_sess).is_dir():
+        _validate_name("session", explicit_sess)
+        sessions = ws_root / "sessions"
+        sess_dir = sessions / explicit_sess
+        _assert_under(sessions, sess_dir, "session", explicit_sess)
+        if not sess_dir.is_dir():
             raise StoreError(
                 f"session '{explicit_sess}' not found in workspace '{ws_root.name}'")
         return explicit_sess
