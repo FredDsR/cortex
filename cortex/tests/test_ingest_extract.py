@@ -92,3 +92,109 @@ def test_json_openapi_parses_without_yaml(tmp_path):
     j.write_text('{"openapi":"3.0.0","paths":{"/x":{"get":{"summary":"X"}}}}')
     recs = ie.detect_and_extract(str(j))
     assert any(r["slug"] == "op-get-x" for r in recs)
+
+
+# ---- untrusted extracted text (issue #35) ----
+
+BIDI = "\u202e"          # RLO
+ZWSP = "\u200b"
+BOM = "\ufeff"
+
+
+def _no_invisibles(s):
+    return not any(c in s for c in (BIDI, ZWSP, BOM))
+
+
+def test_openapi_summary_description_is_sanitized():
+    import yaml
+    spec = yaml.safe_load(
+        "openapi: 3.0.0\npaths:\n  /x:\n    get:\n"
+        f'      summary: "List{ZWSP} {BIDI}users{BOM}"\n')
+    rec = _by_slug(ie.extract_openapi("openapi.yaml", spec))["op-get-x"]
+    assert rec["description"] == "List users"
+
+
+def test_openapi_path_and_schema_names_are_sanitized():
+    import yaml
+    spec = yaml.safe_load(
+        "openapi: 3.0.0\npaths:\n"
+        f'  "/users{BIDI}":\n    get: {{summary: S}}\n'
+        "components:\n  schemas:\n"
+        f'    "User{ZWSP}":\n      properties:\n        "id{BOM}": {{type: integer}}\n')
+    for rec in ie.extract_openapi("openapi.yaml", spec):
+        assert _no_invisibles(rec["title"]), rec["slug"]
+        assert _no_invisibles(rec["description"]), rec["slug"]
+        assert _no_invisibles(rec["body"]), rec["slug"]
+
+
+def test_all_invisible_schema_name_keeps_an_identity():
+    # Sanitizing empties the name; emit() would then drop `title:` and write a
+    # bare `description: "Schema "`, leaving the doc identityless in the index.
+    import yaml
+    spec = yaml.safe_load(
+        "openapi: 3.0.0\npaths: {}\ncomponents:\n  schemas:\n"
+        f'    "{ZWSP}{BIDI}":\n      properties:\n        id: {{type: integer}}\n')
+    rec = ie.extract_openapi("openapi.yaml", spec)[0]
+    assert rec["slug"] == "schema-x"           # slugify's own fallback
+    assert rec["title"] == "x"                 # and the title agrees with it
+    assert rec["description"] == "Schema x"
+
+
+def test_all_invisible_table_name_never_reaches_a_record():
+    # The `[\w.]+` name match already excludes these (Cf is not a word
+    # character), so extract_sql yields nothing rather than a nameless table.
+    # _table_concept's fallback is defense in depth for other callers.
+    assert ie.extract_sql("s.sql", f'CREATE TABLE "{ZWSP}" (id INT);') == []
+    rec = ie._table_concept("s.sql", ZWSP, "id INT")
+    assert rec["slug"] == "table-x" and rec["title"] == "x"
+
+
+def test_all_invisible_path_leaves_no_trailing_space():
+    import yaml
+    spec = yaml.safe_load(
+        f'openapi: 3.0.0\npaths:\n  "{ZWSP}":\n    get: {{}}\n')
+    rec = ie.extract_openapi("openapi.yaml", spec)[0]
+    assert rec["title"] == "GET x"
+    assert rec["description"] == "GET x"       # not "" and not "GET "
+
+
+def test_all_invisible_summary_falls_through_to_the_next_candidate():
+    # The `or` chain must weigh the sanitized value, not the raw one: an
+    # all-invisible summary is truthy raw but empty once cleaned, and an empty
+    # description is dropped from the frontmatter entirely.
+    import yaml
+    spec = yaml.safe_load(
+        "openapi: 3.0.0\npaths:\n  /x:\n    get:\n"
+        f'      summary: "{ZWSP}{BIDI}"\n      description: "Real prose"\n')
+    assert ie.extract_openapi("o.yaml", spec)[0]["description"] == "Real prose"
+
+    spec = yaml.safe_load(
+        f'openapi: 3.0.0\npaths:\n  /x:\n    get:\n      summary: "{ZWSP}"\n')
+    assert ie.extract_openapi("o.yaml", spec)[0]["description"] == "GET /x"
+
+
+def test_missing_summary_does_not_become_the_string_none():
+    # sanitize() stringifies, so an unguarded _oneline(op.get("summary"))
+    # would make a summary-less operation describe itself as "None".
+    import yaml
+    spec = yaml.safe_load("openapi: 3.0.0\npaths:\n  /x:\n    get: {}\n")
+    rec = ie.extract_openapi("o.yaml", spec)[0]
+    assert rec["description"] == "GET /x"
+    assert "None" not in rec["body"]
+
+
+def test_ordinary_names_do_not_hit_the_fallback():
+    import yaml
+    spec = yaml.safe_load(OPENAPI)
+    by = _by_slug(ie.extract_openapi("openapi.yaml", spec))
+    assert by["schema-user"]["title"] == "User"
+    assert by["op-get-users"]["title"] == "GET /users"
+
+
+def test_sql_column_type_is_sanitized():
+    # The column name is already fenced in by the `[\w.]+` name match; the
+    # type is the rest of the definition, i.e. arbitrary text.
+    sql = f"CREATE TABLE accounts (id DEC{ZWSP}IMAL{BIDI}(10,2){BOM});"
+    rec = ie.extract_sql("s.sql", sql)[0]
+    assert "`DECIMAL(10,2)`" in rec["body"]
+    assert _no_invisibles(rec["body"])
