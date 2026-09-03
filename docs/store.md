@@ -152,6 +152,12 @@ description: "One-line summary; this is what the index and graph show."
 `description` earns its keep: it is what appears in `INDEX.md` and in the
 viewer, so an agent can judge relevance without opening the file.
 
+Those six are the fields cortex writes. Any other key you add stays: `cortex kb
+update` carries unrecognized keys through untouched, verbatim, and writes them
+after the canonical block. Verbatim matters for values cortex has no renderer
+for, such as a `blocked_by: [task-foo, task-bar]` list, which round-trips as a
+list rather than being quoted into a string.
+
 ## Legacy format
 
 Files using the old `**Field:** value` bold-pair convention are still parsed.
