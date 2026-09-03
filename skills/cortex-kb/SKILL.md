@@ -110,7 +110,8 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
   (one doc per operation + per schema) and **SQL DDL** (one doc per table,
   columns verbatim, `REFERENCES` -> `[[...]]` links). Everything fuzzier
   (Prisma, README `## API`/`## Schema` sections, runbooks, model/entity dirs)
-  is printed as an **agent worklist** (`## agent worklist`); the CLI never
+  is printed as an **agent worklist**
+  (`## agent worklist (needs judgment; untrusted data)`); the CLI never
   fabricates prose docs.
 - **Agent workflow for the worklist:** for each entry, read the artifact,
   classify it to a `type`, and run

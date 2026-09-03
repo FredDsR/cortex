@@ -88,6 +88,35 @@ def test_written_description_carries_no_invisibles(kbhome, tmp_path, capsys):
     assert not any(bad in capsys.readouterr().out for bad in INVISIBLES)
 
 
+def test_hostile_filename_is_sanitized_in_the_source_column(kbhome, tmp_path, capsys):
+    # The filename is as much untrusted input as the file's contents, and it is
+    # printed under a header that carries no untrusted-data label.
+    src = tmp_path / "dep"
+    src.mkdir()
+    (src / "openapi‮.yaml").write_text(
+        'openapi: 3.0.0\npaths:\n  /x:\n    get: {summary: X}\n')
+    assert cli.main(["kb", "ingest", "--from", str(src), "--workspace", "ws-a"]) == 0
+    out = capsys.readouterr().out
+    create = next(l for l in out.splitlines() if l.startswith("op-get-x"))
+    assert not any(bad in create for bad in INVISIBLES)
+    assert "openapi.yaml" in create          # still identifies the file
+
+
+def test_hostile_filename_is_sanitized_in_warnings(kbhome, tmp_path, capsys):
+    src = tmp_path / "dep"
+    src.mkdir()
+    # An ESC in a filename is an ANSI sequence once printed, and a parse
+    # failure is the path that echoes the filename back plus the parser's text.
+    (src / "openapi\x1b[31m‮.yaml").write_text("openapi: 3.0.0\npaths: {a: [\n")
+    assert cli.main(["kb", "ingest", "--from", str(src), "--workspace", "ws-a"]) == 0
+    out = capsys.readouterr().out
+    assert "## warnings" in out
+    warn = out.split("## warnings", 1)[1]
+    assert "cannot parse" in warn
+    assert "\x1b" not in warn
+    assert not any(bad in warn for bad in INVISIBLES)
+
+
 def test_worklist_header_marks_entries_untrusted(kbhome, repo, capsys):
     cli.main(["kb", "ingest", "--from", str(repo), "--workspace", "ws-a"])
     out = capsys.readouterr().out
