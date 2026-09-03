@@ -124,7 +124,10 @@ from cortex.errors import CortexError
 from cortex.parser import parse_world
 
 
-def _parse_max(raw: str) -> int:
+def parse_max(raw: str) -> int:
+    """Public because `cortex query search` shares it. Distinct from
+    `kb.parse_max`, which accepts 0; the `query` group's listings are pointless
+    at zero, so this one floors at 1."""
     try:
         n = int(raw)
     except (TypeError, ValueError):
@@ -180,6 +183,6 @@ def cmd_neighbors(args) -> int:
         lines = "\n".join(f"  - {d.id.canonical()}" for d in matches)
         raise CortexError(
             f"{args.slug!r} is ambiguous; narrow with --workspace/--session/--kind:\n{lines}")
-    res = neighbors(world, matches[0].id, max=_parse_max(args.max))
+    res = neighbors(world, matches[0].id, max=parse_max(args.max))
     _print_result(res)
     return 0

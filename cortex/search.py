@@ -238,3 +238,39 @@ def search(world: World, terms, *, kind: str = "all", names=None,
                 snippet=_snippet(docs[key], query_tokens), score=score)
             for key, score in ranked[:max]]
     return SearchResult(hits=hits, total=len(ranked))
+
+
+# --- CLI (the only IO in this module) ---
+from pathlib import Path
+
+from cortex import store
+from cortex.parser import parse_world
+from cortex.query import parse_max
+
+
+def _print_result(res: SearchResult, max_n: int) -> None:
+    """No score column. Under `--kind all` the number is an RRF score, which is
+    not comparable to a BM25 score and carries nothing a reader can act on;
+    rank order is the signal."""
+    if not res.hits:
+        print("(no matches)")
+        return
+    kw = max(len(h.kind) for h in res.hits)
+    aw = max(len(h.address) for h in res.hits)
+    for rank, h in enumerate(res.hits, start=1):
+        print(f"{rank:>3}  {h.kind:<{kw}}  {h.address:<{aw}}  {h.snippet}")
+    if res.total > max_n:
+        print(f"(+{res.total - max_n} more; raise --max)")
+
+
+def cmd_search(args) -> int:
+    max_n = parse_max(args.max)
+    root, names = store.resolve_scope(args.workspace,
+                                      home=Path.home(), cwd=Path.cwd())
+    # Always parse the archive; `--archive` gates what gets indexed, so the flag
+    # stays a filter rather than a second walk of the store.
+    world = parse_world(root, include_archive=True)
+    res = search(world, args.terms, kind=args.kind, names=names,
+                 include_archive=bool(args.archive), max=max_n)
+    _print_result(res, max_n)
+    return 0
