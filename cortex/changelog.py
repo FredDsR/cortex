@@ -79,6 +79,7 @@ class History:
     first: str = ""               # oldest author date seen
     last: str = ""                # newest author date seen
     uncommitted: int = 0          # knowledge files git does not yet know about
+    since: str = ""               # the --since as given, echoed for the reader
 
 
 def is_git_repo(path: Path) -> bool:
@@ -115,12 +116,15 @@ def read_history(kdir: Path, *, since: str = "") -> History:
         if parsed is not None:
             entries.append(Entry(date=date, verb=parsed[0], slug=parsed[1]))
 
-    st = _git(["status", "--porcelain", "--", "."], cwd=kdir, capture=True)
+    # `-uall` because the default `-unormal` collapses a wholly untracked
+    # directory into a single line, which would report "1 uncommitted change"
+    # for a `knowledge/` holding twenty docs git has never seen.
+    st = _git(["status", "--porcelain", "-uall", "--", "."], cwd=kdir, capture=True)
     pending = sum(1 for ln in (st.stdout or "").splitlines()
                   if ln.strip() and not model.is_reserved(Path(ln[3:]).name))
     return History(entries=_dedupe(entries), commits=commits,
                    first=min(dates) if dates else "", last=max(dates) if dates else "",
-                   uncommitted=pending)
+                   uncommitted=pending, since=since)
 
 
 def _dedupe(entries: list) -> list:
@@ -136,7 +140,10 @@ def _dedupe(entries: list) -> list:
         prev = best.get(key)
         if prev is None or (e.created and not prev.created):
             best[key] = e
-    return sorted(best.values(), key=lambda e: (e.date, e.slug), reverse=True)
+    # Newest day first, but slugs read a-z inside a day: a plain reverse sort
+    # on (date, slug) would order one day's entries z-a for no reason.
+    by_slug = sorted(best.values(), key=lambda e: e.slug)
+    return sorted(by_slug, key=lambda e: e.date, reverse=True)
 
 
 def _describe(kdir: Path, slug: str) -> tuple:
@@ -152,7 +159,9 @@ def _describe(kdir: Path, slug: str) -> tuple:
         return slug, "", "(no longer in the store)"
     try:
         block, _ = fm.split(path.read_text(encoding="utf-8"))
-    except OSError:
+    except (OSError, UnicodeDecodeError):
+        # A doc that is unreadable or not UTF-8 still gets a line. Letting the
+        # decode error escape would abort the whole log over one bad file.
         return slug, "", "(unreadable)"
     block = block or ""
     title = fm.read_field(block, "title")
@@ -176,11 +185,14 @@ def render(kdir: Path, hist: History, *, max_n: int | None, banner: bool) -> lis
 
     shown = hist.entries[:max_n]
     day = ""
+    seen: dict = {}                # a doc edited across 40 days is read once
     for e in shown:
         if e.date != day:
             day = e.date
             lines += ["", f"## {day}", ""]
-        text, target, desc = _describe(kdir, e.slug)
+        if e.slug not in seen:
+            seen[e.slug] = _describe(kdir, e.slug)
+        text, target, desc = seen[e.slug]
         body = (f"[{_md_escape(text)}]({target})" if target else _md_escape(text))
         lines.append(f"* **{e.label}**: {body} - {desc}")
     more = _more_notice(len(hist.entries), max_n)
@@ -197,7 +209,12 @@ def _coverage(hist: History) -> list[str]:
     that silently omits today's work while looking complete is worse than one
     that names its own edge."""
     if not hist.commits:
-        return ["_Derived from no commits touching this directory._"]
+        # Naming the filter matters most here. git does not reject a date it
+        # cannot parse -- it falls back to "now", so `--since=notadate` reports
+        # zero commits rather than an error, and without the echo an empty log
+        # looks like a quiet period instead of a typo.
+        since = f" since `{hist.since}`" if hist.since else ""
+        return [f"_Derived from no commits touching `knowledge/`{since}._"]
     span = (f"{hist.first} to {hist.last}" if hist.first != hist.last else hist.first)
     out = [f"_Derived from {hist.commits} commit"
            f"{'' if hist.commits == 1 else 's'} touching `knowledge/`, {span}._"]
@@ -213,11 +230,18 @@ def cmd_log(args) -> int:
     ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
     kdir = ws_root / "knowledge"
 
+    if not kdir.is_dir():
+        # Distinct from the no-git case: telling somebody with a perfectly good
+        # repo to `git init` it sends them after the wrong thing.
+        print(f"kb log: {kdir} does not exist, so there is nothing to log "
+              f"(write a doc with `cortex kb new knowledge <slug>`)")
+        return 0
+
     if not is_git_repo(kdir):
         # The dead-ref pattern: a check with no source says so and reports
         # nothing, rather than reporting nothing and looking clean. Not an
         # error -- a store without `cortex sync setup` is a supported state.
-        print(f"kb log: {ws_root.parent.parent if False else kdir} is not a git repo, "
+        print(f"kb log: {kdir} is not a git repo, "
               f"so there is no history to derive from "
               f"(run `cortex sync setup`, or `git init` the store)")
         return 0

@@ -285,3 +285,64 @@ def test_history_before_a_workspace_rename_is_not_reached(kbhome, capsys):
     assert "early" not in out                     # under the old path
     assert "2026-01-01" not in out                # and the header says so
     assert "2026-02-01 to 2026-03-01" in out
+
+
+# ---- reserved is a knowledge/ concern, not a store-wide one ----
+
+def test_authoring_a_reserved_knowledge_slug_is_refused(kbhome, capsys):
+    # Without this, `kb new knowledge log` writes a doc that no index lists and
+    # that the next `kb log --write` silently overwrites.
+    for slug in ("log", "index"):
+        assert cli.main(["kb", "new", "knowledge", slug, "--type", "Reference",
+                         "--body", "precious"]) == 1
+        assert "reserved" in capsys.readouterr().err
+        assert not (kbhome / f".cortex/workspaces/ws-a/knowledge/{slug}.md").exists()
+
+
+def test_updating_a_reserved_knowledge_slug_is_refused(kbhome, capsys):
+    assert cli.main(["kb", "update", "knowledge", "log", "--description", "x"]) == 1
+    assert "reserved" in capsys.readouterr().err
+
+
+def test_workbench_may_be_called_log(kbhome, capsys):
+    # Nothing is derived in workbench/, so there is no file to collide with and
+    # `log` is an ordinary slug for a session scratch note.
+    assert cli.main(["kb", "new", "workbench", "log", "--body", "session notes"]) == 0
+    doc = kbhome / ".cortex/workspaces/ws-a/sessions/sess-a/workbench/log.md"
+    assert doc.is_file()
+    assert "session notes" in doc.read_text()
+
+
+def test_a_workbench_log_is_still_indexed(kbhome, capsys):
+    # The regression the store-wide reading would have caused: a real doc
+    # vanishing from the index, search and the viz with no message.
+    cli.main(["kb", "new", "workbench", "log", "--body", "b",
+              "--description", "the running session log"])
+    capsys.readouterr()
+    assert cli.main(["kb", "index", "--workspace", "ws-a"]) == 0
+    assert "the running session log" in capsys.readouterr().out
+
+
+def test_a_knowledge_log_is_never_indexed(kbhome, capsys):
+    kd = kbhome / ".cortex/workspaces/ws-a/knowledge"
+    kd.mkdir(parents=True, exist_ok=True)
+    (kd / "log.md").write_text("# Knowledge change log\n")
+    _doc(kbhome, "apple", desc="a decision")
+    cli.main(["kb", "index", "--workspace", "ws-a"])
+    out = capsys.readouterr().out
+    assert "a decision" in out and "change log" not in out
+
+
+# ---- an unparseable --since ----
+
+def test_an_unparsed_since_is_named_not_left_looking_quiet(kbhome, capsys):
+    # git does not reject a date it cannot parse: it falls back to "now", so
+    # `--since=notadate` yields zero commits rather than an error. Measured, not
+    # assumed -- it returns nothing, not everything.
+    store = _repo(kbhome)
+    _doc(kbhome, "apple", desc="a")
+    _commit(store, "track(kb): new knowledge apple", date="2026-05-01")
+    cli.main(["kb", "log", "--workspace", "ws-a", "--since", "notadate"])
+    out = capsys.readouterr().out
+    assert "no commits" in out
+    assert "notadate" in out            # the cause, where the confusion happens

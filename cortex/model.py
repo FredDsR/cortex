@@ -14,24 +14,36 @@ ALL_STATUSES = (STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED
 
 NODE_KINDS = ("root", "workspace", "session", "task", "knowledge", "workbench")
 
-# OKF v0.2 reserves these filenames at any level of a bundle: §8 `index.md` and
-# §9 `log.md`. Both are derived, both carry no frontmatter, and neither is a
-# knowledge doc. Keeping the set here (rather than in `kb`) is what lets the
-# parser share it without importing the command layer.
+# OKF v0.2 reserves §8 `index.md` and §9 `log.md` inside a bundle. A bundle is
+# a `knowledge/` directory, and that is also the only place cortex derives
+# either file, so the reservation stops there.
 #
-# A reserved file that leaked through would be read as knowledge: listed in its
-# own index, returned by `search`, drawn in the viz, and -- having no `type` --
-# reported by `kb lint --check okf` as a violation in a file cortex derived
-# itself, advising a regeneration that would recreate it.
+# It deliberately does not extend to `workbench/` or `tasks/`. Nothing is
+# derived in those, so there is no file to collide with, and `log` is an
+# entirely reasonable slug for a session scratch note. Treating it as reserved
+# there would hide a real doc from the index, search and the viz to buy nothing.
+#
+# Inside `knowledge/` the reservation earns its keep twice over: a reserved file
+# read back as knowledge would be listed in its own index, returned by `search`,
+# drawn in the viz, and -- carrying no frontmatter by §8/§9 -- reported by
+# `kb lint --check okf` as a doc with no `type`, against a file cortex wrote
+# itself. And `kb index --write` / `kb log --write` would overwrite it.
+#
+# Kept here rather than in `kb` so the parser can share it without importing
+# the command layer.
 RESERVED_DOC_NAMES = frozenset({"index.md", "log.md"})
+
+AUTHORED_EDGE_KINDS = ("blocked", "related", "follows", "mentions")
+ALL_EDGE_KINDS = AUTHORED_EDGE_KINDS + ("contains",)
 
 
 def is_reserved(name: str) -> bool:
-    """True for an OKF-reserved filename, case-insensitively so a legacy
-    `INDEX.md` is excluded by the same rule as the lowercase one."""
+    """True for a name reserved inside a `knowledge/` directory. Case-insensitive,
+    so a legacy `INDEX.md` is excluded by the same rule as the lowercase one.
+
+    Only meaningful for `knowledge/`; see RESERVED_DOC_NAMES for why callers
+    walking `workbench/` or `tasks/` must not use it."""
     return name.lower() in RESERVED_DOC_NAMES
-AUTHORED_EDGE_KINDS = ("blocked", "related", "follows", "mentions")
-ALL_EDGE_KINDS = AUTHORED_EDGE_KINDS + ("contains",)
 
 
 def format_description(description: Optional[str], title: Optional[str]) -> str:

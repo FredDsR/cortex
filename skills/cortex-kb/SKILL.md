@@ -258,6 +258,13 @@ It exists for the export boundary, where a bundle has no `.git`.
 It says so and writes nothing when the store is not a git repo, and its header
 names the range it actually covers, since a doc written but not yet committed is
 invisible to git and a workspace rename leaves earlier writes under the old path.
+The header also echoes `--since`, because git does not reject a date it cannot
+parse: it falls back to "now", so a typo yields an empty log rather than an error.
+
+**`index` and `log` are reserved slugs in `knowledge/`.** `cortex kb new
+knowledge log` is refused, because the doc would be invisible to every reader and
+overwritten by the next `--write`. `workbench/` derives nothing, so a workbench
+note may be called `log`.
 
 ### Bulk ingestion (`cortex kb ingest`)
 

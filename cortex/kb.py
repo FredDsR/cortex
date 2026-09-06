@@ -50,9 +50,18 @@ def _home() -> Path:
     return Path(os.environ.get("HOME") or str(Path.home()))
 
 
-def _validate_slug(slug: str) -> None:
+def _validate_slug(slug: str, kind: str = "knowledge") -> None:
     if not _SLUG.match(slug):
         raise CortexError(f"invalid slug: '{slug}' (must match [a-z0-9][a-z0-9-]*)")
+    # In `knowledge/`, `index` and `log` name files cortex derives: a doc
+    # authored under one is invisible everywhere (index, search, viz, lint) and
+    # then overwritten the next time `kb index --write` or `kb log --write`
+    # runs. Refusing up front is the only point at which the author can still be
+    # told. `workbench/` has no derived files, so `log` is a fine slug there.
+    if kind == "knowledge" and model.is_reserved(f"{slug}.md"):
+        raise CortexError(
+            f"'{slug}' is reserved in knowledge/: {slug}.md is derived by cortex "
+            f"(OKF §8 index.md / §9 log.md) and would be overwritten")
 
 
 def parse_max(value, flag: str = "--max") -> int:
@@ -135,7 +144,7 @@ def _require_type(args) -> None:
 
 
 def cmd_new(args) -> int:
-    _validate_slug(args.slug)
+    _validate_slug(args.slug, args.kind)
     _require_type(args)
     author = _resolve_author(args)
     path = _resolve_path(args, args.kind)
@@ -164,9 +173,14 @@ def _doc_rows(dir_path: Path) -> list[tuple[str, str, str, str]]:
     rows = []
     if not dir_path.is_dir():
         return rows
+    # The reservation is a property of the directory, not of the name: only
+    # `knowledge/` holds files cortex derives, so `log.md` is reserved there and
+    # an ordinary doc in `workbench/`. The bare `index.md` skip below is the
+    # pre-existing one and stays as it was for every other kb directory.
+    bundle = dir_path.name == "knowledge"
     for f in sorted(dir_path.glob("*.md")):
-        if model.is_reserved(f.name):
-            continue                # index.md (either case) and log.md
+        if model.is_reserved(f.name) if bundle else f.name.lower() == "index.md":
+            continue
         block, _ = fm.split(f.read_text(encoding="utf-8"))
         block = block or ""
         ty = fm.read_field(block, "type")
@@ -370,7 +384,7 @@ def cmd_index(args) -> int:
 
 
 def cmd_update(args) -> int:
-    _validate_slug(args.slug)
+    _validate_slug(args.slug, args.kind)
     path = _resolve_path(args, args.kind)
     if not path.exists():
         raise CortexError(f"{path} not found")

@@ -127,10 +127,15 @@ Two honest limits, both deliberate:
   old path. The header stays truthful because it reports the range actually
   read, which is why it names a range at all.
 
-`log.md` and `index.md` are both reserved by OKF, so neither is ever read back
-as a knowledge doc: they stay out of the index, out of `search`, out of the viz
-graph, and out of `lint --check okf`, which would otherwise report a file cortex
-derived itself as having no `type`.
+`log.md` and `index.md` are reserved **inside `knowledge/`**, so neither is ever
+read back as a knowledge doc: they stay out of the index, out of `search`, out of
+the viz graph, and out of `lint --check okf`, which would otherwise report a file
+cortex derived itself as having no `type`. `cortex kb new knowledge log` is
+refused for the same reason, since the next `--write` would overwrite it.
+
+The reservation stops at `knowledge/`. Nothing is derived in `workbench/` or
+`tasks/`, so `cortex kb new workbench log` is fine and that doc is indexed and
+searchable like any other.
 
 **`ingest`** reads a source (a codebase, an OpenAPI spec, SQL schemas) and
 writes knowledge entries into a workspace. Also dry-run by default; `--only`

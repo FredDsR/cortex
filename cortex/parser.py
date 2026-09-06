@@ -236,7 +236,9 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
             tasks_dir = sess_dir / "tasks"
             if tasks_dir.is_dir():
                 for tfile in sorted(tasks_dir.glob("*.md")):
-                    if is_reserved(tfile.name):
+                    # Not `is_reserved`: nothing is derived here, so `log.md`
+                    # is an ordinary doc. Unchanged from before §9.
+                    if tfile.name.lower() == "index.md":
                         continue
                     tid = DocId(kind="task", workspace=ws_slug,
                                 session=sess_slug, slug=tfile.stem)
@@ -251,7 +253,9 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
             wb_dir = sess_dir / "workbench"
             if wb_dir.is_dir():
                 for wfile in sorted(wb_dir.glob("*.md")):
-                    if is_reserved(wfile.name):
+                    # Not `is_reserved`: nothing is derived here, so `log.md`
+                    # is an ordinary doc. Unchanged from before §9.
+                    if wfile.name.lower() == "index.md":
                         continue
                     wid = DocId(kind="workbench", workspace=ws_slug,
                                 session=sess_slug, slug=wfile.stem)
