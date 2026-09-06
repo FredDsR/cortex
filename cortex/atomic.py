@@ -14,7 +14,7 @@ the target, then fsync the directory so the rename itself is durable.
 
 Two things this does not cover, deliberately: files agents author through the
 harness (`SUMMARY.md`, `tasks/*.md`, `workbench/*.md`), and the
-`shutil.copy`/`shutil.move` paths in `cortex.viz.generator` and
+`shutil.copy`/`shutil.move` paths in `cortex.viz.pages` and
 `cortex.migrate_store`.
 """
 from __future__ import annotations
