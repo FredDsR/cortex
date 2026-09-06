@@ -5,6 +5,7 @@ One command fronts the whole family. Every verb runs through the self-contained
 
 ```
 cortex kb    <command>   Author and query knowledge / workbench docs
+cortex okf   <command>   Exchange Open Knowledge Format bundles
 cortex viz   <command>   Build and serve the visual dashboard
 cortex query <command>   Query the work graph
 cortex inject <command>  Opt-in session-start injection
@@ -203,6 +204,98 @@ it ignores attribute access (`args.max`), placeholders (`<slug>.md`), and
 home- or env-relative paths. It still cannot know that a doc is *about* another
 project, so a note comparing cortex to something else will report that other
 project's symbols as dead. Narrow with `--check` when that is the doc you have.
+
+---
+
+## cortex okf
+
+Moves knowledge across the [Open Knowledge Format][okf] boundary, in both
+directions.
+
+```
+cortex okf export [--workspace W] --out DIR [--since DATE]
+cortex okf import <bundle> [--workspace W] [--write]
+```
+
+The store keeps `[[wikilinks]]` and does not also carry markdown links, because
+two link grammars would have to be kept in sync forever. The cost is that an
+external consumer reading an exported `knowledge/` sees the concepts and none of
+the edges. These two verbs are where that translation happens instead: once, at
+a boundary.
+
+### export
+
+Writes a workspace's `knowledge/` as a self-contained bundle.
+
+- Every `[[knowledge/slug]]` and `[[slug]]` naming a concept the bundle holds
+  becomes `[Title](/slug.md)`. §7 recommends bundle-absolute over relative, and
+  every concept sits at the bundle root.
+- Every reference that does not resolve becomes plain text, not a dangling
+  link. A ghost node is authoring intent inside cortex, where `cortex query
+  neighbors` shows it and `kb lint --check broken-ref` reports it; exported as a
+  broken link it is only a defect in somebody else's bundle.
+- References inside fenced blocks and inline code are left alone. A doc writing
+  about the `[[...]]` grammar is illustrating the syntax, not using it.
+- `index.md` (§8) and `log.md` (§9) come from the same renderers `kb index
+  --write` and `kb log --write` use, so a bundle's catalog and the store's
+  cannot disagree. The log is the reason `kb log` exists at all: a bundle has no
+  `.git`, so §9 is the only shape the history can travel in. `--since` windows
+  it exactly as on `kb log`.
+- The index carries `okf_version: 0.2`, §8's one exception to index files having
+  no frontmatter, and the only place a recipient can read what they are holding.
+- The bundle is validated against §11 before the command reports success. A
+  store doc with no `type:`, or none at all, fails the export loudly and names
+  the file rather than shipping a bundle that does not parse.
+
+`--out` must not already hold files: a bundle is defined by what is in the
+directory, so exporting over other files would claim concepts the store never
+had.
+
+```bash
+cortex okf export --workspace my-project --out /tmp/my-project-okf
+```
+
+### import
+
+Reads somebody else's bundle into a workspace. **Dry run until you pass
+`--write`**, and it never overwrites an existing doc, exactly like `kb ingest`.
+
+- Markdown links between concepts become `[[knowledge/slug]]`. External URLs,
+  in-page anchors, non-`.md` assets, and links to files this import did not take
+  are left as they are: rewriting one would turn a working link into a reference
+  that resolves to nothing.
+- A nested bundle flattens, because `knowledge/` is flat. Two files sharing a
+  stem keep the first, with a warning.
+- `generated: {by, at}` (§5) maps where it maps. `generated.at` is "the
+  content's last meaningful change", which is `updated` here, and a bundle
+  carrying its own `created:` / `updated:` wins over both. Neither is stamped
+  with today: an import is not a re-verification, and stamping would blind `kb
+  lint --check stale` on every doc it touched. `author` is a two-value field, so
+  a generator's name cannot go in it; the `generated:` block rides through
+  verbatim, which is what actually preserves that provenance.
+- Every other unknown key rides through verbatim too, which `cortex kb update`
+  has preserved since #32.
+- A concept with no `type:` is imported and reported, not refused. Dropping it
+  would lose content over a field `cortex kb update --type` can add, and `kb
+  lint --check okf` already lists exactly these.
+
+**A bundle is untrusted input.** Its `description:` fields land in the
+`<cortex-index>` block `cortex inject` hands a fresh agent at SessionStart,
+before the user has said anything. So every string read out of a bundle goes
+through `cortex/sanitize.py` -- not the ones that look risky, all of them,
+frontmatter values and body alike. The one cost is that NFKC normalization
+touches a foreign doc's text, which is the right trade in this direction: the
+rule that keeps cortex from rewriting your own notes is the same rule that says
+a stranger's bundle is not your notes.
+
+```bash
+cortex okf import /tmp/somebody-elses-bundle              # dry run
+cortex okf import /tmp/somebody-elses-bundle --write
+```
+
+A round trip is not byte-identical, and in one way that is the point: a bare
+`[[slug]]` normalizes to `[[knowledge/slug]]`, which turns a reference cortex
+read as a ghost task into a real knowledge edge.
 
 ---
 
