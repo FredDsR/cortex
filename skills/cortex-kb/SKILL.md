@@ -358,8 +358,29 @@ the frontmatter. `updated` equals `created` on `new` and is bumped to today by
 
 `type` is a documented, evolvable convention, not a validated enum. Reuse a
 canonical value where it fits: `Decision`, `Design`, `Reference`, `Runbook`,
-`Investigation`, `Convention`, `Comparison`. Custom values are accepted without
-error, but prefer the canonical set so the index groups sensibly.
+`Investigation`, `Gotcha`, `Convention`, `Comparison`. Custom values are
+accepted without error, but prefer the canonical set so the index groups
+sensibly.
+
+| Type | The doc answers |
+|------|-----------------|
+| `Decision` | What we chose, and what we turned down. Names the rejected options |
+| `Design` | What we intend to build, before it exists |
+| `Reference` | What is true of a system: shapes, counts, components |
+| `Runbook` | What to do, in order, to achieve something |
+| `Investigation` | What we went looking for, and what we found |
+| `Gotcha` | What bit us, and will bite the next person |
+| `Convention` | How we do a thing here, as a rule to follow |
+| `Comparison` | How two options differ, and which we take from each |
+
+The pairs that blur are `Investigation` / `Gotcha` (what you sought vs what
+found you) and `Decision` / `Design` (a choice made vs a structure proposed).
+When both fit, prefer the one naming what a reader needs *next*.
+
+**Not a type: a status.** "Draft", "WIP", or "Superseded" describe a doc's
+maturity, not its kind, and a doc whose type is its status loses its kind
+forever. OKF §5 has a `status` field for that; carry it as an unknown
+frontmatter key until cortex models it (`kb update` preserves it verbatim).
 
 It is **required** on `knowledge/`: [OKF][okf] v0.2 §11 makes `type` the one
 mandatory frontmatter field, and `knowledge/` is what a bundle is made of.

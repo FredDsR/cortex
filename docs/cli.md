@@ -46,7 +46,7 @@ agent cannot silently clobber a note it meant to create.
 | `--session <sess>` | active session pointer | Workbench only |
 | `--author human\|agent` | `agent` | Becomes `human` if `--open` is passed without `--author` |
 | `--title <text>` | unset | Frontmatter title |
-| `--type <text>` | unset | Frontmatter type, e.g. `Gotcha`, `Decision`, `Reference`. **Required on `new knowledge`**: OKF v0.2 §11 makes it the one mandatory field. Optional on `workbench`, which is never exported |
+| `--type <text>` | unset | Frontmatter type: `Decision`, `Design`, `Reference`, `Runbook`, `Investigation`, `Gotcha`, `Convention`, `Comparison`. A convention, not an enum, so a custom value is accepted. **Required on `new knowledge`**: OKF v0.2 §11 makes it the one mandatory field. Optional on `workbench`, which is never exported |
 | `--description <text>` | unset | One-line summary; this is what the index shows |
 | `--body <text>` | empty | Inline body |
 | `--body-from <file\|->` | unset | Read body from a file, or `-` for stdin |

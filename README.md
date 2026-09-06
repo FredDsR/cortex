@@ -183,8 +183,8 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 - **Structured frontmatter.** Optional `title` and `description`, a required
   `type`, plus auto-maintained `author` / `created` / `updated`. `type` is a
   documented, evolvable convention (`Decision`, `Design`, `Reference`,
-  `Runbook`, `Investigation`, `Convention`, `Comparison`; custom values
-  allowed), and it is required on `knowledge/` because [OKF][okf] §11 makes it
+  `Runbook`, `Investigation`, `Gotcha`, `Convention`, `Comparison`; custom
+  values allowed), and it is required on `knowledge/` because [OKF][okf] §11 makes it
   the one mandatory field. `workbench/` keeps it optional: it is session-scoped
   and never exported.
 - **`cortex kb new` / `cortex kb update`.** Create-only vs modify-only (field merge

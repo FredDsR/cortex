@@ -23,10 +23,18 @@ _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 # The documented `type` vocabulary (skills/cortex-kb/SKILL.md, "type
 # vocabulary"). Still a convention rather than an enum -- a custom value is
-# accepted without error -- so this exists only to name the canonical set in
-# the error a typeless `kb new knowledge` raises.
+# accepted without error, and OKF §11 requires consumers to tolerate unknown
+# `type` values -- so this exists only to name the canonical set in the error a
+# typeless `kb new knowledge` raises.
+#
+# `Gotcha` sits beside `Investigation` because that is where the two overlap:
+# an investigation is what you went looking for, a gotcha is what found you.
+# It was missing until it was the most-used value in a real store (68 docs)
+# while three of this repo's own examples already taught it, which is how a
+# recommendation quietly becomes wrong. Kept in sync with the four docs that
+# list it by test, not by discipline.
 TYPE_VOCABULARY = ("Decision", "Design", "Reference", "Runbook",
-                   "Investigation", "Convention", "Comparison")
+                   "Investigation", "Gotcha", "Convention", "Comparison")
 
 # OKF v0.2 §8 reserves lowercase `index.md` for a bundle's index. `INDEX.md` is
 # what cortex derived before conformance and is retired on the next `--write`.

@@ -64,7 +64,7 @@ It never overwrites existing docs. This is unrelated to `cortex-migration`
 Frontmatter fields: `title`, `type`, `author`, `created`, `updated`,
 `description` (only `author`/`created`/`updated` are always present). `type` is
 a documented convention (`Decision`, `Design`, `Reference`, `Runbook`,
-`Investigation`, `Convention`, `Comparison`; custom values allowed).
+`Investigation`, `Gotcha`, `Convention`, `Comparison`; custom values allowed).
 
 See `SKILL.md` for the agent-facing contract and full resolution rules.
 
