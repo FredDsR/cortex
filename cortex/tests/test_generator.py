@@ -347,7 +347,7 @@ def test_node_payload_includes_kb_fields(workspaces_root, tmp_path):
 
 
 def test_first_paragraph_skips_h1_and_blanks():
-    from cortex.viz import generator as g
+    from cortex.viz import graph as g
     body = "\n\n# Title Heading\n\nFirst real paragraph here.\nSecond line of it.\n\nLater section.\n"
     assert g._first_paragraph(body) == "First real paragraph here. Second line of it."
     assert g._first_paragraph("") == ""
@@ -356,7 +356,7 @@ def test_first_paragraph_skips_h1_and_blanks():
 
 
 def test_search_page_href_per_kind():
-    from cortex.viz import generator as g
+    from cortex.viz import graph as g
     from cortex.model import DocId
     assert g._search_page_href(DocId(kind="root")) == "index.html"
     assert g._search_page_href(DocId(kind="workspace", workspace="w")) == "workspaces/w/index.html"
