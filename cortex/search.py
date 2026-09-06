@@ -397,6 +397,11 @@ def parse_min_score(raw: str) -> float:
         f = float(raw)
     except (TypeError, ValueError):
         raise CortexError(f"--min-score must be a number, got {raw!r}")
+    # `nan` and `inf` parse as floats but are not thresholds: every `score >=
+    # nan` is False, so a typo would silently print `(no candidates)` over a
+    # store that has them.
+    if not math.isfinite(f):
+        raise CortexError(f"--min-score must be a finite number, got {raw!r}")
     if f < 0:
         raise CortexError("--min-score must be >= 0")
     return f
@@ -433,7 +438,14 @@ def cmd_related(args) -> int:
     root, names, notes = store.resolve_scope(args.workspace,
                                              home=Path.home(), cwd=Path.cwd())
     world = parse_world(root, include_archive=True)
-    doc = qmod.resolve_one(world, args.slug, workspace=args.workspace,
+    # Resolve the slug inside the scope that will be ranked. The parse root is a
+    # whole store, so an unqualified slug would otherwise resolve against every
+    # workspace in it: a doc from a workspace `names` excludes would be ranked
+    # against a corpus it is not part of, and a slug reused in two workspaces
+    # would report as ambiguous even when only one of them is in scope. Under
+    # `all` the two scopes already coincide.
+    scope_ws = "all" if args.workspace == "all" else names[0]
+    doc = qmod.resolve_one(world, args.slug, workspace=scope_ws,
                            session=args.session, kind=args.kind)
     # No candidate-kind flag: candidates are always the resolved doc's own kind,
     # so `--kind` keeps the one meaning it has on `neighbors` (narrow an

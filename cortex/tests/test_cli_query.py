@@ -176,6 +176,49 @@ def test_related_min_score_rejects_a_negative(tmp_path, monkeypatch, capsys):
     assert "--min-score" in capsys.readouterr().err
 
 
+def test_related_min_score_rejects_a_non_finite(tmp_path, monkeypatch, capsys):
+    # `nan` parses as a float and passes `< 0`, but every `score >= nan` is
+    # False, so it would silently print `(no candidates)` over a store that
+    # has them.
+    _home_with_knowledge(tmp_path, monkeypatch, [("solo", "a lone note")])
+    rc = cortex_cli.main(["query", "related", "solo", "--workspace", "relws",
+                          "--min-score", "nan"])
+    assert rc == 1
+    assert "finite" in capsys.readouterr().err
+
+
+def test_related_resolves_the_slug_inside_the_ranked_scope(
+        tmp_path, monkeypatch, capsys):
+    # The parse root is a whole store while `names` is one workspace, so an
+    # unqualified slug must not resolve to a doc the ranking scope excludes:
+    # that would rank a doc against a corpus it is not part of.
+    _home_with_knowledge(tmp_path, monkeypatch, [("in-scope", "rebase notes")])
+    other = tmp_path / ".cortex" / "workspaces" / "otherws" / "knowledge"
+    other.mkdir(parents=True)
+    (other / "out-of-scope.md").write_text(
+        "---\ntitle: out-of-scope\n---\n\nrebase notes\n")
+    rc = cortex_cli.main(["query", "related", "out-of-scope"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "out-of-scope" in err and "relws" in err
+
+
+def test_related_does_not_call_a_slug_ambiguous_across_an_excluded_workspace(
+        tmp_path, monkeypatch, capsys):
+    _home_with_knowledge(tmp_path, monkeypatch, [
+        ("shared-slug", "rebase conflict resolution"),
+        ("neighbour", "rebase conflict resolution"),
+    ])
+    other = tmp_path / ".cortex" / "workspaces" / "otherws" / "knowledge"
+    other.mkdir(parents=True)
+    (other / "shared-slug.md").write_text(
+        "---\ntitle: shared-slug\n---\n\nrebase conflict resolution\n")
+    rc = cortex_cli.main(["query", "related", "shared-slug"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "relws/knowledge/neighbour" in out
+
+
 def test_related_bounds_the_listing_and_says_what_it_left_out(
         tmp_path, monkeypatch, capsys):
     _home_with_knowledge(tmp_path, monkeypatch, [
