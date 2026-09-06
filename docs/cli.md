@@ -73,6 +73,11 @@ Knowledge Format][okf] §8 form instead: `## <type>` group headings over
 parses. `--workspace=all --write` derives `~/.cortex/knowledge/index.md` the
 same way, with URLs relative to that file.
 
+`--max` bounds the printed listing only. The derived file is uncapped: it is
+the catalog a bundle consumer reads, and one that silently omits entries is not
+a catalog, nor is `... K more (raise --max)` a §8 entry. A bad `--max` still
+errors either way.
+
 The file is lowercase `index.md` because §8 reserves that name. A `--write`
 over a store that predates this retires the old `INDEX.md` in the same commit,
 so a `cortex sync pull` on a second device cannot resurrect it beside the new

@@ -53,7 +53,7 @@ cortex kb lint                              # every check, current workspace
 cortex kb lint --check broken-ref --fix     # repair addresses that resolve elsewhere
 
 # Explicit workspace when ambiguous.
-cortex kb new knowledge cross-project-note --workspace personal
+cortex kb new knowledge cross-project-note --type Reference --workspace personal
 ```
 
 `ingest` deterministically documents OpenAPI and SQL DDL; fuzzier sources

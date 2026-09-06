@@ -230,6 +230,21 @@ def test_lint_okf_accepts_the_index_it_generates(kbhome, capsys):
     assert "no findings" in capsys.readouterr().out
 
 
+def test_lint_okf_accepts_an_index_whose_title_has_brackets(kbhome, capsys):
+    # A bracket in the link text would close the entry early, and lint would
+    # read the index it just derived as a hand edit -- with no way to fix it.
+    kd = kbhome / ".cortex/workspaces/ws-a/knowledge"
+    kd.mkdir(parents=True, exist_ok=True)
+    (kd / "rework.md").write_text(
+        "---\ntitle: rework of [Design]\ntype: Design\nauthor: agent\n"
+        "created: 2026-01-01\nupdated: 2026-01-01\ndescription: d\n---\n\nb\n")
+    cli.main(["kb", "index", "--workspace", "ws-a", "--write"])
+    assert r"* [rework of \[Design\]](rework.md) - d" in (kd / "index.md").read_text()
+    capsys.readouterr()
+    _lint(["--workspace", "ws-a", "--check", "okf"])
+    assert "no findings" in capsys.readouterr().out
+
+
 def test_lint_okf_counts_toward_strict(kbhome, capsys):
     kd = kbhome / ".cortex/workspaces/ws-a/knowledge"
     kd.mkdir(parents=True, exist_ok=True)
@@ -251,3 +266,61 @@ def test_lint_runs_okf_by_default(kbhome, capsys):
         "---\nauthor: agent\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nb\n")
     _lint(["--workspace", "ws-a"])
     assert "## okf" in capsys.readouterr().out
+
+
+def test_index_write_is_not_capped_by_max(kbhome):
+    # `--max` bounds the printed listing. The derived file is the catalog a
+    # bundle consumer reads, and a catalog that silently omits entries is not
+    # one -- nor is `... K more` a valid section 8 entry.
+    for i in range(12):
+        _mk(kbhome, f"doc-{i:02d}", "Reference", f"desc {i}")
+    cli.main(["kb", "index", "--workspace", "ws-a", "--write", "--max", "3"])
+    text = (kbhome / ".cortex/workspaces/ws-a/knowledge/index.md").read_text()
+    assert "more (raise --max)" not in text
+    for i in range(12):
+        assert f"* [doc-{i:02d}](doc-{i:02d}.md) - desc {i}" in text
+
+
+def test_index_write_still_rejects_a_bad_max(kbhome, capsys):
+    _mk(kbhome, "apple", "Decision", "a decision")
+    assert cli.main(["kb", "index", "--workspace", "ws-a", "--write",
+                     "--max", "not-a-number"]) == 1
+
+
+def test_root_index_write_is_not_capped_by_max(kbhome):
+    for i in range(12):
+        _mk_ws(kbhome, "ws-a", f"doc-{i:02d}", "Reference", f"desc {i}")
+    cli.main(["kb", "index", "--workspace", "all", "--write", "--max", "3"])
+    text = (kbhome / ".cortex/knowledge/index.md").read_text()
+    assert "more (raise --max)" not in text
+    assert text.count("* [") == 12
+
+
+def test_index_stdout_is_still_capped_by_max(kbhome, capsys):
+    for i in range(12):
+        _mk(kbhome, f"doc-{i:02d}", "Reference", f"desc {i}")
+    cli.main(["kb", "index", "--workspace", "ws-a", "--max", "3"])
+    assert "... 9 more (raise --max)" in capsys.readouterr().out
+
+
+def test_lint_okf_flags_a_legacy_root_brain_index(kbhome, capsys):
+    # The root index belongs to no workspace, so the per-workspace pass never
+    # reaches it and a leftover INDEX.md there would stay invisible.
+    _mk_ws(kbhome, "ws-a", "authn", "Decision", "d")
+    root_kdir = kbhome / ".cortex/knowledge"
+    root_kdir.mkdir(parents=True)
+    (root_kdir / "INDEX.md").write_text("stale\n")
+    _lint(["--workspace", "all", "--check", "okf"])
+    out = capsys.readouterr().out
+    assert "~/.cortex/knowledge/" in out
+    assert "INDEX.md" in out
+
+
+def test_lint_okf_leaves_the_root_index_alone_for_one_workspace(kbhome, capsys):
+    # Scoped to one workspace, the brain is not what the run covers.
+    _mk_ws(kbhome, "ws-a", "authn", "Decision", "d")
+    root_kdir = kbhome / ".cortex/knowledge"
+    root_kdir.mkdir(parents=True)
+    (root_kdir / "INDEX.md").write_text("stale\n")
+    _lint(["--workspace", "ws-a", "--check", "okf"])
+    assert "~/.cortex" not in capsys.readouterr().out

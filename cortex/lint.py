@@ -336,7 +336,12 @@ def _stale(doc: Doc, today: datetime.date, days: int) -> list:
 # A §8 index entry: `* [Title](relative-url) - description`. Everything else a
 # derived index holds (the banner comment, headings, the `... K more` notice,
 # blank lines) is not an entry and is not checked against this.
-_OKF_ENTRY = re.compile(r"^\* \[[^\]]+\]\([^)]+\)")
+#
+# The link text is `.+` and greedy rather than `[^\]]+`: a title carrying a
+# bracket (escaped by `kb._md_escape`, or literal in an index derived before
+# that) still ends its link at the last `](`, and reading such a line as a hand
+# edit would flag a freshly derived index that nothing can fix.
+_OKF_ENTRY = re.compile(r"^\* \[.+\]\([^)]+\)")
 
 
 def _okf_doc(doc: Doc) -> list:
@@ -356,14 +361,18 @@ def _okf_doc(doc: Doc) -> list:
                     f"{doc.description or '(no description)'}")]
 
 
-def _okf_index(kdir: Path, ws: str) -> list:
+def _okf_index(kdir: Path, label: str) -> list:
     """The §8 half, which is per-directory rather than per-doc: a legacy
     `INDEX.md` left over from before the rename, and an `index.md` carrying
     lines that are not §8 entries (which is what a hand edit looks like, and
-    the banner says not to make one)."""
+    the banner says not to make one).
+
+    `label` names the directory in the id column. The caller supplies it rather
+    than this deriving it from a workspace name, because the root brain index
+    belongs to no workspace and would otherwise be unreachable."""
     # A directory rather than a doc, so the id column names it as one. It is
     # still a store path, which is what the column promises: openable as typed.
-    out, doc = [], f"{ws}/knowledge/"
+    out, doc = [], f"{label}/knowledge/"
     legacy, current = kdir / kb.LEGACY_INDEX_NAME, kdir / kb.INDEX_NAME
     if legacy.exists() and not (current.exists() and legacy.samefile(current)):
         out.append(Finding("okf", doc, f"{kb.LEGACY_INDEX_NAME} alongside the "
@@ -542,16 +551,18 @@ def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:
 
 
 def collect(world: World, *, names, checks, repos, today: datetime.date,
-            stale_days: int, archived: bool, root: Path | None = None) -> list:
+            stale_days: int, archived: bool, index_dirs=()) -> list:
     """Every deterministic finding, in check order then doc order.
 
-    `root` is the scope's workspaces root. Only the §8 half of `okf` needs it,
-    because a derived index is a file the world never parses into a `Doc`."""
+    `index_dirs` is `(directory, label)` per derived index the run covers. Only
+    the §8 half of `okf` reads it, because a derived index is a file the world
+    never parses into a `Doc`. The caller builds the list, since which indexes a
+    run covers is a scope question and scope lives in `cmd_lint`."""
     inbound = _inbound_authored(world) if "orphan" in checks else {}
     found: list = []
-    if "okf" in checks and root is not None:
-        for ws in sorted(names):
-            found += _okf_index(root / ws / "knowledge", ws)
+    if "okf" in checks:
+        for kdir, label in index_dirs:
+            found += _okf_index(kdir, label)
     for canon in sorted(world.docs):
         doc = world.docs[canon]
         if doc.id.kind not in LINKABLE_KINDS or doc.id.workspace not in names:
@@ -631,9 +642,17 @@ def cmd_lint(args) -> int:
                                  f"{_MAX_TOTAL_BYTES >> 20} MiB total): a symbol or "
                                  f"flag living only in a skipped file reads as dead")
 
+    # The derived indexes this run covers: one per workspace, plus the root
+    # brain index under `all`, which belongs to no workspace and would
+    # otherwise never be checked -- a leftover root `INDEX.md` staying
+    # invisible is the same stale artefact the per-workspace check exists for.
+    index_dirs = [(root / ws / "knowledge", ws) for ws in sorted(names)]
+    if args.workspace == "all":
+        index_dirs.append((_home() / ".cortex" / "knowledge", "~/.cortex"))
+
     findings = collect(world, names=names, checks=checks, repos=repos,
                        today=datetime.date.today(), stale_days=stale_days,
-                       archived=args.archive, root=root)
+                       archived=args.archive, index_dirs=index_dirs)
 
     fixed, written = [], []
     if args.fix:

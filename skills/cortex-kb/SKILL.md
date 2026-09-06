@@ -211,7 +211,8 @@ Prints a compact, pull-based table of contents (one line per doc,
 `<slug> [<type>] - <description>`) for the resolved workspace's `knowledge/`,
 plus the active (or `--session`) session's `workbench/` when one resolves.
 Ordered by type then slug (untyped last), bounded by `--max` (default 100) per
-section with a `... K more (raise --max)` notice. By default it writes to
+section on stdout only (the derived file is uncapped: a catalog that silently
+omits entries is not one) with a `... K more (raise --max)` notice. By default it writes to
 stdout. `--write` (re)generates a derived, banner-marked `knowledge/index.md`
 (the knowledge section only), regenerated like `SUMMARY.md` and never
 hand-maintained or injected into any context. `index.md` is excluded from the
@@ -293,7 +294,7 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
 Capture an agent-generated note with the body inline:
 
 ```bash
-cortex kb new knowledge api-versioning-decision --body "$(cat <<'END'
+cortex kb new knowledge api-versioning-decision --type Decision --body "$(cat <<'END'
 ## Decision
 
 We will use header-based versioning for the public API.
@@ -304,7 +305,7 @@ END
 Pipe a longer body from stdin:
 
 ```bash
-some-pipeline | cortex kb new knowledge daily-summary --body-from -
+some-pipeline | cortex kb new knowledge daily-summary --type Reference --body-from -
 ```
 
 Workbench note tied to the current session:

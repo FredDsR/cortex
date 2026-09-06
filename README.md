@@ -192,7 +192,8 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
 - **`cortex kb index`.** A compact, pull-based table of contents so agents can see
   what already exists before authoring a duplicate. Prints to stdout, or
   `--write` regenerates a derived `knowledge/index.md` (like `SUMMARY.md`, never
-  hand-maintained, never injected) in [OKF][okf] §8 form.
+  hand-maintained, never injected) in [OKF][okf] §8 form, uncapped, because a
+  catalog that silently omits entries is not one.
 - **The brain (cross-workspace).** `cortex kb index --workspace=all` aggregates
   every global workspace's knowledge into one dictionary grouped by type; the
   viz root page renders the same data as a wiki whose concepts link across

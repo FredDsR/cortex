@@ -169,8 +169,14 @@ def _doc_rows(dir_path: Path) -> list[tuple[str, str, str, str]]:
     return rows
 
 
-def _more_notice(total: int, max_n: int) -> list[str]:
-    return [f"... {total - max_n} more (raise --max)"] if total > max_n else []
+def _more_notice(total: int, max_n: int | None) -> list[str]:
+    """`max_n=None` means uncapped, and an uncapped render has nothing to
+    notice. `--max` bounds what a terminal prints for an agent to read; a
+    derived file has no such constraint, and a catalog that silently omits
+    entries is not a catalog. See `cmd_index`."""
+    if max_n is None or total <= max_n:
+        return []
+    return [f"... {total - max_n} more (raise --max)"]
 
 
 def _okf_entry(text: str, target: str, desc: str) -> str:
@@ -178,8 +184,17 @@ def _okf_entry(text: str, target: str, desc: str) -> str:
 
     The link text is the doc's title when it has one, but the URL always ends
     in `<slug>.md`, so the slug an agent needs for `[[wikilinks]]` stays on the
-    line either way."""
-    return f"* [{text}]({target}) - {desc}"
+    line either way.
+
+    A bracket in the title is escaped: unescaped, `title: [Design] rework`
+    closes the link text early, which breaks the link for a bundle consumer and
+    makes `cortex kb lint` read its own freshly derived index as hand-edited."""
+    return f"* [{_md_escape(text)}]({target}) - {desc}"
+
+
+def _md_escape(text: str) -> str:
+    """Escape the two characters that can end a §8 entry's link text early."""
+    return text.replace("[", r"\[").replace("]", r"\]")
 
 
 def _okf_heading(display_ty: str, first: bool) -> list[str]:
@@ -187,7 +202,7 @@ def _okf_heading(display_ty: str, first: bool) -> list[str]:
     return ([] if first else [""]) + [f"## {display_ty or '(untyped)'}", ""]
 
 
-def _render_section(dir_path: Path, max_n: int, *, okf: bool = False) -> list[str]:
+def _render_section(dir_path: Path, max_n: int | None, *, okf: bool = False) -> list[str]:
     """The rows of one kb directory, capped at max_n with a `... K more`
     notice. Flat (`<slug> [<type>] - <desc>`) by default: that is what an agent
     reads on stdout and what `cortex inject` emits. `okf=True` renders the same
@@ -215,7 +230,7 @@ def _knowledge_rows(kdir: Path, ws_name: str) -> list[tuple[str, str, str, str, 
             for ty, slug, title, desc in _doc_rows(kdir)]
 
 
-def _render_all(workspaces_root: Path, max_n: int, *, okf: bool = False) -> list[str]:
+def _render_all(workspaces_root: Path, max_n: int | None, *, okf: bool = False) -> list[str]:
     """Cross-workspace dictionary: `## <type>` sections (untyped last), each
     sorted by slug then workspace and capped per section. Scope is the global
     store's workspaces; repo-local `.cortex` stores are not included (they are
@@ -272,20 +287,33 @@ def _retire_legacy_index(kdir: Path) -> None:
 
 
 def _write_index(kdir: Path, lines: list[str]) -> Path:
-    """Write the derived §8 index, retiring any legacy `INDEX.md` first.
+    """Write the derived §8 index, then retire any legacy `INDEX.md`.
 
     Both happen before the caller's `sync_after`, because `cortex sync push`
     stages the whole store in one commit. Split across two commits, a `sync
-    pull` on a second device resurrects the old name beside the new one."""
+    pull` on a second device resurrects the old name beside the new one.
+
+    Write first, retire second, so an interrupted first `--write` after the
+    rename leaves the old index rather than no index at all. On a
+    case-insensitive filesystem the two names are one file, which
+    `_retire_legacy_index` detects and renames instead of deleting, so the
+    freshly written bytes survive that order too."""
     kdir.mkdir(parents=True, exist_ok=True)
-    _retire_legacy_index(kdir)
     path = kdir / INDEX_NAME
     atomic.write_text(path, "\n".join(lines) + "\n", encoding="utf-8")
+    _retire_legacy_index(kdir)
     return path
 
 
 def cmd_index(args) -> int:
-    max_n = parse_max(args.max)
+    # `--max` bounds the printed listing only. `--write` derives a file that
+    # `cortex okf export` ships and a bundle consumer reads as the catalog, so
+    # truncating it would omit docs silently and emit a `... K more` line that
+    # is not an OKF §8 entry. Uncapped there, and `None` is the whole list
+    # because `rows[:None]` is `rows`.
+    max_n = parse_max(args.max)          # validated even when --write ignores it
+    if args.write:
+        max_n = None
     if args.workspace == "all":
         workspaces_root = _home() / ".cortex" / "workspaces"
         if args.write:
@@ -296,7 +324,7 @@ def cmd_index(args) -> int:
             ] + _render_all(workspaces_root, max_n, okf=True)
             path = _write_index(_home() / ".cortex" / "knowledge", out)
             print(path)
-            sync_after("index", "knowledge", "INDEX")
+            sync_after("index", "knowledge", INDEX_NAME)
             return 0
         for ln in _render_all(workspaces_root, max_n):
             print(ln)
@@ -310,7 +338,7 @@ def cmd_index(args) -> int:
             "# Knowledge index", "",
         ] + _render_section(kdir, max_n, okf=True)
         print(_write_index(kdir, lines))
-        sync_after("index", "knowledge", "INDEX")
+        sync_after("index", "knowledge", INDEX_NAME)
         return 0
 
     print("## knowledge")
