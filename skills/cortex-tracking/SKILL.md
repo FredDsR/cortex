@@ -73,6 +73,7 @@ Then decide:
 | User asks to move a session between stores | Invoke `cortex-migration`. |
 | User asks what the store knows about a topic, or you are about to author a knowledge entry | Run `cortex query search <terms>`. It ranks docs by content, so it finds a note nobody can name; `kb index` only lists descriptions. Searching first is what keeps the store from accumulating two docs about one thing. |
 | User wants to capture a durable note, an unresolved `[[knowledge/...]]` / `[[workbench/...]]` ghost link needs a real entry, spec/plan/brainstorm output should be recorded, or a task needs supporting files (especially shared context referenced by more than one task) | **Search first** (`cortex query search`), then invoke `cortex-kb` to author `knowledge/<slug>.md` (workspace-scoped, for context shared across tasks) or `workbench/<slug>.md` (session-scoped). Reference the entry from the relevant task bodies with `[[knowledge/<slug>]]`. |
+| User asks to connect up the knowledge base, or a knowledge doc has no inbound links | Invoke `cortex-kb` and follow "Sweeping for missing links": `cortex kb lint --check orphan` for the holes, `cortex query related <slug>` for the candidates. The CLI ranks; declining is the default outcome. |
 | After any write to `tasks/*.md` or `SUMMARY.md` | Run `cortex sync push "<track: ... message>"`. |
 | `cortex sync pull` prints `SUMMARY.md regenerate-needed` | Regenerate the affected SUMMARY.md from its `tasks/*.md`. |
 | On session close (after archive move) | Run `cortex sync push "track: archive session <slug>"`. |

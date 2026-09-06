@@ -13,6 +13,10 @@ systematically favour one kind over the other. When a query spans both, the two
 ranked lists fuse with Reciprocal Rank Fusion, which uses only rank position
 and so needs no score calibration between two incomparable corpora.
 
+`related` powers `cortex query related <slug>`: the same ranking with a
+document as the query instead of terms, so link discovery is deterministic
+rather than a per-run judgment call about which words to search for.
+
 The index is derived and disposable, rebuilt on every invocation, matching how
 `SUMMARY.md` and `INDEX.md` are already derived rather than stored.
 
@@ -24,6 +28,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from cortex import query as qmod
 from cortex.model import Doc, DocId, World
 from cortex.sanitize import sanitize
 
@@ -74,12 +79,20 @@ class Index:
         df = len(self._postings.get(term, ()))
         return math.log(1 + (n - df + 0.5) / (df + 0.5))
 
+    def _avgdl(self) -> float:
+        return sum(self._lengths.values()) / len(self._lengths)
+
+    def _term_score(self, idf: float, freq: int, dl: int, avgdl: float) -> float:
+        """One term's BM25 contribution to one document."""
+        denom = freq + self.k1 * (1 - self.b + self.b * dl / avgdl)
+        return idf * freq * (self.k1 + 1) / denom
+
     def search(self, query_tokens: list, max: int | None = None) -> list:
         """Ranked `(key, score)`, descending by score then ascending by key.
         Only documents matching at least one query term appear."""
         if not self._lengths or not query_tokens:
             return []
-        avgdl = sum(self._lengths.values()) / len(self._lengths)
+        avgdl = self._avgdl()
         scores: dict = {}
         for term in query_tokens:
             postings = self._postings.get(term)
@@ -87,11 +100,29 @@ class Index:
                 continue
             idf = self._idf(term)
             for key, freq in postings.items():
-                dl = self._lengths[key]
-                denom = freq + self.k1 * (1 - self.b + self.b * dl / avgdl)
-                scores[key] = scores.get(key, 0.0) + idf * freq * (self.k1 + 1) / denom
+                scores[key] = scores.get(key, 0.0) + self._term_score(
+                    idf, freq, self._lengths[key], avgdl)
         ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
         return ranked if max is None else ranked[:max]
+
+    def top_terms(self, query_tokens: list, key: str, max_terms: int) -> list:
+        """The query terms that actually earned KEY its score, highest
+        contribution first, then alphabetically.
+
+        `query related` prints these so a candidate's rank is explainable. A
+        ranked list nobody can interrogate gets either trusted blindly or
+        ignored, and both are worse than a short list of the shared words."""
+        if key not in self._lengths or not query_tokens:
+            return []
+        avgdl, dl = self._avgdl(), self._lengths[key]
+        scored = []
+        for term in dict.fromkeys(query_tokens):
+            freq = self._postings.get(term, {}).get(key)
+            if not freq:
+                continue
+            scored.append((self._term_score(self._idf(term), freq, dl, avgdl), term))
+        scored.sort(key=lambda st: (-st[0], st[1]))
+        return [term for _score, term in scored[:max_terms]]
 
 
 # Reciprocal Rank Fusion's conventional constant. It damps the gap between the
@@ -138,6 +169,9 @@ class Hit:
     address: str
     snippet: str
     score: float
+    # Only `related` fills this in; `search` leaves it empty, because a hit for
+    # terms the user typed already names its own reason.
+    terms: list = field(default_factory=list)
 
 
 @dataclass
@@ -161,9 +195,9 @@ def _doc_tokens(doc: Doc, weights) -> list:
     return tokens
 
 
-def _clip(text: str) -> str:
+def _clip(text: str, width: int = SNIPPET_WIDTH) -> str:
     flat = _WS_RE.sub(" ", sanitize(text)).strip()
-    return flat if len(flat) <= SNIPPET_WIDTH else flat[:SNIPPET_WIDTH] + "..."
+    return flat if len(flat) <= width else flat[:width] + "..."
 
 
 def _snippet(doc: Doc, query_tokens) -> str:
@@ -244,12 +278,86 @@ def search(world: World, terms, *, kind: str = "all", names=None,
     return SearchResult(hits=hits, total=len(ranked))
 
 
+# How many shared terms `related` names per candidate, and how wide its summary
+# column runs. Both are narrow so a candidate stays one readable line.
+RELATED_TERMS = 5
+RELATED_SUMMARY_WIDTH = 56
+
+
+def _query_tokens(doc: Doc) -> list:
+    """The doc-as-query token list: an ordered dedup over title, description,
+    and body.
+
+    Deduplicated because `Index.search` scores a repeated query term once per
+    occurrence. Handing it a body's raw token list would weight every term by
+    its frequency in the *source* doc, so a word the author happened to repeat
+    would outweigh the rare term that actually makes two notes related."""
+    seen, out = set(), []
+    for text in (doc.title, doc.description, doc.body):
+        for tok in tokenize(text):
+            if tok not in seen:
+                seen.add(tok)
+                out.append(tok)
+    return out
+
+
+def related(world: World, target_id: DocId, *, names=None,
+            include_archive: bool = False, max: int = 5,
+            min_score: float = 0.0) -> SearchResult:
+    """Link candidates for TARGET: BM25 with the document itself as the query.
+
+    Deriving the query from the doc rather than from terms an agent picks is
+    the whole point. A sweep that re-chooses its own search terms per document
+    gives different candidates on a second run over an unchanged store, and
+    nothing about it is testable.
+
+    Candidates are always TARGET's own kind, so knowledge ranks against
+    knowledge. There is no kind selector and deliberately no `all`: fusing two
+    corpora with RRF would put `min_score` on a scale where 0.016 is a good
+    result, and a threshold nobody can reason about is the same as no
+    threshold. One index also keeps the score a raw BM25 number, so
+    `min_score` compares like with like across the docs of one sweep."""
+    target = world.docs.get(target_id.canonical())
+    if target is None:
+        raise ValueError(f"no such doc: {target_id.canonical()}")
+    kind = target_id.kind
+    if kind not in _INDEXED_KINDS:
+        # A workspace or session is a container, not a document, so it has no
+        # text to query with and no index to rank against.
+        raise ValueError(f"cannot rank candidates for kind {kind!r}")
+    query_tokens = _query_tokens(target)
+    if not query_tokens:
+        return SearchResult(hits=[], total=0)
+    docs = _indexable(world, names=names, include_archive=include_archive)
+    prose, tasks = _build(docs)
+    index = prose if kind in PROSE_KINDS else tasks
+    excluded = qmod.linked_ids(world, target_id)
+    ranked = [(key, score) for key, score in index.search(query_tokens)
+              if key not in excluded
+              and docs[key].id.kind == kind
+              and score >= min_score]
+    hits = [Hit(doc_id=docs[key].id, kind=kind, address=key,
+                snippet=_clip(docs[key].description or docs[key].title
+                              or "(no summary)", RELATED_SUMMARY_WIDTH),
+                score=score,
+                terms=index.top_terms(query_tokens, key, RELATED_TERMS))
+            for key, score in ranked[:max]]
+    return SearchResult(hits=hits, total=len(ranked))
+
+
 # --- CLI (the only IO in this module) ---
 from pathlib import Path
 
 from cortex import store
+from cortex.errors import CortexError
 from cortex.parser import parse_world
-from cortex.query import parse_max
+
+
+def _print_notes(notes) -> None:
+    """Trailing `# ...` lines naming what the scope left out. After the hits,
+    alongside `(+N more)`: both say what the ranking you just read excludes."""
+    for note in notes:
+        print(f"# {note}")
 
 
 def _print_result(res: SearchResult, max_n: int) -> None:
@@ -268,7 +376,7 @@ def _print_result(res: SearchResult, max_n: int) -> None:
 
 
 def cmd_search(args) -> int:
-    max_n = parse_max(args.max)
+    max_n = qmod.parse_max(args.max)
     root, names, notes = store.resolve_scope(args.workspace,
                                              home=Path.home(), cwd=Path.cwd())
     # Always parse the archive; `--archive` gates what gets indexed, so the flag
@@ -277,8 +385,61 @@ def cmd_search(args) -> int:
     res = search(world, args.terms, kind=args.kind, names=names,
                  include_archive=args.archive, max=max_n)
     _print_result(res, max_n)
-    # After the hits, alongside the `(+N more)` line: both say what the ranking
-    # you just read does not include.
-    for note in notes:
-        print(f"# {note}")
+    _print_notes(notes)
+    return 0
+
+
+def parse_min_score(raw: str) -> float:
+    """`--min-score` is a raw BM25 score, so it is corpus-relative and has no
+    defensible default above zero. It filters before truncation, so `(+N more)`
+    counts what passed the threshold rather than what merely matched."""
+    try:
+        f = float(raw)
+    except (TypeError, ValueError):
+        raise CortexError(f"--min-score must be a number, got {raw!r}")
+    if f < 0:
+        raise CortexError("--min-score must be >= 0")
+    return f
+
+
+def _print_related(res: SearchResult, target: DocId, kind: str,
+                   max_n: int) -> None:
+    """One line per candidate: rank, score, address, summary, and the shared
+    terms that earned the rank. No kind column, because a run ranks exactly one
+    kind.
+
+    `search` omits its score because under `--kind all` it is an RRF number on
+    no meaningful scale. Here it is a raw BM25 score over one index, and it is
+    printed because it is the only way to calibrate `--min-score`: a threshold
+    flag whose values you cannot see is the decorative knob it was added to
+    avoid. It is comparable within one run and not across two."""
+    print(f"{target.canonical()}  (candidates: {kind})")
+    if not res.hits:
+        print("(no candidates)")
+        return
+    aw = max(len(h.address) for h in res.hits)
+    sw = max(len(h.snippet) for h in res.hits)
+    for rank, h in enumerate(res.hits, start=1):
+        shared = ", ".join(h.terms) or "(none)"
+        print(f"{rank:>3}  {h.score:>8.2f}  {h.address:<{aw}}  "
+              f"{h.snippet:<{sw}}  shared: {shared}")
+    if res.total > max_n:
+        print(f"(+{res.total - max_n} more; raise --max)")
+
+
+def cmd_related(args) -> int:
+    max_n = qmod.parse_max(args.max)
+    min_score = parse_min_score(args.min_score)
+    root, names, notes = store.resolve_scope(args.workspace,
+                                             home=Path.home(), cwd=Path.cwd())
+    world = parse_world(root, include_archive=True)
+    doc = qmod.resolve_one(world, args.slug, workspace=args.workspace,
+                           session=args.session, kind=args.kind)
+    # No candidate-kind flag: candidates are always the resolved doc's own kind,
+    # so `--kind` keeps the one meaning it has on `neighbors` (narrow an
+    # ambiguous slug) instead of quietly meaning two things on one command.
+    res = related(world, doc.id, names=names, include_archive=args.archive,
+                  max=max_n, min_score=min_score)
+    _print_related(res, doc.id, doc.id.kind, max_n)
+    _print_notes(notes)
     return 0

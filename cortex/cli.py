@@ -1,4 +1,5 @@
 """cortex CLI: `cortex kb {new,update,index,ingest,lint}` (+ viz/query/inject/sync).
+`cortex query {neighbors,search,related}`.
 
 Invoked as `python -m cortex.cli <group> <cmd> ...` by the cortex dispatcher.
 """
@@ -73,7 +74,8 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Visualize the work tree (build, serve)")
     vp.add_argument("args", nargs=argparse.REMAINDER)
 
-    qp = groups.add_parser("query", help="Query the work graph (neighbors, search)")
+    qp = groups.add_parser("query",
+                           help="Query the work graph (neighbors, search, related)")
     qcmds = qp.add_subparsers(dest="cmd", required=True)
     nb = qcmds.add_parser("neighbors",
                           help="Show a doc's links, backlinks, and ghost refs")
@@ -92,6 +94,18 @@ def build_parser() -> argparse.ArgumentParser:
                     default="all")
     se.add_argument("--max", default="10")
     se.add_argument("--archive", action="store_true")
+
+    rl = qcmds.add_parser("related",
+                          help="Rank unlinked docs by similarity to one doc")
+    rl.add_argument("slug")
+    rl.add_argument("--workspace", default="")     # "all" ranks every workspace
+    rl.add_argument("--session", default="")
+    # Narrows an ambiguous slug, exactly as on `neighbors`. It does not pick the
+    # candidate kind: candidates are always the resolved doc's own kind.
+    rl.add_argument("--kind", choices=["task", "knowledge", "workbench"], default="")
+    rl.add_argument("--max", default="5")
+    rl.add_argument("--min-score", dest="min_score", default="0")
+    rl.add_argument("--archive", action="store_true")
 
     ip = groups.add_parser("inject", help="Opt-in session-start injection")
     icmds = ip.add_subparsers(dest="cmd", required=True)
@@ -140,7 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
 _VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
                 "--description", "--body", "--body-from", "--from", "--only", "--max",
                 "--format", "--wire-hook", "--unwire-hook", "--repo", "--check",
-                "--stale-days", "--kind"}
+                "--stale-days", "--kind", "--min-score"}
 
 
 def _glue_flag_values(argv):
@@ -167,6 +181,7 @@ _KB_DISPATCH = {
 _QUERY_DISPATCH = {
     "neighbors": query.cmd_neighbors,
     "search": search_mod.cmd_search,
+    "related": search_mod.cmd_related,
 }
 
 _INJECT_DISPATCH = {

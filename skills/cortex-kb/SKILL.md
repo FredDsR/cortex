@@ -27,6 +27,9 @@ tree.
 - Before writing a new entry, to check whether one already covers the ground:
   `cortex query search <terms>`. A duplicate doc is the failure that avoids,
   and `kb index` only lists descriptions, not content.
+- The user asks to connect up a knowledge base that has more notes than links,
+  or `cortex kb lint --check orphan` reports docs nothing points at. See
+  "Sweeping for missing links".
 
 ## CLI surface
 
@@ -52,6 +55,9 @@ to no doc), `dead-ref` (a backticked path, symbol, or `--flag` that no longer
 exists in the repo), `orphan` (a knowledge doc nothing links to), `stale`
 (`updated` older than `--stale-days`, missing, or unparseable), and
 `missing-description`. Select a subset with `--check`.
+
+`orphan` reports the hole and never what fills it. `cortex query related
+<slug>` is the other half; see "Sweeping for missing links" below.
 
 After them comes `## agent worklist (needs judgment)`, selectable as `overlap`:
 pairs of same-typed docs whose summaries overlap. **These are candidates, not
@@ -106,6 +112,64 @@ cortex query search <terms>... [--kind knowledge|workbench|task|all]
 
 **Run this before `cortex kb new`.** It is the cheapest way to avoid writing a
 second doc about something the store already knows.
+
+`cortex query related <slug>` is the same BM25 ranking with the document itself
+as the query: link candidates for one doc. It excludes the doc, everything it
+links to, and everything that links to it, so what is left is only what you
+have not acted on. Each line carries the shared terms that earned the rank, so
+a weak candidate is visible as weak without opening it.
+
+Candidates are always the resolved doc's own kind (`--kind` narrows an
+ambiguous slug, exactly as on `neighbors`; it does not pick the candidate
+kind). Scores are raw BM25, printed so `--min-score` is calibratable, and
+comparable within one run rather than across two. `--max` defaults to 5 on
+purpose: a listing of forty candidates gets ignored by the third document.
+
+```
+cortex query related <slug> [--workspace <ws>|all] [--session <sess>]
+                            [--kind task|knowledge|workbench]
+                            [--max <N>] [--min-score <F>] [--archive]
+```
+
+## Sweeping for missing links
+
+A knowledge base accumulates notes faster than it accumulates links, because
+linking requires knowing the sibling note exists. `cortex kb lint --check
+orphan` names the holes; `cortex query related` proposes what fills them. **The
+CLI ranks, you decide.** It never writes an edge.
+
+Run the sweep orphans-first, because that is where a missing link costs the
+most:
+
+```bash
+cortex kb lint --workspace <ws> --check orphan   # the docs to sweep first
+cortex query related <slug> --workspace <ws>     # per doc, then the rest
+```
+
+For each candidate, choose exactly one of four:
+
+- **`related_to:` in frontmatter**, when the connection is a *fact about the
+  docs*: two notes covering the same subsystem, the same file, the same
+  release. Add it with `cortex kb update knowledge <slug>`; the key survives as
+  unrecognized frontmatter.
+- **`[[knowledge/<slug>]]` in prose**, when the connection is an *argument*:
+  this note's claim depends on, qualifies, or is evidence for that one. Put it
+  in the sentence that needs it. A link in prose carries its reason; a
+  frontmatter key carries only the fact of the edge.
+- **Hand it to `overlap`**, when the two look like a contradiction or a
+  supersession rather than a relation. That is the `cortex kb lint` worklist's
+  territory, and the resolution there is to say so in the surviving doc, not to
+  add an edge between them.
+- **Nothing**, and this is the default. Two notes sharing vocabulary is not a
+  relationship. A sweep that links every plausible pair over 300 docs produces
+  a hairball where every node touches every other and the graph stops meaning
+  anything. Read the `shared:` terms: a candidate ranked on filler words is a
+  decline, not a link.
+
+Declining is the common outcome. If a sweep is proposing more links than it
+declines, raise `--min-score` and re-run rather than working through the list.
+
+## Authoring reference
 
 `new` and `update` share the same flags:
 
