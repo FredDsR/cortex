@@ -2,8 +2,9 @@ import math
 
 import pytest
 
-from cortex import search
 from cortex.model import Doc, DocId, Edge, World
+from cortex.search import index as search_index
+from cortex.search import rank as search_rank
 
 
 def _approx(value):
@@ -13,28 +14,28 @@ def _approx(value):
 # --- tokenize ---
 
 def test_tokenize_casefolds_and_splits_on_punctuation():
-    assert search.tokenize("Atomic Writes, Ported!") == ["atomic", "writes", "ported"]
+    assert search_index.tokenize("Atomic Writes, Ported!") == ["atomic", "writes", "ported"]
 
 
 def test_tokenize_splits_hyphens_and_underscores():
     # This is what makes a search for "active pointer" find
     # close-day-active-pointer, and "parse world" find parse_world.
-    assert search.tokenize("close-day-active-pointer") == [
+    assert search_index.tokenize("close-day-active-pointer") == [
         "close", "day", "active", "pointer"]
-    assert search.tokenize("parse_world") == ["parse", "world"]
+    assert search_index.tokenize("parse_world") == ["parse", "world"]
 
 
 def test_tokenize_keeps_digits_and_unicode_letters():
-    assert search.tokenize("BM25 café") == ["bm25", "café"]
+    assert search_index.tokenize("BM25 café") == ["bm25", "café"]
 
 
 def test_tokenize_on_empty_and_punctuation_only():
-    assert search.tokenize("") == []
-    assert search.tokenize("... --- ...") == []
+    assert search_index.tokenize("") == []
+    assert search_index.tokenize("... --- ...") == []
 
 
 def test_tokenize_accepts_none_as_empty():
-    assert search.tokenize(None) == []
+    assert search_index.tokenize(None) == []
 
 
 # --- BM25 ---
@@ -42,7 +43,7 @@ def test_tokenize_accepts_none_as_empty():
 def test_idf_stays_positive_for_a_term_in_every_document():
     # The textbook idf goes negative once df > N/2, which would make a common
     # term actively demote the documents holding it.
-    idx = search.Index()
+    idx = search_index.Index()
     for i in range(5):
         idx.add(f"d{i}", ["cortex", f"other{i}"])
     hits = idx.search(["cortex"])
@@ -52,7 +53,7 @@ def test_idf_stays_positive_for_a_term_in_every_document():
 
 def test_bm25_score_matches_hand_computation():
     # Corpus: 3 docs, "retry" in d1 twice and d2 once, absent from d3.
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("d1", ["retry", "retry", "backoff", "sync"])       # dl 4, f 2
     idx.add("d2", ["retry", "push"])                           # dl 2, f 1
     idx.add("d3", ["unrelated", "words", "here", "entirely"])  # dl 4, f 0
@@ -72,21 +73,21 @@ def test_bm25_score_matches_hand_computation():
 
 
 def test_shorter_document_outranks_longer_at_equal_frequency():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("short", ["retry", "sync"])
     idx.add("long", ["retry"] + [f"filler{i}" for i in range(50)])
     assert [key for key, _ in idx.search(["retry"])] == ["short", "long"]
 
 
 def test_repeated_term_outranks_single_occurrence_at_equal_length():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("twice", ["retry", "retry"])
     idx.add("once", ["retry", "filler"])
     assert [key for key, _ in idx.search(["retry"])] == ["twice", "once"]
 
 
 def test_multi_term_query_sums_contributions():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("both", ["retry", "backoff"])
     idx.add("one", ["retry", "unrelated"])
     idx.add("neither", ["nothing", "relevant"])
@@ -94,37 +95,37 @@ def test_multi_term_query_sums_contributions():
 
 
 def test_unknown_term_returns_nothing():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("d1", ["retry"])
     assert idx.search(["nonexistent"]) == []
 
 
 def test_search_on_empty_index_returns_nothing():
-    assert search.Index().search(["retry"]) == []
+    assert search_index.Index().search(["retry"]) == []
 
 
 def test_empty_query_returns_nothing():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("d1", ["retry"])
     assert idx.search([]) == []
 
 
 def test_max_truncates_without_reordering():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("short", ["retry"])
     idx.add("long", ["retry"] + [f"f{i}" for i in range(20)])
     assert [k for k, _ in idx.search(["retry"], max=1)] == ["short"]
 
 
 def test_equal_scores_break_ties_on_key():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("zeta", ["retry", "x"])
     idx.add("alpha", ["retry", "y"])
     assert [k for k, _ in idx.search(["retry"])] == ["alpha", "zeta"]
 
 
 def test_len_counts_added_documents():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("d1", ["a"])
     idx.add("d2", ["b"])
     assert len(idx) == 2
@@ -139,7 +140,7 @@ def test_rrf_beats_a_naive_score_merge():
     # so both list winners come first.
     loud = [("big", 100.0), ("runner_up", 40.0)]
     quiet = [("small", 0.9), ("small_2", 0.4)]
-    fused = [key for key, _ in search.rrf([loud, quiet])]
+    fused = [key for key, _ in search_index.rrf([loud, quiet])]
     assert set(fused[:2]) == {"big", "small"}
     assert set(fused[2:]) == {"runner_up", "small_2"}
 
@@ -147,7 +148,7 @@ def test_rrf_beats_a_naive_score_merge():
 def test_rrf_score_is_the_sum_of_reciprocal_ranks():
     a = [("shared", 9.0), ("only_a", 1.0)]
     b = [("only_b", 5.0), ("shared", 2.0)]
-    fused = dict(search.rrf([a, b], k=60))
+    fused = dict(search_index.rrf([a, b], k=60))
     assert fused["shared"] == _approx(1 / 61 + 1 / 62)
     assert fused["only_a"] == _approx(1 / 62)
     assert fused["only_b"] == _approx(1 / 61)
@@ -156,23 +157,23 @@ def test_rrf_score_is_the_sum_of_reciprocal_ranks():
 def test_rrf_promotes_a_document_ranked_by_both_lists():
     a = [("x", 9.0), ("shared", 8.0)]
     b = [("y", 9.0), ("shared", 8.0)]
-    assert [key for key, _ in search.rrf([a, b])][0] == "shared"
+    assert [key for key, _ in search_index.rrf([a, b])][0] == "shared"
 
 
 def test_rrf_degrades_when_one_list_is_empty():
     a = [("x", 1.0), ("y", 0.5)]
-    assert [key for key, _ in search.rrf([a, []])] == ["x", "y"]
+    assert [key for key, _ in search_index.rrf([a, []])] == ["x", "y"]
 
 
 def test_rrf_of_nothing_is_nothing():
-    assert search.rrf([]) == []
-    assert search.rrf([[], []]) == []
+    assert search_index.rrf([]) == []
+    assert search_index.rrf([[], []]) == []
 
 
 def test_rrf_breaks_ties_on_key():
     a = [("zeta", 1.0)]
     b = [("alpha", 1.0)]
-    assert [key for key, _ in search.rrf([a, b])] == ["alpha", "zeta"]
+    assert [key for key, _ in search_index.rrf([a, b])] == ["alpha", "zeta"]
 
 
 # --- World-level search ---
@@ -195,7 +196,7 @@ def _world(*docs):
 def test_search_finds_a_term_in_a_knowledge_body():
     w = _world(_doc("knowledge", "retry-policy",
                     body="Exponential backoff on 5xx retries."))
-    res = search.search(w, "backoff")
+    res = search_rank.search(w, "backoff")
     assert [h.address for h in res.hits] == ["ws/knowledge/retry-policy"]
     assert res.hits[0].kind == "knowledge"
     assert res.total == 1
@@ -206,20 +207,20 @@ def test_slug_match_outranks_a_body_only_match():
         _doc("knowledge", "atomic-writes", body="Unrelated prose entirely."),
         _doc("knowledge", "other-note", body="atomic " * 3),
     )
-    ranked = [h.address for h in search.search(w, "atomic writes").hits]
+    ranked = [h.address for h in search_rank.search(w, "atomic writes").hits]
     assert ranked[0] == "ws/knowledge/atomic-writes"
 
 
 def test_description_and_type_are_searchable():
     w = _world(_doc("knowledge", "n1", description="mkstemp mode pitfalls",
                     type="Gotcha"))
-    assert search.search(w, "mkstemp").hits
-    assert search.search(w, "gotcha").hits
+    assert search_rank.search(w, "mkstemp").hits
+    assert search_rank.search(w, "gotcha").hits
 
 
 def test_task_status_is_searchable():
     w = _world(_doc("task", "t1", status="Blocked", body="waiting"))
-    hits = search.search(w, "blocked").hits
+    hits = search_rank.search(w, "blocked").hits
     assert [h.address for h in hits] == ["ws/s1/task/t1"]
 
 
@@ -231,7 +232,7 @@ def test_kind_filter_selects_one_kind():
     )
 
     def kinds(kind):
-        return {h.kind for h in search.search(w, "retry", kind=kind).hits}
+        return {h.kind for h in search_rank.search(w, "retry", kind=kind).hits}
 
     assert kinds("knowledge") == {"knowledge"}
     assert kinds("workbench") == {"workbench"}
@@ -246,7 +247,7 @@ def test_kind_filter_reports_its_own_total():
         _doc("knowledge", "k1", body="retry"),
         _doc("workbench", "wb1", body="retry"),
     )
-    assert search.search(w, "retry", kind="knowledge").total == 1
+    assert search_rank.search(w, "retry", kind="knowledge").total == 1
 
 
 def test_all_kind_fuses_so_each_index_winner_surfaces():
@@ -257,7 +258,7 @@ def test_all_kind_fuses_so_each_index_winner_surfaces():
         _doc("task", "t1", body="retry " + "filler " * 40),
         _doc("task", "t2", body="retry"),
     )
-    kinds = [h.kind for h in search.search(w, "retry", kind="all").hits][:2]
+    kinds = [h.kind for h in search_rank.search(w, "retry", kind="all").hits][:2]
     assert set(kinds) == {"knowledge", "task"}
 
 
@@ -266,10 +267,10 @@ def test_archived_docs_are_excluded_by_default():
         _doc("knowledge", "live", body="retry"),
         _doc("knowledge", "dead", body="retry", archived=True),
     )
-    assert [h.address for h in search.search(w, "retry").hits] == [
+    assert [h.address for h in search_rank.search(w, "retry").hits] == [
         "ws/knowledge/live"]
     both = {h.address
-            for h in search.search(w, "retry", include_archive=True).hits}
+            for h in search_rank.search(w, "retry", include_archive=True).hits}
     assert both == {"ws/knowledge/live", "ws/knowledge/dead"}
 
 
@@ -278,7 +279,7 @@ def test_names_filter_scopes_to_named_workspaces():
         _doc("knowledge", "k1", body="retry", workspace="wsa"),
         _doc("knowledge", "k2", body="retry", workspace="wsb"),
     )
-    hits = search.search(w, "retry", names=["wsa"]).hits
+    hits = search_rank.search(w, "retry", names=["wsa"]).hits
     assert [h.address for h in hits] == ["wsa/knowledge/k1"]
 
 
@@ -288,7 +289,7 @@ def test_ghost_docs_are_never_indexed():
     ghost = _doc("knowledge", "ghosted", body="")
     ghost.ghost = True
     w.docs[ghost.id.canonical()] = ghost
-    assert [h.address for h in search.search(w, "ghosted").hits] == []
+    assert [h.address for h in search_rank.search(w, "ghosted").hits] == []
 
 
 def test_non_linkable_kinds_are_never_indexed():
@@ -299,28 +300,28 @@ def test_non_linkable_kinds_are_never_indexed():
                title="s1", body="retry retry retry", frontmatter={},
                rel_path=None)
     w = World(root=root, docs={sess.id.canonical(): sess})
-    assert search.search(w, "retry").hits == []
+    assert search_rank.search(w, "retry").hits == []
 
 
 def test_snippet_is_the_first_matching_body_line():
     w = _world(_doc("knowledge", "k1",
                     body="# Heading\n\nUnrelated opening line.\n\n"
                          "The retry path fsyncs the directory.\n"))
-    assert search.search(w, "retry").hits[0].snippet == (
+    assert search_rank.search(w, "retry").hits[0].snippet == (
         "The retry path fsyncs the directory.")
 
 
 def test_snippet_falls_back_to_description_then_title():
     w = _world(_doc("knowledge", "retry-note", description="Retry semantics"))
-    assert search.search(w, "retry").hits[0].snippet == "Retry semantics"
+    assert search_rank.search(w, "retry").hits[0].snippet == "Retry semantics"
     w2 = _world(_doc("knowledge", "retry-note", title="Retry Note"))
-    assert search.search(w2, "retry").hits[0].snippet == "Retry Note"
+    assert search_rank.search(w2, "retry").hits[0].snippet == "Retry Note"
 
 
 def test_snippet_is_sanitized_and_whitespace_collapsed():
     w = _world(_doc("knowledge", "k1",
                     body="retry‮ reversed​ text\t\tspaced"))
-    snippet = search.search(w, "retry").hits[0].snippet
+    snippet = search_rank.search(w, "retry").hits[0].snippet
     assert "‮" not in snippet and "​" not in snippet
     assert "\t" not in snippet
     assert snippet == "retry reversed text spaced"
@@ -328,32 +329,32 @@ def test_snippet_is_sanitized_and_whitespace_collapsed():
 
 def test_snippet_is_truncated():
     w = _world(_doc("knowledge", "k1", body="retry " + "x" * 400))
-    snippet = search.search(w, "retry").hits[0].snippet
-    assert len(snippet) == search.SNIPPET_WIDTH + 3
+    snippet = search_rank.search(w, "retry").hits[0].snippet
+    assert len(snippet) == search_rank.SNIPPET_WIDTH + 3
     assert snippet.endswith("...")
 
 
 def test_max_bounds_the_hits_but_not_the_total():
     w = _world(*[_doc("knowledge", f"k{i}", body="retry") for i in range(5)])
-    res = search.search(w, "retry", max=2)
+    res = search_rank.search(w, "retry", max=2)
     assert len(res.hits) == 2
     assert res.total == 5
 
 
 def test_no_match_returns_an_empty_result():
     w = _world(_doc("knowledge", "k1", body="retry"))
-    res = search.search(w, "nonexistent")
+    res = search_rank.search(w, "nonexistent")
     assert res.hits == [] and res.total == 0
 
 
 def test_punctuation_only_query_returns_an_empty_result():
     w = _world(_doc("knowledge", "k1", body="retry"))
-    assert search.search(w, "...").total == 0
+    assert search_rank.search(w, "...").total == 0
 
 
 def test_terms_accept_a_list_as_well_as_a_string():
     w = _world(_doc("knowledge", "k1", body="exponential backoff"))
-    assert search.search(w, ["exponential", "backoff"]).total == 1
+    assert search_rank.search(w, ["exponential", "backoff"]).total == 1
 
 
 def test_unknown_kind_raises_rather_than_returning_task_hits():
@@ -361,7 +362,7 @@ def test_unknown_kind_raises_rather_than_returning_task_hits():
     # plausible-looking task ranking is worse than an error.
     w = _world(_doc("task", "t1", body="retry"))
     with pytest.raises(ValueError, match="unknown search kind"):
-        search.search(w, "retry", kind="Task")
+        search_rank.search(w, "retry", kind="Task")
 
 
 def test_build_indexes_partitions_prose_from_tasks():
@@ -370,7 +371,7 @@ def test_build_indexes_partitions_prose_from_tasks():
         _doc("workbench", "wb1", body="retry"),
         _doc("task", "t1", body="retry"),
     )
-    prose, tasks = search.build_indexes(w)
+    prose, tasks = search_rank.build_indexes(w)
     assert len(prose) == 2
     assert len(tasks) == 1
 
@@ -378,7 +379,7 @@ def test_build_indexes_partitions_prose_from_tasks():
 # --- top_terms ---
 
 def test_top_terms_orders_by_contribution_and_caps():
-    idx = search.Index()
+    idx = search_index.Index()
     # "rare" appears in one doc, "common" in all four, so "rare" earns more.
     idx.add("d1", ["rare", "common", "filler"])
     for i in range(2, 5):
@@ -388,13 +389,13 @@ def test_top_terms_orders_by_contribution_and_caps():
 
 
 def test_top_terms_skips_terms_the_document_does_not_hold():
-    idx = search.Index()
+    idx = search_index.Index()
     idx.add("d1", ["alpha"])
     assert idx.top_terms(["alpha", "beta"], "d1", 5) == ["alpha"]
 
 
 def test_top_terms_on_an_unknown_key_is_empty():
-    assert search.Index().top_terms(["alpha"], "nope", 5) == []
+    assert search_index.Index().top_terms(["alpha"], "nope", 5) == []
 
 
 # --- the doc-as-query token list ---
@@ -402,7 +403,7 @@ def test_top_terms_on_an_unknown_key_is_empty():
 def test_query_tokens_cover_title_description_and_body_once_each():
     doc = _doc("knowledge", "n1", title="Retry Policy",
                description="backoff rules", body="retry retry backoff sync")
-    toks = search._query_tokens(doc)
+    toks = search_rank._query_tokens(doc)
     assert toks == ["retry", "policy", "backoff", "rules", "sync"]
 
 
@@ -410,7 +411,7 @@ def test_query_tokens_dedup_keeps_a_repeated_word_from_dominating():
     # Index.search scores a repeated query term once per occurrence, so the raw
     # token list would weight terms by their frequency in the *source* doc.
     doc = _doc("knowledge", "n1", title="", body="filler " * 40 + "mkstemp")
-    assert search._query_tokens(doc).count("filler") == 1
+    assert search_rank._query_tokens(doc).count("filler") == 1
 
 
 # --- related ---
@@ -423,7 +424,7 @@ def test_related_ranks_by_shared_vocabulary_and_names_the_terms():
     target = _doc("knowledge", "sync-conflicts", body="rebase conflict summary")
     near = _doc("knowledge", "rebase-notes", body="rebase conflict handling")
     far = _doc("knowledge", "colour-palette", body="teal magenta swatches")
-    res = search.related(_world(target, near, far), target.id)
+    res = search_rank.related(_world(target, near, far), target.id)
     assert [h.address for h in res.hits] == ["ws/knowledge/rebase-notes"]
     assert set(res.hits[0].terms) >= {"rebase", "conflict"}
 
@@ -435,7 +436,7 @@ def test_related_excludes_the_doc_itself_and_both_link_directions():
     free = _doc("knowledge", "d", body="rebase conflict summary")
     w = _world(target, out, back, free)
     w.edges = [_edge(target, out), _edge(back, target)]
-    assert [h.address for h in search.related(w, target.id).hits] == [
+    assert [h.address for h in search_rank.related(w, target.id).hits] == [
         "ws/knowledge/d"]
 
 
@@ -444,7 +445,7 @@ def test_related_ranks_only_the_targets_own_kind():
     wb = _doc("workbench", "wb1", body="rebase conflict summary")
     task = _doc("task", "t1", body="rebase conflict summary")
     peer = _doc("knowledge", "k-peer", body="rebase conflict summary")
-    res = search.related(_world(target, wb, task, peer), target.id)
+    res = search_rank.related(_world(target, wb, task, peer), target.id)
     assert [h.address for h in res.hits] == ["ws/knowledge/k-peer"]
 
 
@@ -453,10 +454,10 @@ def test_related_min_score_filters_before_truncation():
     strong = _doc("knowledge", "strong", body="alpha beta")
     weak = _doc("knowledge", "weak", body="alpha zeta eta theta iota kappa")
     w = _world(target, strong, weak)
-    unfiltered = search.related(w, target.id)
+    unfiltered = search_rank.related(w, target.id)
     assert unfiltered.total == 2
     cutoff = unfiltered.hits[0].score
-    filtered = search.related(w, target.id, min_score=cutoff)
+    filtered = search_rank.related(w, target.id, min_score=cutoff)
     # `total` counts what passed the threshold, not what merely matched, so the
     # "(+N more)" line never promises results --min-score already removed.
     assert filtered.total == 1
@@ -467,13 +468,13 @@ def test_related_caps_at_max_and_reports_the_remainder():
     target = _doc("knowledge", "t", body="alpha beta")
     w = _world(target, *[_doc("knowledge", f"c{i}", body="alpha beta")
                          for i in range(4)])
-    res = search.related(w, target.id, max=2)
+    res = search_rank.related(w, target.id, max=2)
     assert len(res.hits) == 2 and res.total == 4
 
 
 def test_related_on_a_doc_with_no_words_returns_nothing():
     target = _doc("knowledge", "empty", title="", body="")
-    res = search.related(_world(target, _doc("knowledge", "other", body="x")),
+    res = search_rank.related(_world(target, _doc("knowledge", "other", body="x")),
                          target.id)
     assert res.hits == [] and res.total == 0
 
@@ -482,14 +483,14 @@ def test_related_skips_archived_docs_unless_asked():
     target = _doc("knowledge", "t", body="rebase conflict summary")
     old = _doc("knowledge", "old", body="rebase conflict summary", archived=True)
     w = _world(target, old)
-    assert search.related(w, target.id).hits == []
-    assert search.related(w, target.id, include_archive=True).hits
+    assert search_rank.related(w, target.id).hits == []
+    assert search_rank.related(w, target.id, include_archive=True).hits
 
 
 def test_related_on_an_unknown_doc_raises():
     w = _world(_doc("knowledge", "k1", body="x"))
     with pytest.raises(ValueError, match="no such doc"):
-        search.related(w, DocId(kind="knowledge", workspace="ws", slug="nope"))
+        search_rank.related(w, DocId(kind="knowledge", workspace="ws", slug="nope"))
 
 
 def test_related_refuses_a_container_kind():
@@ -501,4 +502,4 @@ def test_related_refuses_a_container_kind():
                        frontmatter={}, rel_path=None),
               docs={sess.id.canonical(): sess})
     with pytest.raises(ValueError, match="cannot rank candidates"):
-        search.related(w, sess.id)
+        search_rank.related(w, sess.id)

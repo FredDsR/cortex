@@ -9,16 +9,16 @@ import sys
 
 from cortex import changelog
 from cortex import kb
-from cortex import ingest
 from cortex import query
-from cortex import search as search_mod
 from cortex import inject
 from cortex import migrate_store
 from cortex import sync
 from cortex.errors import CortexError
+from cortex.ingest import cli as ingest_cli
 from cortex.lint import checks as lint_checks
 from cortex.lint import cli as lint_cli
 from cortex.okf import cli as okf_cli
+from cortex.search import cli as search_cli
 from cortex.store import StoreError
 
 
@@ -197,14 +197,14 @@ _KB_DISPATCH = {
     "update": kb.cmd_update,
     "index": kb.cmd_index,
     "log": changelog.cmd_log,
-    "ingest": ingest.cmd_ingest,
+    "ingest": ingest_cli.cmd_ingest,
     "lint": lint_cli.cmd_lint,
 }
 
 _QUERY_DISPATCH = {
     "neighbors": query.cmd_neighbors,
-    "search": search_mod.cmd_search,
-    "related": search_mod.cmd_related,
+    "search": search_cli.cmd_search,
+    "related": search_cli.cmd_related,
 }
 
 _OKF_DISPATCH = {

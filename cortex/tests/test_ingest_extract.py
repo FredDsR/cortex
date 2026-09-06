@@ -1,4 +1,4 @@
-from cortex import ingest as ie
+from cortex.ingest import extract as ie
 
 
 def _by_slug(recs):
