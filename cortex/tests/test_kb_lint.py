@@ -2,7 +2,10 @@ import datetime
 
 import pytest
 
-from cortex import cli, lint
+from cortex import cli
+from cortex import parser
+from cortex.lint import checks as lint_checks
+from cortex.lint import fix as lint_fix
 
 
 TODAY = datetime.date.today().isoformat()
@@ -403,7 +406,7 @@ def test_details_are_sanitized_before_printing(home, capsys):
     ("no", None),                               # too short
 ])
 def test_classify(word, expected):
-    assert lint._classify(word) == expected
+    assert lint_checks._classify(word) == expected
 
 
 def test_replace_outside_fences_only_touches_reference_positions():
@@ -417,7 +420,7 @@ def test_replace_outside_fences_only_touches_reference_positions():
         "Related to: task-foo",               # fenced: an example
         "```",
     ])
-    new, n = lint._replace_outside_fences(text, [("task-foo", "s2/task-foo")])
+    new, n = lint_fix._replace_outside_fences(text, [("task-foo", "s2/task-foo")])
     assert n == 3
     assert new.split("\n") == [
         "related_to: [s2/task-foo, task-bar]",
@@ -440,6 +443,23 @@ def test_fix_does_not_rewrite_a_slug_used_as_prose(home, capsys):
     after = p.read_text()
     assert "See [knowledge/retry-policy]." in after
     assert "The retry-policy changed last week." in after
+
+
+def test_collect_runs_without_argparse_or_stdout(home, capsys):
+    """The pure half called directly: a parsed world in, findings out.
+
+    Every other test here goes through `cli.main` and reads stdout, because
+    before the split there was no other way in. This one is the check that the
+    seam stays open."""
+    _kb(home, "ws-a", "solo", "See [[knowledge/gone]].", typ="Gotcha", desc="d")
+    world = parser.parse_world(home / ".cortex/workspaces", include_archive=True)
+    found = lint_checks.collect(world, names={"ws-a"}, checks=("broken-ref",),
+                                repos={}, today=datetime.date.today(),
+                                stale_days=lint_checks.DEFAULT_STALE_DAYS,
+                                archived=False)
+    assert [(f.check, f.doc, f.detail) for f in found] == [
+        ("broken-ref", "ws-a/knowledge/solo", "knowledge/gone (no such doc)")]
+    assert capsys.readouterr().out == ""
 
 
 # ---- scope notes (#47) ----

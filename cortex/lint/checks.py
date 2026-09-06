@@ -1,22 +1,11 @@
-"""cortex kb lint: a health check over a workspace's docs.
+"""The deterministic half of `cortex kb lint`: a `World` in, findings out.
 
-Karpathy's llm-wiki names lint as a first-class operation alongside ingest and
-query. cortex had the other two. The gap this closes is that a knowledge base
-accumulates statements that were true when written and quietly stopped being
-true, and nothing noticed: this repo's README advertised `cortex viz --watch`
-long after the flag was deleted, and two archived tasks described symbols in a
-file that no longer existed.
-
-The split mirrors `cortex kb ingest`. Everything a machine can decide is a
-finding, printed one line per finding. Everything needing judgment goes to an
-agent worklist and is phrased as a candidate, never an assertion.
-
-Report-only unless `--fix`, which is deliberately narrow: it repairs a broken
-reference ONLY when the target it names exists elsewhere under an unambiguous
-address, so the edit changes an address and never a claim. It does not delete
-dangling links (a link to a doc nobody has written yet is authoring intent, and
-it is what the viz renders as a ghost node) and it does not touch `updated`
-(bumping it would erase the very signal the stale check reads).
+Every check here is a pure function of the docs it is handed, so adding a sixth
+one is a function plus a name in `CHECKS` plus a branch in `collect`, all in
+this file. The two names without a leading underscore that look like internals
+(`FENCE`, `MAX_*_BYTES`) are public because they cross a module boundary:
+`fix.py` skips the same fenced blocks the scanner does, and `cli.py` prints the
+budgets in the note that says the corpus had holes.
 """
 from __future__ import annotations
 import datetime
@@ -26,15 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cortex import address
-from cortex import atomic
 from cortex import kb
 from cortex import parser
-from cortex import store
-from cortex.errors import CortexError, UsageError
-from cortex.kb import _home, parse_max, sync_after
 from cortex.model import AUTHORED_EDGE_KINDS, Doc, World
 from cortex.query import LINKABLE_KINDS
-from cortex.sanitize import sanitize
 
 CHECKS = ("broken-ref", "dead-ref", "orphan", "stale", "missing-description", "okf")
 # The judgment half. Selectable by name like a check, but kept out of CHECKS
@@ -45,16 +29,10 @@ SELECTABLE = CHECKS + (WORKLIST,)
 KB_KINDS = ("knowledge", "workbench")
 DEFAULT_STALE_DAYS = 180
 
-# Boundary characters of an address token, used to bound the `--fix`
-# replacement so `task-foo` never matches inside `task-foobar`.
-_ADDR_CHAR = r"[A-Za-z0-9/_-]"
-_FENCE = re.compile(r"^\s*```")
-# The lines on which an unbracketed slug is a reference rather than a word:
-# the parser's own typed body labels, and the frontmatter relation keys. Kept in
-# the same order and spelling as cortex/parser.py's _BODY_REL_RE / _FM_KEY_TO_KIND.
-_REL_LINE = re.compile(
-    r"^\s*(?:Blocked by|Related to|Follows)\s*:|^(?:blocked_by|related_to|follows)\s*:",
-    re.IGNORECASE)
+# A fenced block delimiter. Shared with `fix.py`, which skips fences for the
+# same reason the scanner does: what is inside one is an example, not a
+# reference.
+FENCE = re.compile(r"^\s*```")
 
 
 @dataclass(frozen=True)
@@ -75,8 +53,8 @@ class Finding:
 _PRUNE = {".git", ".hg", ".svn", "node_modules", "__pycache__", ".venv", "venv",
           ".mypy_cache", ".pytest_cache", ".ruff_cache", ".worktrees", ".cortex",
           "dist", "build", "target", "vendor", ".next", ".tox", "coverage"}
-_MAX_FILE_BYTES = 1 << 20          # 1 MiB: past this it is data, not source
-_MAX_TOTAL_BYTES = 32 << 20        # 32 MiB of text read per repo, then paths only
+MAX_FILE_BYTES = 1 << 20          # 1 MiB: past this it is data, not source
+MAX_TOTAL_BYTES = 32 << 20        # 32 MiB of text read per repo, then paths only
 _TOKEN = re.compile(r"--[A-Za-z0-9][A-Za-z0-9-]*|[A-Za-z_][A-Za-z0-9_]*")
 
 
@@ -126,7 +104,7 @@ def index_repo(repo: Path) -> RepoIndex:
             f = here / fn
             idx.paths.add(f.relative_to(repo).as_posix())
             idx.basenames.add(fn)
-            if total >= _MAX_TOTAL_BYTES:
+            if total >= MAX_TOTAL_BYTES:
                 idx.partial = True
                 continue
             try:
@@ -135,7 +113,7 @@ def index_repo(repo: Path) -> RepoIndex:
                 continue
             if f.is_symlink():
                 continue                       # its target is indexed on its own
-            if size > _MAX_FILE_BYTES:
+            if size > MAX_FILE_BYTES:
                 idx.partial = True
                 continue
             try:
@@ -183,7 +161,7 @@ def _code_words(body: str):
     claimed to exist."""
     in_fence = False
     for line in body.splitlines():
-        if _FENCE.match(line):
+        if FENCE.match(line):
             in_fence = not in_fence
             continue
         if in_fence:
@@ -411,7 +389,7 @@ def _sig(text: str) -> set:
     return {w for w in _WORD.findall(text.lower()) if w not in _STOP}
 
 
-def _overlaps(docs: list) -> list:
+def overlaps(docs: list) -> list:
     """Candidate pairs for the contradiction / superseded reading. Same type,
     and titles-plus-descriptions that overlap past a threshold.
 
@@ -435,120 +413,7 @@ def _overlaps(docs: list) -> list:
     return sorted(rows)
 
 
-# ---- --fix ----
-
-def _replace_outside_fences(text: str, pairs) -> tuple[str, int]:
-    """Rewrite each `raw` as `fix` where the text is structurally a reference.
-
-    Two forms, and only two. Inside brackets anywhere (`[task-foo]`,
-    `[[knowledge/foo]]`), and bare on a line that is a relation: a body
-    `Related to:` / `Blocked by:` / `Follows:` line, or a frontmatter
-    `related_to:` / `blocked_by:` / `follows:` key, which is where the parser
-    reads a comma-separated list of unbracketed slugs.
-
-    Anchoring matters. A slug is also an ordinary noun phrase, so an
-    unrestricted bounded replacement rewrites prose: a doc holding both
-    `[retry-policy]` and the sentence "the retry-policy changed" would come
-    back saying "the knowledge/retry-policy changed". Rewriting an address is
-    the contract; rewriting a sentence is not."""
-    bracketed = [(re.compile(rf"\[{re.escape(raw)}\]"), fix) for raw, fix in pairs]
-    bare = [(re.compile(rf"(?<!{_ADDR_CHAR}){re.escape(raw)}(?!{_ADDR_CHAR})"), fix)
-            for raw, fix in pairs]
-    out, in_fence, total = [], False, 0
-    for line in text.split("\n"):
-        if _FENCE.match(line):
-            in_fence = not in_fence
-            out.append(line)
-            continue
-        if not in_fence:
-            for pat, fix in bracketed:
-                line, n = pat.subn(lambda _m, f=fix: f"[{f}]", line)
-                total += n
-            if _REL_LINE.match(line):
-                for pat, fix in bare:
-                    line, n = pat.subn(lambda _m, f=fix: f, line)
-                    total += n
-        out.append(line)
-    return "\n".join(out), total
-
-
-def apply_fixes(findings: list) -> tuple[list, list]:
-    """Rewrite repairable references in place. Returns (applied, files written).
-
-    The replacement lands on the authored forms and nowhere else: bracketed
-    anywhere, bare only on a relation line (see _replace_outside_fences).
-    Fenced blocks are skipped for the same reason the scanner skips them: what
-    is in one is an example, not a reference.
-
-    One reference at a time, so `applied` names the references that were really
-    rewritten. Grouping the whole file into a single pass would report a
-    reference as fixed on the strength of a sibling's replacement -- and with
-    `--strict` that turns a still-broken reference into exit 0."""
-    by_path: dict = {}
-    for f in findings:
-        if f.check == "broken-ref" and f.fix and f.path is not None:
-            by_path.setdefault(Path(f.path), []).append(f)
-    applied, written = [], []
-    for path, group in sorted(by_path.items()):
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as e:
-            raise CortexError(f"cannot read {path}: {e}")
-        new = text
-        done = []
-        for f in group:
-            new, n = _replace_outside_fences(new, [(f.raw, f.fix)])
-            if n:
-                done.append(f)
-        if not done or new == text:
-            continue
-        atomic.write_text(path, new, encoding="utf-8")
-        written.append(path)
-        applied.extend(done)
-    return applied, written
-
-
-# ---- orchestration ----
-
-def _parse_checks(raw: str) -> tuple:
-    if not raw:
-        return SELECTABLE
-    picked = {c.strip() for c in raw.split(",") if c.strip()}
-    bad = sorted(c for c in picked if c not in SELECTABLE)
-    if bad:
-        raise UsageError(f"--check: unknown {', '.join(bad)}; "
-                         f"choose from {', '.join(SELECTABLE)}")
-    return tuple(c for c in SELECTABLE if c in picked)
-
-
-def _scope(args) -> store.Scope:
-    """Thin adapter: unpack argparse and hand off to the shared resolver.
-    `cortex query search` and `cortex query related` need the identical scope,
-    so the logic lives in `store`, beside every other piece of workspace
-    resolution."""
-    return store.resolve_scope(args.workspace, home=_home(), cwd=Path.cwd())
-
-
-def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:
-    if explicit:
-        p = Path(explicit).expanduser()
-        if not p.is_dir():
-            raise CortexError(f"--repo path not found: {p}")
-        return p
-    recorded = store._meta_cwd(root / ws)
-    if recorded:
-        p = Path(recorded).expanduser()
-        if p.is_dir():
-            return p
-    # A repo-local store is `<repo>/.cortex`, so `_scope`'s root IS the repo it
-    # documents. Without this, `cortex kb lint` in a repo with a local store
-    # skips dead-ref and asks for a --repo that is the directory it is standing
-    # in. Guarded on the root as well as the name, since a global workspace may
-    # itself be called `.cortex` and its root is not anybody's repo.
-    if ws == ".cortex" and root.resolve() != (_home() / ".cortex" / "workspaces").resolve():
-        return root
-    return None
-
+# ---- the run ----
 
 def collect(world: World, *, names, checks, repos, today: datetime.date,
             stale_days: int, archived: bool, index_dirs=()) -> list:
@@ -590,112 +455,3 @@ def collect(world: World, *, names, checks, repos, today: datetime.date,
                 found.append(Finding("missing-description", canon, "no description: field"))
     order = {c: i for i, c in enumerate(CHECKS)}
     return sorted(found, key=lambda f: (order[f.check], f.doc, f.detail))
-
-
-def _print_rows(header: str, rows: list, max_n: int) -> None:
-    if not rows:
-        return
-    print(header)
-    for r in rows[:max_n]:
-        print(r)
-    if len(rows) > max_n:
-        print(f"... {len(rows) - max_n} more (raise --max)")
-    print()
-
-
-def _row(f: Finding) -> str:
-    # The doc id is a store path and stays byte-exact so it can be opened; the
-    # detail is doc content, which `kb ingest` may have extracted from a
-    # codebase nobody here wrote, so it is sanitized before it reaches an
-    # agent's terminal. Same split as ingest's worklist. See cortex/sanitize.py.
-    return f"{f.doc}  ->  {sanitize(f.detail)}"
-
-
-def cmd_lint(args) -> int:
-    if args.repo and args.workspace == "all":
-        raise UsageError("--repo cannot be combined with --workspace=all")
-    selected = _parse_checks(args.check)
-    checks = tuple(c for c in selected if c in CHECKS)
-    max_n = parse_max(args.max)
-    stale_days = parse_max(args.stale_days, "--stale-days")
-    root, names, scope_notes = _scope(args)
-
-    # Archives are always parsed, never always linted: a live task pointing at
-    # an archived one is a resolved reference, and leaving archives out would
-    # report every such link as broken. `--archive` decides what gets checked,
-    # not what exists.
-    world = parser.parse_world(root, include_archive=True)
-
-    # Scope notes lead: what the run covered frames every row under it.
-    notes, repos = list(scope_notes), {}
-    if "dead-ref" in checks:
-        for ws in names:
-            repo = _repo_for(root, ws, args.repo)
-            if repo is None:
-                notes.append(f"dead-ref skipped for {ws}: no repo "
-                             f"(pass --repo, or set cwd: in the workspace .meta)")
-            else:
-                repos[ws] = index_repo(repo)
-                if repos[ws].partial:
-                    notes.append(f"dead-ref read only part of {repo.name}'s text "
-                                 f"(files over {_MAX_FILE_BYTES >> 20} MiB, or past "
-                                 f"{_MAX_TOTAL_BYTES >> 20} MiB total): a symbol or "
-                                 f"flag living only in a skipped file reads as dead")
-
-    # The derived indexes this run covers: one per workspace, plus the root
-    # brain index under `all`, which belongs to no workspace and would
-    # otherwise never be checked -- a leftover root `INDEX.md` staying
-    # invisible is the same stale artefact the per-workspace check exists for.
-    index_dirs = [(root / ws / "knowledge", ws) for ws in sorted(names)]
-    if args.workspace == "all":
-        index_dirs.append((_home() / ".cortex" / "knowledge", "~/.cortex"))
-
-    findings = collect(world, names=names, checks=checks, repos=repos,
-                       today=datetime.date.today(), stale_days=stale_days,
-                       archived=args.archive, index_dirs=index_dirs)
-
-    fixed, written = [], []
-    if args.fix:
-        fixed, written = apply_fixes(findings)
-        done = {id(f) for f in fixed}
-        findings = [f for f in findings if id(f) not in done]
-
-    for check in checks:
-        _print_rows(f"## {check}",
-                    [_row(f) for f in findings if f.check == check], max_n)
-    _print_rows("## fixed (addresses rewritten; no claim changed)",
-                [_row(f) for f in fixed], max_n)
-
-    pairs = _overlaps([world.docs[c] for c in sorted(world.docs)
-                       if world.docs[c].id.kind == "knowledge"
-                       and world.docs[c].id.workspace in names
-                       and (args.archive or not world.docs[c].archived)]
-                      ) if WORKLIST in selected else []
-    if pairs:
-        print("## agent worklist (needs judgment)")
-        print("# Candidate pairs only. Same type and overlapping summaries is"
-              " what a contradiction or a superseded claim looks like from the"
-              " outside; it is also what two legitimately distinct notes look"
-              " like. Read them before concluding anything.")
-        for row in pairs[:max_n]:
-            print(sanitize(row))
-        if len(pairs) > max_n:
-            print(f"... {len(pairs) - max_n} more (raise --max)")
-        print()
-
-    _print_rows("## notes", notes, max_n)
-
-    print("## summary")
-    if findings:
-        tally = ", ".join(f"{c} {sum(1 for f in findings if f.check == c)}"
-                          for c in checks if any(f.check == c for f in findings))
-        n = len(findings)
-        print(f"{n} finding{'' if n == 1 else 's'}: {tally}")
-    else:
-        print("no findings")
-    if written:
-        print(f"fixed {len(fixed)} reference{'' if len(fixed) == 1 else 's'} "
-              f"in {len(written)} doc{'' if len(written) == 1 else 's'}")
-        sync_after("lint", "refs", f"{len(written)} docs")
-
-    return 1 if (args.strict and findings) else 0
