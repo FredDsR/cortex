@@ -411,3 +411,38 @@ def test_root_index_description_placeholder_matches_cli(workspaces_root, tmp_pat
     build(world, out)
     root_idx = (out / "index.md").read_text()
     assert "[by-agent (authored-ws)](workspaces/authored-ws/knowledge/by-agent.md) - (no description)" in root_idx
+
+
+def test_payload_survives_a_closing_script_tag_in_a_doc(workspaces_root, tmp_path):
+    """A doc whose frontmatter mentions `</script>` must not close the payload
+    element early. The browser parses that blob with JSON.parse, so a truncated
+    one renders an empty page rather than raising anything visible."""
+    hostile = "never inline </script> raw"
+    (workspaces_root / "demo-ws" / "knowledge" / "html-note.md").write_text(
+        f'---\ntype: Gotcha\ndescription: "{hostile}"\nupdated: 2026-09-06\n---\n\n'
+        "# HTML note\n\nBody.\n")
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+
+    page = (out / "index.html").read_text()
+    blob = page.split('type="application/json">')[1].split("</script>")[0]
+    payload = json.loads(blob)  # would raise on a truncated blob
+
+    node = next(n for n in payload["nodes"]
+                if n["id"] == "demo-ws/knowledge/html-note")
+    assert node["description"] == hostile
+
+
+def test_shell_escapes_title_and_subtitle(workspaces_root, tmp_path):
+    """Workspace and session names come from directory names, which nothing
+    validates, so they reach the shell as untrusted text."""
+    import shutil
+    ws = workspaces_root / "demo-ws"
+    hostile_ws = workspaces_root / "ws-<b>-name"
+    shutil.copytree(ws, hostile_ws)
+    out = tmp_path / "out"
+    build(parse_world(workspaces_root), out)
+
+    page = (out / "workspaces" / "ws-<b>-name" / "index.html").read_text()
+    assert "<title>ws-&lt;b&gt;-name</title>" in page
+    assert "<b>" not in page.split("</head>")[1].split("<script")[0]

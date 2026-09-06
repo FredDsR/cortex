@@ -8,6 +8,7 @@ live refresh `viz serve --edit` performs on save.
 from __future__ import annotations
 import json
 import re
+from html import escape
 from pathlib import Path
 
 from cortex.model import World, Doc, DocId, Edge
@@ -216,20 +217,23 @@ def build_payload(world: World, scope: str, scope_id: str) -> dict:
 
 # ---- html shells ----
 
-def _render_shell(scope: str, scope_id: str, payload: dict, vendor_rel: str,
+def _render_shell(payload: dict, vendor_rel: str,
                   title: str, title_line: str, subtitle_line: str) -> str:
-    blob = json.dumps(payload, ensure_ascii=False)
+    # The payload is inlined in a <script> element, so every "<" has to leave as
+    # a \u003c escape. Without it a doc whose title or description mentions
+    # "</script>" closes the element early and the page renders nothing.
+    blob = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
     html = _SHELL_TEMPLATE
-    html = html.replace("__TITLE__", title)
-    html = html.replace("__TITLE_LINE__", title_line)
-    html = html.replace("__SUBTITLE_LINE__", subtitle_line)
+    html = html.replace("__TITLE__", escape(title))
+    html = html.replace("__TITLE_LINE__", escape(title_line))
+    html = html.replace("__SUBTITLE_LINE__", escape(subtitle_line))
     html = html.replace("__VENDOR__", vendor_rel)
     html = html.replace("__ROOT_HREF__", payload.get("rootHref", "index.html"))
     html = html.replace("__SCOPE_JSON__", blob)
     return html
 
 
-def _vendor_rel(scope: str, scope_id: str) -> str:
+def _vendor_rel(scope: str) -> str:
     if scope == "root":
         return "vendor"
     if scope == "workspace":
@@ -240,7 +244,7 @@ def _vendor_rel(scope: str, scope_id: str) -> str:
 def emit_html_pages(world: World, out_dir: Path) -> None:
     payload = build_payload(world, "root", "/")
     write_out(out_dir / "index.html",
-               _render_shell("root", "/", payload, _vendor_rel("root", "/"),
+               _render_shell(payload, _vendor_rel("root"),
                              "Your Cortex",
                              title_line="Your Cortex",
                              subtitle_line="all workspaces"))
@@ -250,8 +254,7 @@ def emit_html_pages(world: World, out_dir: Path) -> None:
         payload = build_payload(world, "workspace", ws_scope_id)
         ws_html = out_dir / "workspaces" / ws.id.workspace / "index.html"
         write_out(ws_html,
-                   _render_shell("workspace", ws_scope_id, payload,
-                                 _vendor_rel("workspace", ws_scope_id),
+                   _render_shell(payload, _vendor_rel("workspace"),
                                  ws.id.workspace,
                                  title_line=ws.id.workspace,
                                  subtitle_line="workspace"))
@@ -261,8 +264,7 @@ def emit_html_pages(world: World, out_dir: Path) -> None:
             sess_html = ws_html.parent / "sessions" / sess.id.session / "index.html"
             write_out(
                 sess_html,
-                _render_shell("session", sess_scope_id, payload,
-                              _vendor_rel("session", sess_scope_id),
+                _render_shell(payload, _vendor_rel("session"),
                               f"{sess.id.session} - {ws.id.workspace}",
                               title_line=sess.id.session,
                               subtitle_line=f"session in workspace {ws.id.workspace}"))
