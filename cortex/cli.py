@@ -1,5 +1,5 @@
 """cortex CLI: `cortex kb {new,update,index,log,ingest,lint}` (+ viz/query/inject/sync).
-`cortex query {neighbors,search,related}`.
+`cortex query {neighbors,search,related}`. `cortex okf {export,import}`.
 
 Invoked as `python -m cortex.cli <group> <cmd> ...` by the cortex dispatcher.
 """
@@ -18,6 +18,7 @@ from cortex import sync
 from cortex.errors import CortexError
 from cortex.lint import checks as lint_checks
 from cortex.lint import cli as lint_cli
+from cortex.okf import cli as okf_cli
 from cortex.store import StoreError
 
 
@@ -115,6 +116,19 @@ def build_parser() -> argparse.ArgumentParser:
     rl.add_argument("--min-score", dest="min_score", default="0")
     rl.add_argument("--archive", action="store_true")
 
+    op = groups.add_parser("okf", help="Exchange OKF bundles (export, import)")
+    ocmds = op.add_subparsers(dest="cmd", required=True)
+
+    ex = ocmds.add_parser("export", help="Write a workspace's knowledge/ as an OKF bundle")
+    ex.add_argument("--workspace", default="")
+    ex.add_argument("--out", required=True)
+    ex.add_argument("--since", default="")            # windows the §9 log, as on kb log
+
+    im = ocmds.add_parser("import", help="Read an OKF bundle into a workspace (dry run)")
+    im.add_argument("bundle")
+    im.add_argument("--workspace", default="")
+    im.add_argument("--write", action="store_true")
+
     ip = groups.add_parser("inject", help="Opt-in session-start injection")
     icmds = ip.add_subparsers(dest="cmd", required=True)
 
@@ -162,7 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
 _VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
                 "--description", "--body", "--body-from", "--from", "--only", "--max",
                 "--format", "--wire-hook", "--unwire-hook", "--repo", "--check",
-                "--stale-days", "--kind", "--min-score", "--since"}
+                "--stale-days", "--kind", "--min-score", "--since", "--out"}
 
 
 def _glue_flag_values(argv):
@@ -193,6 +207,11 @@ _QUERY_DISPATCH = {
     "related": search_mod.cmd_related,
 }
 
+_OKF_DISPATCH = {
+    "export": okf_cli.cmd_export,
+    "import": okf_cli.cmd_import,
+}
+
 _INJECT_DISPATCH = {
     "here": inject.cmd_here,
     "enable": inject.cmd_enable,
@@ -209,6 +228,7 @@ _SYNC_DISPATCH = {
 
 _GROUP_DISPATCH = {
     "kb": _KB_DISPATCH,
+    "okf": _OKF_DISPATCH,
     "query": _QUERY_DISPATCH,
     "inject": _INJECT_DISPATCH,
     "sync": _SYNC_DISPATCH,

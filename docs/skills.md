@@ -190,7 +190,12 @@ Every write checkpoint ends with the same `cortex sync push` call.
 a durable note, filling in a `[[knowledge/...]]` ghost link, or recording spec
 and plan output.
 
-**`cortex kb ingest` and `cortex-migration` are unrelated**, despite both
-sounding like they move things. `ingest` reads a codebase and writes knowledge
-into a workspace. `migration` moves a session between stores. Different verbs,
-opposite directions, different data.
+**`cortex kb ingest`, `cortex okf import`, and `cortex-migration` are
+unrelated**, despite all three sounding like they move things. `ingest` reads a
+codebase and writes knowledge into a workspace. `okf import` reads somebody
+else's knowledge base, translating its links into cortex's grammar on the way
+in; `okf export` is its inverse, and the only way the store's `[[wikilinks]]`
+reach a consumer as edges rather than prose. `migration` moves a session between
+stores. Different verbs, different sources, different data. A bundle handed to
+`okf import` is untrusted input, and is sanitized on the way in for the same
+reason `ingest` sanitizes what it scrapes.

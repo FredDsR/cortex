@@ -52,6 +52,22 @@ HOME="$home" "$bindir/cortex" kb index --workspace ws-a --write >/dev/null
 grep -q 'log.md' "$home/.cortex/workspaces/ws-a/knowledge/index.md" \
     && fail "reserved log.md leaked into the index"
 
+# okf routing: export derives a bundle, import reads one back, dry run by default
+bundle="$home/bundle"
+HOME="$home" "$bindir/cortex" okf export --workspace ws-a --out "$bundle" >/dev/null \
+    || fail "cortex okf export nonzero"
+{ [ -f "$bundle/index.md" ] && [ -f "$bundle/log.md" ]; } \
+    || fail "okf export derived no index.md/log.md"
+grep -q '^okf_version: ' "$bundle/index.md" || fail "exported index declares no okf_version"
+mkdir -p "$home/.cortex/workspaces/ws-b"
+iout="$(HOME="$home" "$bindir/cortex" okf import "$bundle" --workspace ws-b 2>&1)" \
+    || fail "cortex okf import nonzero"
+printf '%s\n' "$iout" | grep -q "would create" || fail "okf import is not a dry run by default"
+[ ! -d "$home/.cortex/workspaces/ws-b/knowledge" ] || fail "okf import dry run wrote files"
+HOME="$home" "$bindir/cortex" okf import "$bundle" --workspace ws-b --write >/dev/null \
+    || fail "cortex okf import --write nonzero"
+[ -f "$home/.cortex/workspaces/ws-b/knowledge/foo.md" ] || fail "okf import --write wrote no doc"
+
 # viz routing: --help exits 0 and mentions build
 vout="$(HOME="$home" "$bindir/cortex" viz --help 2>&1)" || fail "cortex viz --help nonzero"
 printf '%s\n' "$vout" | grep -qi "build" || fail "cortex viz --help not routed to the viz engine"
@@ -73,8 +89,9 @@ set +e; HOME="$home" "$bindir/cortex" kb lint --workspace ws-a --check orphan --
 # top-level help lists all groups, exit 0
 hout="$(HOME="$home" "$bindir/cortex" --help 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] || fail "cortex --help exit $rc"
-printf '%s\n' "$hout" | grep -q "kb" && printf '%s\n' "$hout" | grep -q "viz" \
-    && printf '%s\n' "$hout" | grep -q "query" || fail "help missing groups"
+for g in kb okf viz query inject sync migrate-store; do
+    printf '%s\n' "$hout" | grep -q "cortex $g" || fail "help missing group $g"
+done
 
 # unknown group exits 2
 set +e; HOME="$home" "$bindir/cortex" bogus >/dev/null 2>&1; rc=$?; set -e

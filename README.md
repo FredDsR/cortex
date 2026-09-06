@@ -6,7 +6,7 @@
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Antigravity.
 
-One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author knowledge, and derive its index and change log), `cortex viz` (visualize), `cortex query` (`neighbors` to explore a doc's links, `search` for BM25 keyword search, `related` for link candidates), `cortex inject` (opt-in session-start injection), `cortex sync` (cross-device sync of the store), and `cortex migrate-store` (move a legacy `~/.work` store to `~/.cortex`). Every verb runs through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired.
+One CLI fronts the whole family: **`cortex`**. Its verbs are `cortex kb` (author knowledge, and derive its index and change log), `cortex okf` (`export` and `import` OKF bundles), `cortex viz` (visualize), `cortex query` (`neighbors` to explore a doc's links, `search` for BM25 keyword search, `related` for link candidates), `cortex inject` (opt-in session-start injection), `cortex sync` (cross-device sync of the store), and `cortex migrate-store` (move a legacy `~/.work` store to `~/.cortex`). Every verb runs through one self-contained `cortex` Python package (`cortex/`); the former per-skill bash/Python CLIs have been retired.
 
 ## Compared to Karpathy's LLM Wiki
 
@@ -33,6 +33,7 @@ to find out what exists. Where the two differ is instructive in both directions.
 | Lint | A named operation: contradictions, stale claims, orphans | `cortex kb lint`: six deterministic checks, plus a worklist for the judgment calls |
 | Scope | Knowledge only | Knowledge plus work tracking: sessions, tasks, blockers |
 | Format | Ad hoc | A conformant [Open Knowledge Format][okf] v0.2 bundle: required `type`, §8 `index.md` |
+| Portability | The wiki is the format | `cortex okf export` / `import`: the store keeps one link grammar, and the translation happens once, at the boundary |
 
 **Where cortex is stronger.** Deterministic extraction means an OpenAPI schema
 is transcribed rather than paraphrased, which matters because the failure mode
@@ -51,7 +52,10 @@ the git history `cortex sync` already writes, so there is nothing to keep
 current by hand. While the store has a `.git`, that derived file is strictly
 worse than `git log --follow`, which also gives diffs and authorship. It earns
 its keep at the export boundary: an OKF bundle has no `.git`, and §9 `log.md` is
-the only portable form the history can take.
+the only portable form the history can take. `cortex okf export` is the consumer
+that makes that concrete, and it is also where the `[[wikilinks]]` row above
+resolves: the store keeps one link grammar, and the translation into markdown
+links happens once, on the way out, rather than continuously, in every doc.
 
 The rest of this README is how that works in practice: the dashboard, the
 concepts, the CLI, and the ingest path the table above compares.
@@ -147,7 +151,8 @@ one call with a bounded response.
 
 | Verb | Does |
 |------|------|
-| `cortex kb` | Author and audit knowledge / workbench docs (`new`, `update`, `index`, `ingest`, `lint`) |
+| `cortex kb` | Author and audit knowledge / workbench docs (`new`, `update`, `index`, `log`, `ingest`, `lint`) |
+| `cortex okf` | Exchange [OKF][okf] bundles with other tools (`export`, `import`) |
 | `cortex viz` | Build and serve the dashboard (`build`, `serve`) |
 | `cortex query` | Explore a doc's links and backlinks (`neighbors`), search its content (`search`), rank the links it is missing (`related`) |
 | `cortex inject` | Opt-in session-start injection (`enable`, `disable`, `status`, `here`) |
@@ -227,6 +232,16 @@ Beyond sessions and tasks, a workspace can hold durable notes. `cortex-kb`
   assert. Report-only by default; `--strict` exits 1 for CI, and `--fix` is
   narrow on purpose: it repairs a reference whose target exists under a
   different unambiguous address, and touches nothing else.
+- **`cortex okf export` / `cortex okf import`.** The bundle boundary. Export
+  writes a workspace's `knowledge/` as a self-contained [OKF][okf] bundle,
+  rewriting `[[wikilinks]]` into markdown links so a consumer sees the edges and
+  not only the concepts, leaving unresolved references as plain text rather than
+  as broken links, and validating its own output against §11 before reporting
+  success. Import is the way in that `kb ingest` never was: it reads somebody
+  else's bundle, translates the links back, carries unknown frontmatter through,
+  never overwrites, and is a dry run until `--write`. A bundle is untrusted
+  input, so every string it yields is sanitized before it can reach the
+  injection block.
 - **`cortex query related <slug>`.** The other half of the `orphan` check.
   `lint` can say a doc has nothing linking to it; it cannot say what should.
   `related` runs the same BM25 ranking as `search` with the document itself as

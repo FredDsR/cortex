@@ -2,10 +2,13 @@
 
 Every check here is a pure function of the docs it is handed, so adding a sixth
 one is a function plus a name in `CHECKS` plus a branch in `collect`, all in
-this file. The two names without a leading underscore that look like internals
-(`FENCE`, `MAX_*_BYTES`) are public because they cross a module boundary:
-`fix.py` skips the same fenced blocks the scanner does, and `cli.py` prints the
-budgets in the note that says the corpus had holes.
+this file. The three names without a leading underscore that look like
+internals (`FENCE`, `MAX_*_BYTES`, `OKF_ENTRY`) are public because they cross a
+module boundary: `fix.py` skips the same fenced blocks the scanner does,
+`cli.py` prints the budgets in the note that says the corpus had holes, and
+`okf.bundle` validates an exported index against the same §8 entry grammar this
+check reads a derived one with -- one definition, so a bundle cortex writes and
+a bundle cortex lints can only ever agree.
 """
 from __future__ import annotations
 import datetime
@@ -319,7 +322,7 @@ def _stale(doc: Doc, today: datetime.date, days: int) -> list:
 # bracket (escaped by `kb._md_escape`, or literal in an index derived before
 # that) still ends its link at the last `](`, and reading such a line as a hand
 # edit would flag a freshly derived index that nothing can fix.
-_OKF_ENTRY = re.compile(r"^\* \[.+\]\([^)]+\)")
+OKF_ENTRY = re.compile(r"^\* \[.+\]\([^)]+\)")
 
 
 def _okf_doc(doc: Doc) -> list:
@@ -366,7 +369,7 @@ def _okf_index(kdir: Path, label: str) -> list:
     for n, line in enumerate(text.split("\n"), 1):
         stripped = line.strip()
         if (not stripped or stripped.startswith(("#", "<!--", "..."))
-                or _OKF_ENTRY.match(stripped)):
+                or OKF_ENTRY.match(stripped)):
             continue
         out.append(Finding("okf", doc, f"{kb.INDEX_NAME}:{n} is not a §8 entry "
                                        f"(`* [Title](url) - description`); "
