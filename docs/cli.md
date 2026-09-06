@@ -46,7 +46,7 @@ agent cannot silently clobber a note it meant to create.
 | `--session <sess>` | active session pointer | Workbench only |
 | `--author human\|agent` | `agent` | Becomes `human` if `--open` is passed without `--author` |
 | `--title <text>` | unset | Frontmatter title |
-| `--type <text>` | unset | Frontmatter type, e.g. `Gotcha`, `Decision`, `Reference` |
+| `--type <text>` | unset | Frontmatter type, e.g. `Gotcha`, `Decision`, `Reference`. **Required on `new knowledge`**: OKF v0.2 §11 makes it the one mandatory field. Optional on `workbench`, which is never exported |
 | `--description <text>` | unset | One-line summary; this is what the index shows |
 | `--body <text>` | empty | Inline body |
 | `--body-from <file\|->` | unset | Read body from a file, or `-` for stdin |
@@ -59,11 +59,26 @@ echo "Auth tokens expire after 15m, not 60m as the docs claim." |
     --type Gotcha --description "Token TTL is 15m despite the docs"
 
 # open one in your editor instead
-cortex kb new knowledge api-design --open
+cortex kb new knowledge api-design --type Design --open
 ```
 
-**`index`** regenerates `INDEX.md` from the entries present. It is a dry run
-until you pass `--write`.
+**`index`** regenerates the knowledge index from the entries present. It is a
+dry run until you pass `--write`.
+
+Stdout and the file are two renderings of the same rows. Stdout is the flat
+`<slug> [<type>] - <description>` listing an agent reads, and the shape
+`cortex inject` emits. `--write` derives `knowledge/index.md` in [Open
+Knowledge Format][okf] §8 form instead: `## <type>` group headings over
+`* [Title](slug.md) - description` entries, which is what a bundle consumer
+parses. `--workspace=all --write` derives `~/.cortex/knowledge/index.md` the
+same way, with URLs relative to that file.
+
+The file is lowercase `index.md` because §8 reserves that name. A `--write`
+over a store that predates this retires the old `INDEX.md` in the same commit,
+so a `cortex sync pull` on a second device cannot resurrect it beside the new
+one.
+
+[okf]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
 
 **`ingest`** reads a source (a codebase, an OpenAPI spec, SQL schemas) and
 writes knowledge entries into a workspace. Also dry-run by default; `--only`
@@ -74,7 +89,7 @@ knowledge base collects statements that were true when written and quietly
 stopped being true, and neither the index nor the graph notices. Report-only
 unless you pass `--fix`.
 
-Five deterministic checks, one line per finding, grouped under a `## <check>`
+Six deterministic checks, one line per finding, grouped under a `## <check>`
 header:
 
 | Check | Fires when |
@@ -84,6 +99,7 @@ header:
 | `orphan` | A knowledge doc has no authored backlink (`contains` does not count) |
 | `stale` | `updated` is older than `--stale-days` (default 180), missing, or unparseable |
 | `missing-description` | No `description:`, which is the field the index and graph display |
+| `okf` | A knowledge doc has no `type:` (OKF §11), or the derived index is not §8: a leftover `INDEX.md`, or an `index.md` with a hand-edited line |
 
 Then an `## agent worklist (needs judgment)` section, in the same spirit as
 `ingest`'s: pairs of same-typed docs whose summaries overlap enough to be worth
@@ -96,7 +112,7 @@ it is not a check: its pairs never count toward the tally and never affect
 |------|---------|-------|
 | `--workspace <ws>\|all` | active session pointer | `all` lints every workspace in the global store, and says so when that leaves out a repo-local one |
 | `--repo <path>` | the `cwd:` in the workspace `.meta`, or the repo itself for a repo-local store | What `dead-ref` checks against; the check is skipped with a note when none resolves |
-| `--check <c,...>` | everything | Comma-separated subset of the five checks plus `overlap` (the worklist) |
+| `--check <c,...>` | everything | Comma-separated subset of the six checks plus `overlap` (the worklist) |
 | `--stale-days <n>` | `180` | Age past which `updated` counts as stale |
 | `--max <n>` | `50` | Per-section cap, with a `... K more` notice |
 | `--archive` | off | Also lint archived sessions. Archives are always *resolved* against, so a link into one is never reported broken |
@@ -108,7 +124,14 @@ cortex kb lint                                   # everything, current workspace
 cortex kb lint --check broken-ref,orphan         # just the graph checks
 cortex kb lint --check broken-ref --fix          # repair mistyped addresses
 cortex kb lint --strict                          # gate a commit or a CI job
+cortex kb lint --check okf                       # OKF conformance only
 ```
+
+The `okf` rows double as the backfill worklist for a store written before
+`type` was required: each names the doc's title and description, which is what
+you need to choose a value. Fix one with `cortex kb update knowledge <slug>
+--type <T>`. It is deliberately not a `--fix`, because a migration that guesses
+a type makes the store conformant and the field meaningless.
 
 **What `--fix` deliberately will not do.** It rewrites a reference only when
 the slug it names belongs to exactly one doc in the store, so the edit changes

@@ -4,49 +4,49 @@ from cortex import cli
 
 
 def test_invalid_slug_exit_1(kbhome):
-    assert cli.main(["kb", "new", "knowledge", "BAD_Slug", "--body", "x"]) == 1
+    assert cli.main(["kb", "new", "knowledge", "BAD_Slug", "--type", "Reference", "--body", "x"]) == 1
 
 
 def test_already_exists_exit_1(kbhome):
-    assert cli.main(["kb", "new", "knowledge", "dup", "--body", "first"]) == 0
-    assert cli.main(["kb", "new", "knowledge", "dup", "--body", "second"]) == 1
+    assert cli.main(["kb", "new", "knowledge", "dup", "--type", "Reference", "--body", "first"]) == 0
+    assert cli.main(["kb", "new", "knowledge", "dup", "--type", "Reference", "--body", "second"]) == 1
 
 
 def test_no_active_no_workspace_exit_1(tmp_path, monkeypatch):
     (tmp_path / ".cortex/workspaces/ws-orphan/knowledge").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert cli.main(["kb", "new", "knowledge", "foo", "--body", "x"]) == 1
+    assert cli.main(["kb", "new", "knowledge", "foo", "--type", "Reference", "--body", "x"]) == 1
 
 
 def test_multiple_active_workspaces_exit_1(kbhome):
     wsb = kbhome / ".cortex/workspaces/ws-b/sessions/sess-b"
     wsb.mkdir(parents=True)
     (kbhome / ".cortex/workspaces/ws-b/.active.testid2").write_text("sess-b\n")
-    assert cli.main(["kb", "new", "knowledge", "foo", "--body", "x"]) == 1
+    assert cli.main(["kb", "new", "knowledge", "foo", "--type", "Reference", "--body", "x"]) == 1
 
 
 def test_author_human(kbhome):
-    cli.main(["kb", "new", "knowledge", "human-entry", "--author", "human", "--body", "x"])
+    cli.main(["kb", "new", "knowledge", "human-entry", "--type", "Reference", "--author", "human", "--body", "x"])
     assert "author: human" in (
         kbhome / ".cortex/workspaces/ws-a/knowledge/human-entry.md").read_text()
 
 
 def test_body_from_stdin(kbhome, monkeypatch):
     monkeypatch.setattr(sys, "stdin", io.StringIO("piped body"))
-    cli.main(["kb", "new", "knowledge", "piped", "--body-from", "-"])
+    cli.main(["kb", "new", "knowledge", "piped", "--type", "Reference", "--body-from", "-"])
     assert "piped body" in (
         kbhome / ".cortex/workspaces/ws-a/knowledge/piped.md").read_text()
 
 
 def test_explicit_workspace_override(kbhome):
     (kbhome / ".cortex/workspaces/ws-c/knowledge").mkdir(parents=True)
-    cli.main(["kb", "new", "knowledge", "cross", "--workspace", "ws-c", "--body", "x"])
+    cli.main(["kb", "new", "knowledge", "cross", "--type", "Reference", "--workspace", "ws-c", "--body", "x"])
     assert (kbhome / ".cortex/workspaces/ws-c/knowledge/cross.md").is_file()
 
 
 def test_open_defaults_author_human(kbhome, monkeypatch):
     monkeypatch.setenv("EDITOR", "true")
-    rc = cli.main(["kb", "new", "knowledge", "editable", "--body", "x", "--open"])
+    rc = cli.main(["kb", "new", "knowledge", "editable", "--type", "Reference", "--body", "x", "--open"])
     assert rc == 0
     assert "author: human" in (
         kbhome / ".cortex/workspaces/ws-a/knowledge/editable.md").read_text()
@@ -65,12 +65,12 @@ def test_workbench_no_active_no_session_exit_1(tmp_path, monkeypatch):
 
 
 def test_bad_flag_exit_2(kbhome):
-    assert cli.main(["kb", "new", "knowledge", "x", "--bogus"]) == 2
+    assert cli.main(["kb", "new", "knowledge", "x", "--type", "Reference", "--bogus"]) == 2
 
 
 def test_body_from_missing_file_clean_error(kbhome, capsys):
     # Was: uncaught traceback. Now: clean CortexError -> exit 1.
-    rc = cli.main(["kb", "new", "knowledge", "x", "--body-from", "/no/such/file"])
+    rc = cli.main(["kb", "new", "knowledge", "x", "--type", "Reference", "--body-from", "/no/such/file"])
     assert rc == 1
     assert "Traceback" not in capsys.readouterr().err
 
@@ -80,7 +80,7 @@ def test_max_non_numeric_exit_1(kbhome):
 
 
 def test_dash_leading_flag_value_accepted(kbhome):
-    rc = cli.main(["kb", "new", "knowledge", "changelog",
+    rc = cli.main(["kb", "new", "knowledge", "changelog", "--type", "Reference",
                    "--description", "-> migration notes", "--body", "b"])
     assert rc == 0
     assert "-> migration notes" in (
@@ -89,7 +89,7 @@ def test_dash_leading_flag_value_accepted(kbhome):
 
 def test_open_missing_editor_clean_error(kbhome, monkeypatch, capsys):
     monkeypatch.setenv("EDITOR", "definitely-not-a-real-editor-xyz")
-    rc = cli.main(["kb", "new", "knowledge", "ed", "--body", "x", "--open"])
+    rc = cli.main(["kb", "new", "knowledge", "ed", "--type", "Reference", "--body", "x", "--open"])
     assert rc == 1
     assert "Traceback" not in capsys.readouterr().err
     assert (kbhome / ".cortex/workspaces/ws-a/knowledge/ed.md").is_file()  # written before open

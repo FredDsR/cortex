@@ -27,7 +27,7 @@ cortex kb update knowledge api-versioning
 
 # Compact, pull-based table of contents of what already exists.
 cortex kb index                 # stdout
-cortex kb index --write         # (re)generate derived knowledge/INDEX.md
+cortex kb index --write         # (re)generate derived knowledge/index.md (OKF section 8)
 
 # Search the content, not just the descriptions. Run this BEFORE `kb new`:
 # it is the cheapest way to avoid a second doc about something already covered.

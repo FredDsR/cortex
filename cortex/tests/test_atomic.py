@@ -299,13 +299,13 @@ def test_kb_index_does_not_leave_a_partial_index(kbhome, monkeypatch):
     kb.cmd_new(_kb_new_args(workspace="ws-a", slug="probe"))
     kdir = kbhome / ".cortex" / "workspaces" / "ws-a" / "knowledge"
     kb.cmd_index(_kb_index_args(workspace="ws-a"))
-    before = (kdir / "INDEX.md").read_text(encoding="utf-8")
+    before = (kdir / "index.md").read_text(encoding="utf-8")
 
     monkeypatch.setattr(atomic.os, "replace",
                         lambda s, d: (_ for _ in ()).throw(KeyboardInterrupt))
     with pytest.raises(KeyboardInterrupt):
         kb.cmd_index(_kb_index_args(workspace="ws-a"))
-    assert (kdir / "INDEX.md").read_text(encoding="utf-8") == before
+    assert (kdir / "index.md").read_text(encoding="utf-8") == before
     assert _tmp_leftovers(kdir) == []
 
 
