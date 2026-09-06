@@ -104,6 +104,31 @@ def test_a_bundles_own_dates_win_over_generated_and_over_today(kbhome, tmp_path,
     assert "created: 2025-01-01" in text and "updated: 2025-06-06" in text
 
 
+def test_a_concept_with_no_frontmatter_keeps_its_body(kbhome, tmp_path, capsys):
+    # `fm.split` reports (None, None) for a file with no `---` block, so taking
+    # its body would import an empty doc over somebody's writing. The export
+    # side already carries such a file whole; this is the same choice inbound.
+    root = tmp_path / "b"
+    root.mkdir()
+    (root / "a.md").write_text("just prose, never given frontmatter\n")
+    _run(root, "--write")
+    assert "just prose" in (_kdir(kbhome) / "a.md").read_text()
+
+
+def test_generated_keeps_at_when_another_subkey_sits_between(kbhome, tmp_path,
+                                                             capsys):
+    # A §5 `generated:` block may carry more than `by` and `at`. Reading an
+    # unrecognized sub-key as the end of the mapping loses `at`, and losing
+    # `at` is exactly the silent stamping this module refuses to do.
+    root = tmp_path / "b"
+    root.mkdir()
+    (root / "a.md").write_text(
+        "---\ntype: Design\ngenerated:\n  by: agent\n  model: some-model\n"
+        "  at: 2024-03-04T10:00:00Z\n---\n\nbody\n")
+    _run(root, "--write")
+    assert "updated: 2024-03-04" in (_kdir(kbhome) / "a.md").read_text()
+
+
 def test_unknown_keys_survive_the_import(kbhome, tmp_path, capsys):
     root = tmp_path / "b"
     root.mkdir()

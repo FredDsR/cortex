@@ -26,9 +26,12 @@ from cortex.lint.checks import FENCE
 # alone: they address tasks and workbench docs, and a bundle holds neither.
 _WIKILINK = re.compile(r"\[\[([^\[\]]+)\]\]")
 
-# A markdown inline link. The label is `[^\]]*` rather than greedy so two links
-# on one line stay two links.
-_MD_LINK = re.compile(r"\[([^\]]*)\]\(([^)\s]+)\)")
+# A markdown inline link. The label stops at the first unescaped `]` rather
+# than running greedy, so two links on one line stay two links -- and it steps
+# over a backslash-escaped one, because `to_markdown` writes exactly that when
+# a title holds a bracket, and a link cortex itself exported has to be readable
+# on the way back in.
+_MD_LINK = re.compile(r"\[((?:[^\[\]\\]|\\.)*)\]\(([^)\s]+)\)")
 
 # An inline code span, the same shape `parser._CODE_SPAN_RE` skips.
 _CODE_SPAN = re.compile(r"`[^`\n]*`")

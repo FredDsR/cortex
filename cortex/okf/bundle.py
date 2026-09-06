@@ -73,9 +73,13 @@ def _generated(block: str) -> dict:
         if not inside:
             continue
         m = _GENERATED_SUB.match(line)
-        if not m:
+        if m:
+            out[m.group(1)] = m.group(2).strip().strip('"\'')
+        elif not line.startswith((" ", "\t")):
             break                       # the mapping ended at the next key
-        out[m.group(1)] = m.group(2).strip().strip('"\'')
+        # An indented key that is neither `by` nor `at` is somebody else's
+        # provenance field; it is skipped, not read as the end of the mapping,
+        # so a `generated:` block that orders them `by, model, at` keeps `at`.
     return out
 
 
@@ -134,6 +138,12 @@ def read_bundle(root: Path) -> ReadResult:
 
 def _concept(slug: str, text: str, rel: str) -> Concept:
     block, body = fm.split(text)
+    if block is None:
+        # No frontmatter at all: the whole file is the body. `fm.split` reports
+        # (None, None) for that, and taking its `body` would silently import an
+        # empty doc over somebody's writing. The export side makes the same
+        # choice in `_store_docs`, for the same reason.
+        body = text
     block = sanitize(block or "")
     gen = _generated(block)
     when = _date(gen.get("at", ""), kb.today())
@@ -207,7 +217,10 @@ def export_bundle(kdir: Path, out: Path, *, since: str = "") -> ExportResult:
     OUT must not already hold files. A bundle is defined by what is in the
     directory, so exporting over somebody else's files would produce one that
     claims concepts this store never had."""
-    if out.exists() and any(out.iterdir()):
+    if out.exists() and not out.is_dir():
+        raise CortexError(f"--out is not a directory: {out} "
+                          f"(a bundle is a directory; pick a fresh one)")
+    if out.is_dir() and any(out.iterdir()):
         raise CortexError(f"--out is not empty: {out} "
                           f"(a bundle is the whole directory; pick a fresh one)")
     docs = _store_docs(kdir)

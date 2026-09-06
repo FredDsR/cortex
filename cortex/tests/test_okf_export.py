@@ -125,6 +125,13 @@ def test_a_derived_file_in_the_store_is_not_exported_as_a_concept(store_docs, tm
     assert "okf_version" in (out / "index.md").read_text()
 
 
+def test_out_naming_an_existing_file_is_a_clean_error(store_docs, tmp_path, capsys):
+    out = tmp_path / "not-a-dir"
+    out.write_text("x")
+    assert _run(out) == 1
+    assert "not a directory" in capsys.readouterr().err
+
+
 def test_a_round_trip_through_a_bundle_keeps_the_edges(store_docs, tmp_path, capsys):
     out = tmp_path / "bundle"
     _run(out)
@@ -132,3 +139,18 @@ def test_a_round_trip_through_a_bundle_keeps_the_edges(store_docs, tmp_path, cap
     assert cli.main(["okf", "import", str(out), "--workspace", "ws-b", "--write"]) == 0
     body = (store_docs / ".cortex/workspaces/ws-b/knowledge/auth-tokens.md").read_text()
     assert "[[knowledge/token-refresh]]" in body
+
+
+def test_a_bracketed_title_still_round_trips_as_an_edge(kbhome, tmp_path, capsys):
+    # Export escapes a bracket in the link text (`[Auth \[token\] expiry]`), so
+    # a link-matching pattern that stops at the first `]` cannot read cortex's
+    # own output back, and the edge is lost with nothing to show for it.
+    _doc(kbhome, "auth-tokens", title="Auth [token] expiry", desc="d")
+    _doc(kbhome, "caller", title="Caller", body="See [[knowledge/auth-tokens]].\n")
+    out = tmp_path / "bundle"
+    _run(out)
+    assert r"[Auth \[token\] expiry](/auth-tokens.md)" in (out / "caller.md").read_text()
+    (kbhome / ".cortex/workspaces/ws-b/knowledge").mkdir(parents=True)
+    cli.main(["okf", "import", str(out), "--workspace", "ws-b", "--write"])
+    body = (kbhome / ".cortex/workspaces/ws-b/knowledge/caller.md").read_text()
+    assert "[[knowledge/auth-tokens]]" in body
