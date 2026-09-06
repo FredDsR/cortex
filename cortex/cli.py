@@ -10,13 +10,14 @@ import sys
 from cortex import changelog
 from cortex import kb
 from cortex import ingest
-from cortex import lint
 from cortex import query
 from cortex import search as search_mod
 from cortex import inject
 from cortex import migrate_store
 from cortex import sync
 from cortex.errors import CortexError
+from cortex.lint import checks as lint_checks
+from cortex.lint import cli as lint_cli
 from cortex.store import StoreError
 
 
@@ -59,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     lp.add_argument("--workspace", default="")        # "all" lints every workspace
     lp.add_argument("--repo", default="")             # dead-ref target; default: .meta cwd
     lp.add_argument("--check", default="")            # comma list; "" = every check
-    lp.add_argument("--stale-days", dest="stale_days", default=str(lint.DEFAULT_STALE_DAYS))
+    lp.add_argument("--stale-days", dest="stale_days", default=str(lint_checks.DEFAULT_STALE_DAYS))
     lp.add_argument("--max", default="50")
     lp.add_argument("--archive", action="store_true")
     lp.add_argument("--fix", action="store_true")
@@ -183,7 +184,7 @@ _KB_DISPATCH = {
     "index": kb.cmd_index,
     "log": changelog.cmd_log,
     "ingest": ingest.cmd_ingest,
-    "lint": lint.cmd_lint,
+    "lint": lint_cli.cmd_lint,
 }
 
 _QUERY_DISPATCH = {
