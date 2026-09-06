@@ -39,6 +39,7 @@ cortex kb new    workbench <slug> [flags]
 cortex kb update knowledge <slug> [flags]
 cortex kb update workbench <slug> [flags]
 cortex kb index  [--workspace <ws>] [--session <sess>] [--max <N>] [--write]
+cortex kb log    [--workspace <ws>] [--since <date>] [--max <N>] [--write]
 cortex kb ingest [--from <src>] [--workspace <dest>] [--write] [--only openapi|sql] [--max <N>]
 cortex kb lint   [--workspace <ws>|all] [--repo <path>] [--check <c,...>]
                  [--stale-days <N>] [--max <N>] [--archive] [--fix] [--strict]
@@ -237,6 +238,33 @@ repo-local `<repo>/.cortex` stores are intentionally excluded (they are per-repo
 not part of the cross-workspace brain). `lint` and `search` share that scope and
 say when it left a repo-local store out; `index` does not, because its output is
 the brain itself. Type grouping is case-insensitive.
+
+### `cortex kb log`
+
+Derives an [OKF][okf] §9 change log from the store's git history: the structured
+subjects `cortex sync` writes (`track(kb): new knowledge <slug>`), grouped by
+commit date, newest first, each slug resolved to the doc's current title and
+description. `new`, `update` and `add` (the retired bash spelling of `new`)
+count; `index` and `lint` commits, workbench writes and merges do not. One entry
+per doc per day, a creation beating an update.
+
+stdout by default, capped by `--max`; `--write` derives a banner-marked,
+frontmatter-free `knowledge/log.md` uncapped, with `--since` as the windowing
+knob. **You do not need to maintain this file** -- it is derived like
+`index.md`, and while the store has a `.git` you are better served by
+`git log --follow knowledge/<slug>.md`, which also gives diffs and authorship.
+It exists for the export boundary, where a bundle has no `.git`.
+
+It says so and writes nothing when the store is not a git repo, and its header
+names the range it actually covers, since a doc written but not yet committed is
+invisible to git and a workspace rename leaves earlier writes under the old path.
+The header also echoes `--since`, because git does not reject a date it cannot
+parse: it falls back to "now", so a typo yields an empty log rather than an error.
+
+**`index` and `log` are reserved slugs in `knowledge/`.** `cortex kb new
+knowledge log` is refused, because the doc would be invisible to every reader and
+overwritten by the next `--write`. `workbench/` derives nothing, so a workbench
+note may be called `log`.
 
 ### Bulk ingestion (`cortex kb ingest`)
 

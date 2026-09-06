@@ -1,4 +1,4 @@
-"""cortex CLI: `cortex kb {new,update,index,ingest,lint}` (+ viz/query/inject/sync).
+"""cortex CLI: `cortex kb {new,update,index,log,ingest,lint}` (+ viz/query/inject/sync).
 `cortex query {neighbors,search,related}`.
 
 Invoked as `python -m cortex.cli <group> <cmd> ...` by the cortex dispatcher.
@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from cortex import changelog
 from cortex import kb
 from cortex import ingest
 from cortex import lint
@@ -47,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
     idx.add_argument("--session", default="")
     idx.add_argument("--max", default="100")          # validated in cmd (exit 1, bash parity)
     idx.add_argument("--write", action="store_true")
+
+    lg = kbcmds.add_parser("log", help="OKF section 9 change log, derived from history")
+    lg.add_argument("--workspace", default="")
+    lg.add_argument("--since", default="")            # passed straight to git log
+    lg.add_argument("--max", default="100")           # stdout only; --write is uncapped
+    lg.add_argument("--write", action="store_true")
 
     lp = kbcmds.add_parser("lint")
     lp.add_argument("--workspace", default="")        # "all" lints every workspace
@@ -154,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
 _VALUE_FLAGS = {"--workspace", "--session", "--author", "--title", "--type",
                 "--description", "--body", "--body-from", "--from", "--only", "--max",
                 "--format", "--wire-hook", "--unwire-hook", "--repo", "--check",
-                "--stale-days", "--kind", "--min-score"}
+                "--stale-days", "--kind", "--min-score", "--since"}
 
 
 def _glue_flag_values(argv):
@@ -174,6 +181,7 @@ _KB_DISPATCH = {
     "new": kb.cmd_new,
     "update": kb.cmd_update,
     "index": kb.cmd_index,
+    "log": changelog.cmd_log,
     "ingest": ingest.cmd_ingest,
     "lint": lint.cmd_lint,
 }

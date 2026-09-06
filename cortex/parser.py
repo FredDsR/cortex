@@ -8,7 +8,7 @@ import yaml
 
 from .model import (
     Doc, DocId, Edge, RawEdge, World,
-    AUTHORED_EDGE_KINDS,
+    AUTHORED_EDGE_KINDS, is_reserved,
 )
 from . import address
 
@@ -193,7 +193,7 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
         knowledge_dir = ws_dir / "knowledge"
         if knowledge_dir.is_dir():
             for kfile in sorted(knowledge_dir.glob("*.md")):
-                if kfile.name.lower() == "index.md":
+                if is_reserved(kfile.name):
                     continue
                 kid = DocId(kind="knowledge", workspace=ws_slug, slug=kfile.stem)
                 doc, raw = _read_doc(kfile, kid)
@@ -236,6 +236,8 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
             tasks_dir = sess_dir / "tasks"
             if tasks_dir.is_dir():
                 for tfile in sorted(tasks_dir.glob("*.md")):
+                    # Not `is_reserved`: nothing is derived here, so `log.md`
+                    # is an ordinary doc. Unchanged from before §9.
                     if tfile.name.lower() == "index.md":
                         continue
                     tid = DocId(kind="task", workspace=ws_slug,
@@ -251,6 +253,8 @@ def parse_world(workspaces_root: Path, *, include_archive: bool = False) -> Worl
             wb_dir = sess_dir / "workbench"
             if wb_dir.is_dir():
                 for wfile in sorted(wb_dir.glob("*.md")):
+                    # Not `is_reserved`: nothing is derived here, so `log.md`
+                    # is an ordinary doc. Unchanged from before §9.
                     if wfile.name.lower() == "index.md":
                         continue
                     wid = DocId(kind="workbench", workspace=ws_slug,

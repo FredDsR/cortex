@@ -19,7 +19,7 @@ Sub-skills handle optional concerns:
 - `cortex-github` — PR/commit sync when a session has a `github:` field.
 - `cortex-migration` — per-session moves between local and global stores.
 - `cortex-sync` — cross-device sync of `~/.cortex/` via a private GitHub repo (opt-in).
-- `cortex-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `cortex kb` CLI.
+- `cortex-kb`: authors `knowledge/<slug>.md` and `workbench/<slug>.md` via the `cortex kb` CLI, and derives `index.md` (OKF section 8) and `log.md` (section 9) from the store.
 - `cortex-inject`: opt-in, off-by-default session-start context injection via the `cortex inject` CLI. The single exception to the no-auto-injection philosophy.
 
 ## When to Use
