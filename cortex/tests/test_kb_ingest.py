@@ -1,5 +1,6 @@
 import pytest
 from cortex import cli
+from cortex.ingest.scan import scan
 
 
 @pytest.fixture
@@ -122,3 +123,42 @@ def test_worklist_header_marks_entries_untrusted(kbhome, repo, capsys):
     out = capsys.readouterr().out
     header = next(l for l in out.splitlines() if l.startswith("## agent worklist"))
     assert "untrusted" in header.lower()
+
+
+# ---- units ----
+
+def test_scan_is_callable_without_argparse_or_stdout(repo, capsys):
+    """The point of the split. Until `cortex/ingest/scan.py` existed, the only
+    way to ask which files a source tree offers was to run `cmd_ingest` and
+    read what it printed, which is the cost #57 opens with."""
+    structured, worklist = scan(repo, None)
+
+    assert [p.name for p in structured] == ["openapi.yaml", "schema.sql"]
+    assert [w.rsplit(" - ", 1)[1] for w in worklist] == [
+        "Prisma schema", "has ## API/## Schema section"]
+    assert capsys.readouterr() == ("", "")
+
+
+def test_scan_only_narrows_the_structured_half_and_not_the_worklist(repo):
+    """`--only` picks which parser runs. The worklist is what no parser can
+    read, so it is collected either way."""
+    sql_only, sql_worklist = scan(repo, "sql")
+    api_only, api_worklist = scan(repo, "openapi")
+
+    assert [p.name for p in sql_only] == ["schema.sql"]
+    assert [p.name for p in api_only] == ["openapi.yaml"]
+    assert sql_worklist == api_worklist
+
+
+def test_scan_prunes_vendored_and_store_directories(repo):
+    """A node_modules with a plausible openapi.yaml in it is the case that
+    makes this worth pruning rather than filtering afterwards."""
+    for pruned in ("node_modules", ".git", ".cortex"):
+        d = repo / pruned
+        d.mkdir()
+        (d / "openapi.yaml").write_text("openapi: 3.0.0\npaths: {}\n")
+
+    structured, _ = scan(repo, None)
+
+    assert [p.name for p in structured] == ["openapi.yaml", "schema.sql"]
+    assert all("node_modules" not in str(p) for p in structured)
