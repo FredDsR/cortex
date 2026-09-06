@@ -27,6 +27,7 @@ from pathlib import Path
 
 from cortex import address
 from cortex import atomic
+from cortex import kb
 from cortex import parser
 from cortex import store
 from cortex.errors import CortexError, UsageError
@@ -35,7 +36,7 @@ from cortex.model import AUTHORED_EDGE_KINDS, Doc, World
 from cortex.query import LINKABLE_KINDS
 from cortex.sanitize import sanitize
 
-CHECKS = ("broken-ref", "dead-ref", "orphan", "stale", "missing-description")
+CHECKS = ("broken-ref", "dead-ref", "orphan", "stale", "missing-description", "okf")
 # The judgment half. Selectable by name like a check, but kept out of CHECKS
 # because it produces candidates rather than findings: it never counts toward
 # the tally and never decides `--strict`.
@@ -330,6 +331,72 @@ def _stale(doc: Doc, today: datetime.date, days: int) -> list:
     return []
 
 
+# ---- OKF v0.2 §11 conformance ----
+
+# A §8 index entry: `* [Title](relative-url) - description`. Everything else a
+# derived index holds (the banner comment, headings, the `... K more` notice,
+# blank lines) is not an entry and is not checked against this.
+#
+# The link text is `.+` and greedy rather than `[^\]]+`: a title carrying a
+# bracket (escaped by `kb._md_escape`, or literal in an index derived before
+# that) still ends its link at the last `](`, and reading such a line as a hand
+# edit would flag a freshly derived index that nothing can fix.
+_OKF_ENTRY = re.compile(r"^\* \[.+\]\([^)]+\)")
+
+
+def _okf_doc(doc: Doc) -> list:
+    """§11 asks three things of a bundle. The first cortex cannot violate: a
+    file without frontmatter never becomes a `Doc` in the first place. The
+    third is the index, checked per-directory in `_okf_index`. This is the
+    second: a non-empty `type`.
+
+    The finding doubles as the backfill worklist for a store written before the
+    rule, which is why it carries the title and description: an agent needs
+    both to choose a value, and a migration that guesses one would make the
+    store conformant and the field meaningless."""
+    if (doc.type or "").strip():
+        return []
+    return [Finding("okf", doc.id.canonical(),
+                    f"no type: field (OKF §11) - {doc.title or '(no title)'} - "
+                    f"{doc.description or '(no description)'}")]
+
+
+def _okf_index(kdir: Path, label: str) -> list:
+    """The §8 half, which is per-directory rather than per-doc: a legacy
+    `INDEX.md` left over from before the rename, and an `index.md` carrying
+    lines that are not §8 entries (which is what a hand edit looks like, and
+    the banner says not to make one).
+
+    `label` names the directory in the id column. The caller supplies it rather
+    than this deriving it from a workspace name, because the root brain index
+    belongs to no workspace and would otherwise be unreachable."""
+    # A directory rather than a doc, so the id column names it as one. It is
+    # still a store path, which is what the column promises: openable as typed.
+    out, doc = [], f"{label}/knowledge/"
+    legacy, current = kdir / kb.LEGACY_INDEX_NAME, kdir / kb.INDEX_NAME
+    if legacy.exists() and not (current.exists() and legacy.samefile(current)):
+        out.append(Finding("okf", doc, f"{kb.LEGACY_INDEX_NAME} alongside the "
+                                       f"index (§8 reserves lowercase "
+                                       f"{kb.INDEX_NAME}); regenerate with "
+                                       f"cortex kb index --write"))
+    if not current.is_file():
+        return out
+    try:
+        text = current.read_text(encoding="utf-8")
+    except OSError:
+        return out
+    for n, line in enumerate(text.split("\n"), 1):
+        stripped = line.strip()
+        if (not stripped or stripped.startswith(("#", "<!--", "..."))
+                or _OKF_ENTRY.match(stripped)):
+            continue
+        out.append(Finding("okf", doc, f"{kb.INDEX_NAME}:{n} is not a §8 entry "
+                                       f"(`* [Title](url) - description`); "
+                                       f"regenerate with cortex kb index --write"))
+        break                          # one finding per index; the fix is the same
+    return out
+
+
 # ---- the judgment worklist ----
 
 _STOP = frozenset("""
@@ -484,10 +551,18 @@ def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:
 
 
 def collect(world: World, *, names, checks, repos, today: datetime.date,
-            stale_days: int, archived: bool) -> list:
-    """Every deterministic finding, in check order then doc order."""
+            stale_days: int, archived: bool, index_dirs=()) -> list:
+    """Every deterministic finding, in check order then doc order.
+
+    `index_dirs` is `(directory, label)` per derived index the run covers. Only
+    the §8 half of `okf` reads it, because a derived index is a file the world
+    never parses into a `Doc`. The caller builds the list, since which indexes a
+    run covers is a scope question and scope lives in `cmd_lint`."""
     inbound = _inbound_authored(world) if "orphan" in checks else {}
     found: list = []
+    if "okf" in checks:
+        for kdir, label in index_dirs:
+            found += _okf_index(kdir, label)
     for canon in sorted(world.docs):
         doc = world.docs[canon]
         if doc.id.kind not in LINKABLE_KINDS or doc.id.workspace not in names:
@@ -500,8 +575,14 @@ def collect(world: World, *, names, checks, repos, today: datetime.date,
             idx = repos.get(doc.id.workspace)
             if idx is not None:
                 found += _dead_refs(doc, idx)
-        if doc.id.kind == "knowledge" and "orphan" in checks and not inbound.get(canon):
-            found.append(Finding("orphan", canon, "no authored backlinks"))
+        if doc.id.kind == "knowledge":
+            if "orphan" in checks and not inbound.get(canon):
+                found.append(Finding("orphan", canon, "no authored backlinks"))
+            if "okf" in checks:
+                # knowledge/ only: workbench is session-scoped and never
+                # exported, so §11 does not reach it. Same exemption as
+                # `kb new`. See cortex.kb._require_type.
+                found += _okf_doc(doc)
         if doc.id.kind in KB_KINDS:
             if "stale" in checks:
                 found += _stale(doc, today, stale_days)
@@ -561,9 +642,17 @@ def cmd_lint(args) -> int:
                                  f"{_MAX_TOTAL_BYTES >> 20} MiB total): a symbol or "
                                  f"flag living only in a skipped file reads as dead")
 
+    # The derived indexes this run covers: one per workspace, plus the root
+    # brain index under `all`, which belongs to no workspace and would
+    # otherwise never be checked -- a leftover root `INDEX.md` staying
+    # invisible is the same stale artefact the per-workspace check exists for.
+    index_dirs = [(root / ws / "knowledge", ws) for ws in sorted(names)]
+    if args.workspace == "all":
+        index_dirs.append((_home() / ".cortex" / "knowledge", "~/.cortex"))
+
     findings = collect(world, names=names, checks=checks, repos=repos,
                        today=datetime.date.today(), stale_days=stale_days,
-                       archived=args.archive)
+                       archived=args.archive, index_dirs=index_dirs)
 
     fixed, written = [], []
     if args.fix:

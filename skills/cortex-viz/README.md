@@ -2,7 +2,7 @@
 
 Static browser-based viewer for `~/.cortex/workspaces/`. Three panes (collapsible tree, hub-and-spoke Cytoscape graph, rendered markdown content) over a copied markdown tree. Read-only.
 
-It surfaces the knowledge/workbench frontmatter authored by `cortex-kb` (the `cortex kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `INDEX.md` files (from `cortex kb index`) are excluded from the graph.
+It surfaces the knowledge/workbench frontmatter authored by `cortex-kb` (the `cortex kb` CLI): `type`, `title`, `description`, and `updated` show up in the tree (row tooltip) and content pane. Derived `index.md` files (from `cortex kb index`) are excluded from the graph.
 
 ## Install
 

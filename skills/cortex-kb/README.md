@@ -27,7 +27,7 @@ cortex kb update knowledge api-versioning
 
 # Compact, pull-based table of contents of what already exists.
 cortex kb index                 # stdout
-cortex kb index --write         # (re)generate derived knowledge/INDEX.md
+cortex kb index --write         # (re)generate derived knowledge/index.md (OKF section 8)
 
 # Search the content, not just the descriptions. Run this BEFORE `kb new`:
 # it is the cheapest way to avoid a second doc about something already covered.
@@ -53,7 +53,7 @@ cortex kb lint                              # every check, current workspace
 cortex kb lint --check broken-ref --fix     # repair addresses that resolve elsewhere
 
 # Explicit workspace when ambiguous.
-cortex kb new knowledge cross-project-note --workspace personal
+cortex kb new knowledge cross-project-note --type Reference --workspace personal
 ```
 
 `ingest` deterministically documents OpenAPI and SQL DDL; fuzzier sources

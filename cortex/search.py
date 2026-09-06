@@ -18,7 +18,7 @@ document as the query instead of terms, so link discovery is deterministic
 rather than a per-run judgment call about which words to search for.
 
 The index is derived and disposable, rebuilt on every invocation, matching how
-`SUMMARY.md` and `INDEX.md` are already derived rather than stored.
+`SUMMARY.md` and `index.md` are already derived rather than stored.
 
 Pure (stdlib only); the CLI at the bottom is this module's only IO.
 """

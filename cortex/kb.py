@@ -21,6 +21,18 @@ from cortex.errors import CortexError
 AUTHOR_DEFAULT = "agent"
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
+# The documented `type` vocabulary (skills/cortex-kb/SKILL.md, "type
+# vocabulary"). Still a convention rather than an enum -- a custom value is
+# accepted without error -- so this exists only to name the canonical set in
+# the error a typeless `kb new knowledge` raises.
+TYPE_VOCABULARY = ("Decision", "Design", "Reference", "Runbook",
+                   "Investigation", "Convention", "Comparison")
+
+# OKF v0.2 §8 reserves lowercase `index.md` for a bundle's index. `INDEX.md` is
+# what cortex derived before conformance and is retired on the next `--write`.
+INDEX_NAME = "index.md"
+LEGACY_INDEX_NAME = "INDEX.md"
+
 
 def today() -> str:
     return datetime.date.today().isoformat()
@@ -100,8 +112,23 @@ def _maybe_open(args, path: Path) -> None:
             raise CortexError(f"cannot launch editor '{editor}': {e}")
 
 
+def _require_type(args) -> None:
+    """OKF v0.2 §11 makes `type` the one required frontmatter field, and
+    `knowledge/` is what an OKF bundle is made of. `workbench/` is exempt: it is
+    session-scoped, dies with the session, and is never exported.
+
+    `update` is exempt too. A store written before this rule still holds
+    untyped docs, and refusing to touch one is refusing to fix it."""
+    if args.kind == "knowledge" and not (args.type or "").strip():
+        raise CortexError(
+            "knowledge docs require --type (OKF v0.2 §11 makes it the one "
+            "required field). Canonical values: "
+            + ", ".join(TYPE_VOCABULARY) + "; custom values are accepted.")
+
+
 def cmd_new(args) -> int:
     _validate_slug(args.slug)
+    _require_type(args)
     author = _resolve_author(args)
     path = _resolve_path(args, args.kind)
     if path.exists():
@@ -118,103 +145,200 @@ def cmd_new(args) -> int:
     return 0
 
 
-def _render_section(dir_path: Path, max_n: int) -> list[str]:
-    """One line per doc `<slug> [<type>] - <desc>`, ordered by lowercased type
-    (untyped last) then slug, capped at max_n with a `... K more` notice."""
+def _doc_rows(dir_path: Path) -> list[tuple[str, str, str, str]]:
+    """(type, slug, title, description) per non-index doc in DIR_PATH, ordered
+    by lowercased type (untyped last) then slug.
+
+    The single read of a kb directory. The flat stdout listing, the OKF §8
+    index file, and the cross-workspace dictionary are three renderings of
+    these rows, so none of them can disagree about what is in the directory or
+    in what order."""
+    rows = []
     if not dir_path.is_dir():
-        return []
-    rows = []
-    for f in sorted(dir_path.glob("*.md")):
-        if f.name.lower() == "index.md":
-            continue
-        block, _ = fm.split(f.read_text(encoding="utf-8"))
-        block = block or ""
-        ty = fm.read_field(block, "type")
-        desc = model.format_description(fm.read_field(block, "description"),
-                                        fm.read_field(block, "title"))
-        render = f.stem + (f" [{ty}]" if ty else "") + f" - {desc}"
-        rows.append((ty.lower() if ty else "~~~", f.stem, render))
-    if not rows:
-        return []
-    total = len(rows)
-    rows.sort(key=lambda r: (r[0], r[1]))
-    out = [r[2] for r in rows[:max_n]]
-    if total > max_n:
-        out.append(f"... {total - max_n} more (raise --max)")
-    return out
-
-
-def _knowledge_rows(kdir: Path, ws_name: str) -> list[tuple[str, str, str, str]]:
-    """(type, slug, workspace, description) per non-index knowledge doc."""
-    rows = []
-    if not kdir.is_dir():
         return rows
-    for f in sorted(kdir.glob("*.md")):
-        if f.name.lower() == "index.md":
-            continue
+    for f in sorted(dir_path.glob("*.md")):
+        if f.name.lower() == INDEX_NAME:
+            continue                       # matches INDEX.md and index.md alike
         block, _ = fm.split(f.read_text(encoding="utf-8"))
         block = block or ""
         ty = fm.read_field(block, "type")
-        desc = model.format_description(fm.read_field(block, "description"),
-                                        fm.read_field(block, "title"))
-        rows.append((ty, f.stem, ws_name, desc))
+        title = fm.read_field(block, "title")
+        desc = model.format_description(fm.read_field(block, "description"), title)
+        rows.append((ty, f.stem, title, desc))
+    rows.sort(key=lambda r: (r[0].lower() if r[0] else "~~~", r[1]))
     return rows
 
 
-def _render_all(workspaces_root: Path, max_n: int) -> list[str]:
+def _more_notice(total: int, max_n: int | None) -> list[str]:
+    """`max_n=None` means uncapped, and an uncapped render has nothing to
+    notice. `--max` bounds what a terminal prints for an agent to read; a
+    derived file has no such constraint, and a catalog that silently omits
+    entries is not a catalog. See `cmd_index`."""
+    if max_n is None or total <= max_n:
+        return []
+    return [f"... {total - max_n} more (raise --max)"]
+
+
+def _okf_entry(text: str, target: str, desc: str) -> str:
+    """One OKF v0.2 §8 index entry: `* [Title](relative-url) - description`.
+
+    The link text is the doc's title when it has one, but the URL always ends
+    in `<slug>.md`, so the slug an agent needs for `[[wikilinks]]` stays on the
+    line either way.
+
+    A bracket in the title is escaped: unescaped, `title: [Design] rework`
+    closes the link text early, which breaks the link for a bundle consumer and
+    makes `cortex kb lint` read its own freshly derived index as hand-edited."""
+    return f"* [{_md_escape(text)}]({target}) - {desc}"
+
+
+def _md_escape(text: str) -> str:
+    """Escape the two characters that can end a §8 entry's link text early."""
+    return text.replace("[", r"\[").replace("]", r"\]")
+
+
+def _okf_heading(display_ty: str, first: bool) -> list[str]:
+    """A §8 group heading, blank-line separated from what precedes it."""
+    return ([] if first else [""]) + [f"## {display_ty or '(untyped)'}", ""]
+
+
+def _render_section(dir_path: Path, max_n: int | None, *, okf: bool = False) -> list[str]:
+    """The rows of one kb directory, capped at max_n with a `... K more`
+    notice. Flat (`<slug> [<type>] - <desc>`) by default: that is what an agent
+    reads on stdout and what `cortex inject` emits. `okf=True` renders the same
+    rows as §8 `## <type>` groups of markdown-link entries, which is the shape
+    a bundle consumer parses. One function so the two can only ever differ in
+    presentation, never in contents or order."""
+    rows = _doc_rows(dir_path)
+    if not rows:
+        return []
+    if not okf:
+        out = [slug + (f" [{ty}]" if ty else "") + f" - {desc}"
+               for ty, slug, _title, desc in rows[:max_n]]
+        return out + _more_notice(len(rows), max_n)
+    out = []
+    for display_ty, group in model.group_by_type(rows[:max_n], lambda r: r[0]):
+        out += _okf_heading(display_ty, first=not out)
+        out += [_okf_entry(title or slug, f"{slug}.md", desc)
+                for _ty, slug, title, desc in group]
+    return out + _more_notice(len(rows), max_n)
+
+
+def _knowledge_rows(kdir: Path, ws_name: str) -> list[tuple[str, str, str, str, str]]:
+    """(type, slug, workspace, title, description) per non-index knowledge doc."""
+    return [(ty, slug, ws_name, title, desc)
+            for ty, slug, title, desc in _doc_rows(kdir)]
+
+
+def _render_all(workspaces_root: Path, max_n: int | None, *, okf: bool = False) -> list[str]:
     """Cross-workspace dictionary: `## <type>` sections (untyped last), each
-    `<slug> (<ws>) - <desc>` sorted by slug then workspace, capped per section.
-    Scope is the global store's workspaces; repo-local `.cortex` stores are not
-    included (they are per-repo, not part of the cross-workspace brain)."""
-    rows: list[tuple[str, str, str, str]] = []
+    sorted by slug then workspace and capped per section. Scope is the global
+    store's workspaces; repo-local `.cortex` stores are not included (they are
+    per-repo, not part of the cross-workspace brain).
+
+    `okf=True` renders §8 entries instead of flat lines. The URL is relative to
+    `~/.cortex/knowledge/`, where the derived root index lives, so it resolves
+    from the file that carries it."""
+    rows: list[tuple[str, str, str, str, str]] = []
     if workspaces_root.is_dir():
         for ws in sorted(p for p in workspaces_root.iterdir() if p.is_dir()):
             rows += _knowledge_rows(ws / "knowledge", ws.name)
     lines: list[str] = []
     for display_ty, group in model.group_by_type(rows, lambda r: r[0]):
-        lines.append(f"## {display_ty if display_ty else '(untyped)'}")
         entries = sorted(group, key=lambda r: (r[1], r[2]))   # slug, then workspace
-        total = len(entries)
-        for _ty, slug, ws, desc in entries[:max_n]:
-            lines.append(f"{slug} ({ws}) - {desc}")
-        if total > max_n:
-            lines.append(f"... {total - max_n} more (raise --max)")
+        if okf:
+            lines += _okf_heading(display_ty, first=not lines)
+            lines += [_okf_entry(f"{title or slug} ({ws})",
+                                 f"../workspaces/{ws}/knowledge/{slug}.md", desc)
+                      for _ty, slug, ws, title, desc in entries[:max_n]]
+        else:
+            lines.append(f"## {display_ty if display_ty else '(untyped)'}")
+            lines += [f"{slug} ({ws}) - {desc}"
+                      for _ty, slug, ws, _title, desc in entries[:max_n]]
+        lines += _more_notice(len(entries), max_n)
     return lines
 
 
+def _retire_legacy_index(kdir: Path) -> None:
+    """Remove a pre-conformance `INDEX.md` so the directory holds one index.
+
+    On a case-insensitive filesystem the two spellings are one file, so there
+    is nothing to delete and a plain rewrite would leave git tracking the
+    uppercase name forever. `git mv` through a third name is the only way to
+    record the rename; outside a git repo the write still produces the right
+    bytes under the right name and only the history stays silent."""
+    legacy, current = kdir / LEGACY_INDEX_NAME, kdir / INDEX_NAME
+    if not legacy.exists():
+        return
+    if not (current.exists() and legacy.samefile(current)):
+        legacy.unlink()
+        return
+    tmp = "index.okf-rename.md"
+    try:
+        for src, dst in ((LEGACY_INDEX_NAME, tmp), (tmp, INDEX_NAME)):
+            r = subprocess.run(["git", "mv", "-f", src, dst], cwd=kdir,
+                               capture_output=True)
+            if r.returncode != 0:
+                break
+    except OSError:
+        pass
+    if (kdir / tmp).exists():           # git took the first step and not the second
+        os.replace(kdir / tmp, current)
+
+
+def _write_index(kdir: Path, lines: list[str]) -> Path:
+    """Write the derived §8 index, then retire any legacy `INDEX.md`.
+
+    Both happen before the caller's `sync_after`, because `cortex sync push`
+    stages the whole store in one commit. Split across two commits, a `sync
+    pull` on a second device resurrects the old name beside the new one.
+
+    Write first, retire second, so an interrupted first `--write` after the
+    rename leaves the old index rather than no index at all. On a
+    case-insensitive filesystem the two names are one file, which
+    `_retire_legacy_index` detects and renames instead of deleting, so the
+    freshly written bytes survive that order too."""
+    kdir.mkdir(parents=True, exist_ok=True)
+    path = kdir / INDEX_NAME
+    atomic.write_text(path, "\n".join(lines) + "\n", encoding="utf-8")
+    _retire_legacy_index(kdir)
+    return path
+
+
 def cmd_index(args) -> int:
-    max_n = parse_max(args.max)
+    # `--max` bounds the printed listing only. `--write` derives a file that
+    # `cortex okf export` ships and a bundle consumer reads as the catalog, so
+    # truncating it would omit docs silently and emit a `... K more` line that
+    # is not an OKF §8 entry. Uncapped there, and `None` is the whole list
+    # because `rows[:None]` is `rows`.
+    max_n = parse_max(args.max)          # validated even when --write ignores it
+    if args.write:
+        max_n = None
     if args.workspace == "all":
         workspaces_root = _home() / ".cortex" / "workspaces"
-        lines = _render_all(workspaces_root, max_n)
         if args.write:
-            root_kdir = _home() / ".cortex" / "knowledge"
-            root_kdir.mkdir(parents=True, exist_ok=True)
             out = [
                 "<!-- generated by cortex kb index --workspace=all; do not edit. "
                 "regenerate with: cortex kb index --workspace=all --write -->",
                 "# Knowledge index (all workspaces)", "",
-            ] + lines
-            atomic.write_text(root_kdir / "INDEX.md", "\n".join(out) + "\n", encoding="utf-8")
-            print(root_kdir / "INDEX.md")
-            sync_after("index", "knowledge", "INDEX")
+            ] + _render_all(workspaces_root, max_n, okf=True)
+            path = _write_index(_home() / ".cortex" / "knowledge", out)
+            print(path)
+            sync_after("index", "knowledge", INDEX_NAME)
             return 0
-        for ln in lines:
+        for ln in _render_all(workspaces_root, max_n):
             print(ln)
         return 0
     ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
     kdir = ws_root / "knowledge"
 
     if args.write:
-        kdir.mkdir(parents=True, exist_ok=True)
         lines = [
             "<!-- generated by cortex kb index; do not edit. regenerate with: cortex kb index --write -->",
-            "# Knowledge index", "", "## knowledge",
-        ]
-        lines += _render_section(kdir, max_n)
-        atomic.write_text(kdir / "INDEX.md", "\n".join(lines) + "\n", encoding="utf-8")
-        print(kdir / "INDEX.md")
-        sync_after("index", "knowledge", "INDEX")
+            "# Knowledge index", "",
+        ] + _render_section(kdir, max_n, okf=True)
+        print(_write_index(kdir, lines))
+        sync_after("index", "knowledge", INDEX_NAME)
         return 0
 
     print("## knowledge")

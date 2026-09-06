@@ -5,7 +5,7 @@ TODAY = datetime.date.today().isoformat()
 
 
 def test_new_knowledge_happy_path(kbhome, capsys):
-    rc = cli.main(["kb", "new", "knowledge", "sample", "--body", "hello world"])
+    rc = cli.main(["kb", "new", "knowledge", "sample", "--type", "Reference", "--body", "hello world"])
     assert rc == 0
     path = kbhome / ".cortex/workspaces/ws-a/knowledge/sample.md"
     assert path.is_file()
@@ -43,7 +43,17 @@ def test_new_fields_written_in_canonical_order(kbhome):
 
 
 def test_new_plain_omits_optional_fields(kbhome):
-    cli.main(["kb", "new", "knowledge", "plain", "--body", "hi"])
-    text = (kbhome / ".cortex/workspaces/ws-a/knowledge/plain.md").read_text()
+    # Workbench, because `type` stopped being optional on knowledge: OKF §11
+    # requires it, and a workbench doc is never part of a bundle.
+    cli.main(["kb", "new", "workbench", "plain", "--body", "hi"])
+    text = (kbhome
+            / ".cortex/workspaces/ws-a/sessions/sess-a/workbench/plain.md").read_text()
     assert "title:" not in text and "type:" not in text and "description:" not in text
     assert f"updated: {TODAY}" in text
+
+
+def test_new_knowledge_still_omits_the_optional_fields(kbhome):
+    cli.main(["kb", "new", "knowledge", "plain", "--type", "Reference", "--body", "hi"])
+    text = (kbhome / ".cortex/workspaces/ws-a/knowledge/plain.md").read_text()
+    assert "type: Reference" in text
+    assert "title:" not in text and "description:" not in text

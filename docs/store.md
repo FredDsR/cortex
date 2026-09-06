@@ -20,7 +20,7 @@ never both, and moving between them is always explicit through
 ```
 ~/.cortex/
 ├── bin/cortex                     the CLI symlink
-├── knowledge/INDEX.md             cross-workspace synthesis (the "brain")
+├── knowledge/index.md             cross-workspace synthesis (the "brain")
 └── workspaces/
     └── <workspace-slug>/
         ├── .meta                  workspace registry record (global store only)
@@ -149,7 +149,7 @@ description: "One-line summary; this is what the index and graph show."
 ---
 ```
 
-`description` earns its keep: it is what appears in `INDEX.md` and in the
+`description` earns its keep: it is what appears in `index.md` and in the
 viewer, so an agent can judge relevance without opening the file.
 
 Those six are the fields cortex writes. Any other key you add stays: `cortex kb

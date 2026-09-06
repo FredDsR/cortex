@@ -20,7 +20,7 @@ Reproduce against the synthetic fixtures in `cortex/tests/fixtures/`, or build
 a throwaway store under a temporary `HOME`:
 
 ```bash
-HOME=$(mktemp -d) cortex kb new knowledge demo --workspace demo
+HOME=$(mktemp -d) cortex kb new knowledge demo --type Reference --workspace demo
 ```
 
 ## Scope

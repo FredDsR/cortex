@@ -54,10 +54,18 @@ Deterministic checks, one line per finding: `broken-ref` (a reference resolving
 to no doc), `dead-ref` (a backticked path, symbol, or `--flag` that no longer
 exists in the repo), `orphan` (a knowledge doc nothing links to), `stale`
 (`updated` older than `--stale-days`, missing, or unparseable), and
-`missing-description`. Select a subset with `--check`.
+`missing-description`, and `okf` (a knowledge doc with no `type:`, or a derived
+index that is not OKF §8: a leftover `INDEX.md`, or an `index.md` with a
+hand-edited line). Select a subset with `--check`.
 
 `orphan` reports the hole and never what fills it. `cortex query related
 <slug>` is the other half; see "Sweeping for missing links" below.
+
+`okf` rows double as the backfill worklist for a store written before `type`
+was required: each carries the doc's title and description, which is what you
+need to choose a value. Fix one with `cortex kb update knowledge <slug> --type
+<T>`, using the vocabulary below. It is deliberately not a `--fix`: a migration
+that guesses a type makes the store conformant and the field meaningless.
 
 After them comes `## agent worklist (needs judgment)`, selectable as `overlap`:
 pairs of same-typed docs whose summaries overlap. **These are candidates, not
@@ -179,7 +187,7 @@ declines, raise `--min-score` and re-run rather than working through the list.
 | `--session <sess>` | from active session pointer | Workbench only |
 | `--author <human\|agent>` | `agent` (or `human` if `--open` and `--author` not passed) | Must be one of `human`, `agent` |
 | `--title <text>` | unset | Optional frontmatter title |
-| `--type <text>` | unset | Optional frontmatter type (see vocabulary below) |
+| `--type <text>` | unset | Frontmatter type (see vocabulary below). **Required on `new knowledge`**; optional on `workbench` and on `update` |
 | `--description <text>` | unset | Optional one-line frontmatter description |
 | `--body <text>` | empty | Inline body |
 | `--body-from <file\|->` | unset | File or stdin |
@@ -203,16 +211,26 @@ Prints a compact, pull-based table of contents (one line per doc,
 `<slug> [<type>] - <description>`) for the resolved workspace's `knowledge/`,
 plus the active (or `--session`) session's `workbench/` when one resolves.
 Ordered by type then slug (untyped last), bounded by `--max` (default 100) per
-section with a `... K more (raise --max)` notice. By default it writes to
-stdout. `--write` (re)generates a derived, banner-marked `knowledge/INDEX.md`
+section on stdout only (the derived file is uncapped: a catalog that silently
+omits entries is not one) with a `... K more (raise --max)` notice. By default it writes to
+stdout. `--write` (re)generates a derived, banner-marked `knowledge/index.md`
 (the knowledge section only), regenerated like `SUMMARY.md` and never
-hand-maintained or injected into any context. `INDEX.md` is excluded from the
+hand-maintained or injected into any context. `index.md` is excluded from the
 viz graph.
+
+The file and stdout are two renderings of the same rows. The file is [Open
+Knowledge Format][okf] §8: `## <type>` group headings over
+`* [Title](slug.md) - description` entries, lowercase `index.md` because §8
+reserves that name. A `--write` over a store that predates this retires the old
+`INDEX.md` in the same sync commit, so a pull on a second device cannot
+resurrect it beside the new one. Stdout keeps the flat
+`<slug> [<type>] - <description>` listing, which is what `cortex inject` emits.
 
 Pass `--workspace=all` to aggregate every workspace's `knowledge/` into one
 cross-workspace dictionary grouped by `type` and tagged with each doc's
 workspace (the "brain"). `--workspace=all --write` derives
-`~/.cortex/knowledge/INDEX.md`. Entries are one-per-doc and never merged; concepts
+`~/.cortex/knowledge/index.md`, in the same §8 form with URLs relative to that
+file. Entries are one-per-doc and never merged; concepts
 relate only through real `[[...]]` links and backlinks, which the viz root page
 renders as a graph. Scope is the global store (`~/.cortex/workspaces/*`) only;
 repo-local `<repo>/.cortex` stores are intentionally excluded (they are per-repo,
@@ -276,7 +294,7 @@ Bulk-ingest documentable artifacts from a codebase into a workspace's
 Capture an agent-generated note with the body inline:
 
 ```bash
-cortex kb new knowledge api-versioning-decision --body "$(cat <<'END'
+cortex kb new knowledge api-versioning-decision --type Decision --body "$(cat <<'END'
 ## Decision
 
 We will use header-based versioning for the public API.
@@ -287,7 +305,7 @@ END
 Pipe a longer body from stdin:
 
 ```bash
-some-pipeline | cortex kb new knowledge daily-summary --body-from -
+some-pipeline | cortex kb new knowledge daily-summary --type Reference --body-from -
 ```
 
 Workbench note tied to the current session:
@@ -343,6 +361,15 @@ canonical value where it fits: `Decision`, `Design`, `Reference`, `Runbook`,
 `Investigation`, `Convention`, `Comparison`. Custom values are accepted without
 error, but prefer the canonical set so the index groups sensibly.
 
+It is **required** on `knowledge/`: [OKF][okf] v0.2 §11 makes `type` the one
+mandatory frontmatter field, and `knowledge/` is what a bundle is made of.
+`cortex kb new knowledge` without `--type` exits 1 and names the vocabulary.
+`workbench/` is exempt (session-scoped, dies with the session, never exported),
+and so is `update`, because a store written before the rule still holds untyped
+docs and refusing to touch one is refusing to fix it.
+
+[okf]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
+
 `cortex kb` reads frontmatter with a scalar-only line reader (only the known keys
 above). It is not a general YAML parser: any structured/unknown key is ignored,
 never misparsed. The viz uses real YAML for its own reads.
@@ -364,7 +391,7 @@ never misparsed. The viz uses real YAML for its own reads.
 - Open the editor by default. Agent-primary CLI; `$EDITOR` opens only
   when `--open` is passed.
 - Inject the index into any context. `cortex kb index` is pull-based (stdout or a
-  derived `INDEX.md`). Opt-in session-start injection (which builds on this index)
+  derived `index.md`). Opt-in session-start injection (which builds on this index)
   is a separate, off-by-default feature: see `cortex-inject` (`cortex inject`).
 
 ## Sync integration
