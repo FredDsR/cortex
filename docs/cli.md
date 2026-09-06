@@ -184,11 +184,64 @@ cortex query search mkstemp --workspace all # across every workspace
 
 **What `all` covers.** The global store, `~/.cortex/workspaces`, and only that.
 A repo-local `<repo>/.cortex` is not in it: `all` exists to reach across
-workspaces, and a per-repo store belongs to one repo. `search` and `lint` both
-name the excluded store in a trailing note rather than returning a result that
-reads as complete, because `(no matches)` over an empty global store is
-otherwise indistinguishable from "searched everything, found nothing". Omit
-`--workspace` to work in the repo-local store.
+workspaces, and a per-repo store belongs to one repo. `search`, `related`, and
+`lint` all name the excluded store in a trailing note rather than returning a
+result that reads as complete, because `(no matches)` over an empty global
+store is otherwise indistinguishable from "searched everything, found nothing".
+Omit `--workspace` to work in the repo-local store.
+
+```
+cortex query related <slug> [--workspace W|all] [--session S] [--kind task|knowledge|workbench]
+                            [--max N] [--min-score F] [--archive]
+```
+
+Link candidates for one document: the same BM25 ranking as `search`, but with
+the document itself as the query. `cortex kb lint --check orphan` can already
+say a doc has no inbound edges; it can never say what should fill the hole, and
+guessing costs a full-store read.
+
+| Flag | Default | Does |
+|------|---------|------|
+| `--workspace` | resolved | `all` ranks across every workspace in the global store, and says so when that leaves out a repo-local one |
+| `--session` | resolved | Narrows an ambiguous slug |
+| `--kind` | unset | Narrows an ambiguous slug. It does **not** pick the candidate kind |
+| `--max` | `5` | Candidate ceiling, deliberately low |
+| `--min-score` | `0` | Drop candidates below this BM25 score |
+| `--archive` | off | Include archived sessions |
+
+**The query is derived, not chosen.** It is an ordered dedup of the doc's
+`title`, `description`, and body, through the same tokeniser `search` uses. A
+sweep that picked its own search terms per document would return different
+candidates on a second run over an unchanged store, and none of it would be
+testable. Deduplicated because a repeated query term is scored once per
+occurrence, so the raw token list would weight terms by how often the *source*
+doc happened to say them.
+
+**What it excludes.** The doc itself, everything it links to, and everything
+that links to it. A candidate you have already acted on is noise.
+
+**One kind, one index.** Candidates are always the resolved doc's own kind, so
+knowledge ranks against knowledge. There is no `--kind all` here: fusing two
+corpora with RRF would put `--min-score` on a scale where `0.016` is a good
+result. Ranking inside one index keeps the score a raw BM25 number, and the
+score column is printed for exactly that reason: a threshold flag whose values
+you cannot see is a decorative knob. Scores compare within one run, not across
+two.
+
+Output is one line per candidate: rank, score, canonical id, summary, and the
+shared terms that earned the rank, highest-contribution first. The terms are
+the point. A ranked list nobody can interrogate gets either trusted blindly or
+ignored, and both are worse than seeing that a candidate ranked on `resolved,
+pointer, workspace` rather than on `again, now, say`.
+
+```bash
+cortex query related close-day-active-pointer          # top 5 link candidates
+cortex query related close-day-active-pointer --max 3 --min-score 70
+```
+
+**Turning candidates into links** is judgment, and it lives in the
+`cortex-kb` skill under "Sweeping for missing links". The CLI ranks; it never
+writes an edge.
 
 ---
 

@@ -1,7 +1,10 @@
 """Graph queries over a parsed World. Pure: no disk IO (that lives in cli).
 
 `neighbors` powers `cortex query neighbors <slug>`: progressive disclosure of a
-doc's forward links, backlinks, and ghost (unresolved) references."""
+doc's forward links, backlinks, and ghost (unresolved) references.
+
+`linked_ids` is the same edge walk reduced to a set, and is what
+`search.related` excludes so it only ever proposes edges nobody has written."""
 from __future__ import annotations
 from dataclasses import dataclass
 
@@ -70,23 +73,48 @@ def _ghosts(world: World, target: DocId) -> list:
     return out
 
 
-def neighbors(world: World, target_id: DocId, max: int = 20) -> NeighborResult:
-    tcanon = target_id.canonical()
+def _incident(world: World, tcanon: str):
+    """`(outgoing, backlinks)` edges touching TCANON.
+
+    Self-edges are excluded (a doc that references its own slug), so a doc is
+    never its own neighbor in both directions."""
     outgoing, backlinks = [], []
     for e in world.edges:
         s, t = e.source.canonical(), e.target.canonical()
-        # `and t/s != tcanon` excludes self-edges (a doc that references its own
-        # slug) so it is never listed as its own neighbor in both directions.
         if s == tcanon and t != tcanon:
-            tgt = world.docs.get(t)
-            if tgt is not None:
-                outgoing.append(Neighbor(e.kind, e.target,
-                                         _addr(e.target, target_id), _summary(tgt)))
+            outgoing.append(e)
         if t == tcanon and s != tcanon:
-            src = world.docs.get(s)
-            if src is not None:
-                backlinks.append(Neighbor(e.kind, e.source,
-                                          _addr(e.source, target_id), _summary(src)))
+            backlinks.append(e)
+    return outgoing, backlinks
+
+
+def linked_ids(world: World, target_id: DocId) -> set:
+    """Canonical ids already joined to TARGET by an edge in either direction,
+    plus TARGET itself.
+
+    This is `search.related`'s exclusion set. A candidate you have already
+    linked is not a discovery, and the doc itself always ranks first against
+    its own text, so both are noise in a link-suggestion listing."""
+    tcanon = target_id.canonical()
+    outgoing, backlinks = _incident(world, tcanon)
+    return ({tcanon}
+            | {e.target.canonical() for e in outgoing}
+            | {e.source.canonical() for e in backlinks})
+
+
+def neighbors(world: World, target_id: DocId, max: int = 20) -> NeighborResult:
+    outgoing_edges, backlink_edges = _incident(world, target_id.canonical())
+    outgoing, backlinks = [], []
+    for e in outgoing_edges:
+        tgt = world.docs.get(e.target.canonical())
+        if tgt is not None:
+            outgoing.append(Neighbor(e.kind, e.target,
+                                     _addr(e.target, target_id), _summary(tgt)))
+    for e in backlink_edges:
+        src = world.docs.get(e.source.canonical())
+        if src is not None:
+            backlinks.append(Neighbor(e.kind, e.source,
+                                      _addr(e.source, target_id), _summary(src)))
     outgoing.sort(key=_sort_key)
     backlinks.sort(key=_sort_key)
     return NeighborResult(
@@ -162,27 +190,39 @@ def _print_result(res: NeighborResult) -> None:
             print(f"  {g.kind:<{width}}  {g.raw_target}")
 
 
-def cmd_neighbors(args) -> int:
-    root = Path.home() / ".cortex" / "workspaces"
-    world = parse_world(root, include_archive=True)
-    matches = find_by_slug(world, args.slug,
-                           workspace=args.workspace or None,
-                           session=args.session or None,
-                           kind=args.kind or None)
+def resolve_one(world: World, slug: str, *, workspace: str = "",
+                session: str = "", kind: str = "") -> Doc:
+    """The one doc SLUG names, or a CortexError naming the flag that separates
+    the candidates. Shared by `query neighbors` and `query related`: both take
+    a slug and neither may guess, which is the CLI's standing rule on ambiguity.
+
+    A `workspace` of `all` is a scope, not a filter, so it narrows nothing."""
+    matches = find_by_slug(world, slug,
+                           workspace=(workspace if workspace != "all" else "") or None,
+                           session=session or None,
+                           kind=kind or None)
     if not matches:
         scope = ""
-        if args.kind:
-            scope += f" of kind {args.kind!r}"
-        if args.workspace:
-            scope += f" in workspace {args.workspace!r}"
-        if args.session:
-            scope += f" session {args.session!r}"
+        if kind:
+            scope += f" of kind {kind!r}"
+        if workspace:
+            scope += f" in workspace {workspace!r}"
+        if session:
+            scope += f" session {session!r}"
         raise CortexError(
-            f"no task/knowledge/workbench doc with slug {args.slug!r}{scope}")
+            f"no task/knowledge/workbench doc with slug {slug!r}{scope}")
     if len(matches) > 1:
         lines = "\n".join(f"  - {d.id.canonical()}" for d in matches)
         raise CortexError(
-            f"{args.slug!r} is ambiguous; narrow with --workspace/--session/--kind:\n{lines}")
-    res = neighbors(world, matches[0].id, max=parse_max(args.max))
+            f"{slug!r} is ambiguous; narrow with --workspace/--session/--kind:\n{lines}")
+    return matches[0]
+
+
+def cmd_neighbors(args) -> int:
+    root = Path.home() / ".cortex" / "workspaces"
+    world = parse_world(root, include_archive=True)
+    doc = resolve_one(world, args.slug, workspace=args.workspace,
+                      session=args.session, kind=args.kind)
+    res = neighbors(world, doc.id, max=parse_max(args.max))
     _print_result(res)
     return 0

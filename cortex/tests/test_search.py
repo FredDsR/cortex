@@ -3,7 +3,7 @@ import math
 import pytest
 
 from cortex import search
-from cortex.model import Doc, DocId, World
+from cortex.model import Doc, DocId, Edge, World
 
 
 def _approx(value):
@@ -373,3 +373,132 @@ def test_build_indexes_partitions_prose_from_tasks():
     prose, tasks = search.build_indexes(w)
     assert len(prose) == 2
     assert len(tasks) == 1
+
+
+# --- top_terms ---
+
+def test_top_terms_orders_by_contribution_and_caps():
+    idx = search.Index()
+    # "rare" appears in one doc, "common" in all four, so "rare" earns more.
+    idx.add("d1", ["rare", "common", "filler"])
+    for i in range(2, 5):
+        idx.add(f"d{i}", ["common", "filler"])
+    assert idx.top_terms(["common", "rare"], "d1", 5) == ["rare", "common"]
+    assert idx.top_terms(["common", "rare"], "d1", 1) == ["rare"]
+
+
+def test_top_terms_skips_terms_the_document_does_not_hold():
+    idx = search.Index()
+    idx.add("d1", ["alpha"])
+    assert idx.top_terms(["alpha", "beta"], "d1", 5) == ["alpha"]
+
+
+def test_top_terms_on_an_unknown_key_is_empty():
+    assert search.Index().top_terms(["alpha"], "nope", 5) == []
+
+
+# --- the doc-as-query token list ---
+
+def test_query_tokens_cover_title_description_and_body_once_each():
+    doc = _doc("knowledge", "n1", title="Retry Policy",
+               description="backoff rules", body="retry retry backoff sync")
+    toks = search._query_tokens(doc)
+    assert toks == ["retry", "policy", "backoff", "rules", "sync"]
+
+
+def test_query_tokens_dedup_keeps_a_repeated_word_from_dominating():
+    # Index.search scores a repeated query term once per occurrence, so the raw
+    # token list would weight terms by their frequency in the *source* doc.
+    doc = _doc("knowledge", "n1", title="", body="filler " * 40 + "mkstemp")
+    assert search._query_tokens(doc).count("filler") == 1
+
+
+# --- related ---
+
+def _edge(src, dst, kind="related"):
+    return Edge(source=src.id, target=dst.id, raw_target=dst.id.slug, kind=kind)
+
+
+def test_related_ranks_by_shared_vocabulary_and_names_the_terms():
+    target = _doc("knowledge", "sync-conflicts", body="rebase conflict summary")
+    near = _doc("knowledge", "rebase-notes", body="rebase conflict handling")
+    far = _doc("knowledge", "colour-palette", body="teal magenta swatches")
+    res = search.related(_world(target, near, far), target.id)
+    assert [h.address for h in res.hits] == ["ws/knowledge/rebase-notes"]
+    assert set(res.hits[0].terms) >= {"rebase", "conflict"}
+
+
+def test_related_excludes_the_doc_itself_and_both_link_directions():
+    target = _doc("knowledge", "a", body="rebase conflict summary")
+    out = _doc("knowledge", "b", body="rebase conflict summary")
+    back = _doc("knowledge", "c", body="rebase conflict summary")
+    free = _doc("knowledge", "d", body="rebase conflict summary")
+    w = _world(target, out, back, free)
+    w.edges = [_edge(target, out), _edge(back, target)]
+    assert [h.address for h in search.related(w, target.id).hits] == [
+        "ws/knowledge/d"]
+
+
+def test_related_ranks_only_the_targets_own_kind():
+    target = _doc("knowledge", "k-target", body="rebase conflict summary")
+    wb = _doc("workbench", "wb1", body="rebase conflict summary")
+    task = _doc("task", "t1", body="rebase conflict summary")
+    peer = _doc("knowledge", "k-peer", body="rebase conflict summary")
+    res = search.related(_world(target, wb, task, peer), target.id)
+    assert [h.address for h in res.hits] == ["ws/knowledge/k-peer"]
+
+
+def test_related_min_score_filters_before_truncation():
+    target = _doc("knowledge", "t", body="alpha beta")
+    strong = _doc("knowledge", "strong", body="alpha beta")
+    weak = _doc("knowledge", "weak", body="alpha zeta eta theta iota kappa")
+    w = _world(target, strong, weak)
+    unfiltered = search.related(w, target.id)
+    assert unfiltered.total == 2
+    cutoff = unfiltered.hits[0].score
+    filtered = search.related(w, target.id, min_score=cutoff)
+    # `total` counts what passed the threshold, not what merely matched, so the
+    # "(+N more)" line never promises results --min-score already removed.
+    assert filtered.total == 1
+    assert [h.address for h in filtered.hits] == ["ws/knowledge/strong"]
+
+
+def test_related_caps_at_max_and_reports_the_remainder():
+    target = _doc("knowledge", "t", body="alpha beta")
+    w = _world(target, *[_doc("knowledge", f"c{i}", body="alpha beta")
+                         for i in range(4)])
+    res = search.related(w, target.id, max=2)
+    assert len(res.hits) == 2 and res.total == 4
+
+
+def test_related_on_a_doc_with_no_words_returns_nothing():
+    target = _doc("knowledge", "empty", title="", body="")
+    res = search.related(_world(target, _doc("knowledge", "other", body="x")),
+                         target.id)
+    assert res.hits == [] and res.total == 0
+
+
+def test_related_skips_archived_docs_unless_asked():
+    target = _doc("knowledge", "t", body="rebase conflict summary")
+    old = _doc("knowledge", "old", body="rebase conflict summary", archived=True)
+    w = _world(target, old)
+    assert search.related(w, target.id).hits == []
+    assert search.related(w, target.id, include_archive=True).hits
+
+
+def test_related_on_an_unknown_doc_raises():
+    w = _world(_doc("knowledge", "k1", body="x"))
+    with pytest.raises(ValueError, match="no such doc"):
+        search.related(w, DocId(kind="knowledge", workspace="ws", slug="nope"))
+
+
+def test_related_refuses_a_container_kind():
+    # A session is a container, not a document: no text to query with and no
+    # index to rank against. An empty listing would read as "no candidates".
+    sess = Doc(id=DocId(kind="session", workspace="ws", session="s1"),
+               title="s1", body="rebase conflict", frontmatter={}, rel_path=None)
+    w = World(root=Doc(id=DocId(kind="root"), title="/", body="",
+                       frontmatter={}, rel_path=None),
+              docs={sess.id.canonical(): sess})
+    with pytest.raises(ValueError, match="cannot rank candidates"):
+        search.related(w, sess.id)

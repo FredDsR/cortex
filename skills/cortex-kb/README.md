@@ -37,6 +37,11 @@ cortex query search versioning --workspace all  # every global workspace;
                                                 # a repo-local store is
                                                 # named, not included
 
+# Link candidates for one doc: the same ranking, with the doc as the query.
+# Excludes the doc and everything already linked to it. Ranks; never writes.
+cortex query related api-versioning             # top 5 candidates
+cortex query related api-versioning --min-score 70
+
 # Bulk-ingest a codebase into the KB. --from reads the codebase, --workspace
 # writes the KB. Dry-run first (plans, writes nothing), then --write.
 cortex kb ingest --from ./my-service --workspace my-ws          # dry-run plan

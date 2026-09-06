@@ -456,8 +456,9 @@ def _parse_checks(raw: str) -> tuple:
 
 def _scope(args) -> store.Scope:
     """Thin adapter: unpack argparse and hand off to the shared resolver.
-    `cortex query search` needs the identical scope, so the logic lives in
-    `store`, beside every other piece of workspace resolution."""
+    `cortex query search` and `cortex query related` need the identical scope,
+    so the logic lives in `store`, beside every other piece of workspace
+    resolution."""
     return store.resolve_scope(args.workspace, home=_home(), cwd=Path.cwd())
 
 
