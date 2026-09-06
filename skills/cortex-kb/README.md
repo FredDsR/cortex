@@ -29,6 +29,11 @@ cortex kb update knowledge api-versioning
 cortex kb index                 # stdout
 cortex kb index --write         # (re)generate derived knowledge/index.md (OKF section 8)
 
+# Change log, derived from git history (OKF section 9). Never hand-maintained.
+cortex kb log                   # stdout
+cortex kb log --write           # (re)generate derived knowledge/log.md
+cortex kb log --since 2026-08-01
+
 # Search the content, not just the descriptions. Run this BEFORE `kb new`:
 # it is the cheapest way to avoid a second doc about something already covered.
 cortex query search api versioning              # ranked hits, prose + tasks

@@ -165,8 +165,8 @@ def _doc_rows(dir_path: Path) -> list[tuple[str, str, str, str]]:
     if not dir_path.is_dir():
         return rows
     for f in sorted(dir_path.glob("*.md")):
-        if f.name.lower() == INDEX_NAME:
-            continue                       # matches INDEX.md and index.md alike
+        if model.is_reserved(f.name):
+            continue                # index.md (either case) and log.md
         block, _ = fm.split(f.read_text(encoding="utf-8"))
         block = block or ""
         ty = fm.read_field(block, "type")

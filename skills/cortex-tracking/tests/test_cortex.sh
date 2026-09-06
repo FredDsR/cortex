@@ -29,6 +29,29 @@ idx="$home/.cortex/workspaces/ws-a/knowledge/index.md"
 [ ! -f "$home/.cortex/workspaces/ws-a/knowledge/INDEX.md" ] || fail "legacy INDEX.md survived"
 grep -q '^\* \[foo\](foo.md) - ' "$idx" || fail "index.md is not in section 8 form"
 
+# kb log routing: no git in the store means it says so and writes nothing
+lgout="$(HOME="$home" "$bindir/cortex" kb log --workspace ws-a 2>&1)" \
+    || fail "cortex kb log nonzero without a repo"
+printf '%s\n' "$lgout" | grep -q "not a git repo" || fail "kb log did not name the missing repo"
+HOME="$home" "$bindir/cortex" kb log --workspace ws-a --write >/dev/null 2>&1
+[ ! -f "$home/.cortex/workspaces/ws-a/knowledge/log.md" ] || fail "kb log --write wrote without a repo"
+
+# ... and with one, it derives a section 9 log the index never picks up
+git -C "$home/.cortex" init -q
+git -C "$home/.cortex" config user.email t@example.com
+git -C "$home/.cortex" config user.name t
+git -C "$home/.cortex" add -A .
+git -C "$home/.cortex" commit -q -m "track(kb): new knowledge foo"
+HOME="$home" "$bindir/cortex" kb log --workspace ws-a --write >/dev/null \
+    || fail "cortex kb log --write nonzero"
+log="$home/.cortex/workspaces/ws-a/knowledge/log.md"
+[ -f "$log" ] || fail "kb log --write derived no log.md"
+grep -q '^\* \*\*Creation\*\*: ' "$log" || fail "log.md is not in section 9 form"
+head -c 3 "$log" | grep -q -- '---' && fail "log.md must have no frontmatter (section 9)"
+HOME="$home" "$bindir/cortex" kb index --workspace ws-a --write >/dev/null
+grep -q 'log.md' "$home/.cortex/workspaces/ws-a/knowledge/index.md" \
+    && fail "reserved log.md leaked into the index"
+
 # viz routing: --help exits 0 and mentions build
 vout="$(HOME="$home" "$bindir/cortex" viz --help 2>&1)" || fail "cortex viz --help nonzero"
 printf '%s\n' "$vout" | grep -qi "build" || fail "cortex viz --help not routed to the viz engine"

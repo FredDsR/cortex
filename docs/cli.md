@@ -29,6 +29,7 @@ reach for knowledge versus workbench.
 cortex kb new    knowledge|workbench <slug> [flags]
 cortex kb update knowledge|workbench <slug> [flags]
 cortex kb index  [--workspace W] [--session S] [--max N] [--write]
+cortex kb log    [--workspace W] [--since DATE] [--max N] [--write]
 cortex kb ingest [--from SRC] [--workspace W] [--write] [--only openapi|sql] [--max N]
 cortex kb lint   [--workspace W|all] [--repo PATH] [--check C,...] [--stale-days N]
                  [--max N] [--archive] [--fix] [--strict]
@@ -84,6 +85,52 @@ so a `cortex sync pull` on a second device cannot resurrect it beside the new
 one.
 
 [okf]: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
+
+**`log`** derives an [OKF][okf] §9 change log from the store's git history. It
+reads the structured subjects `cortex sync` writes after every kb write, groups
+them by commit date newest first, and resolves each slug to the doc's current
+title and description, so an entry says what the note is rather than only which
+file moved.
+
+```markdown
+# Knowledge change log
+
+_Derived from 35 commits touching `knowledge/`, 2026-08-28 to 2026-09-06._
+
+## 2026-09-06
+
+* **Creation**: [ai-memory 2.0 vs cortex](ai-memory-comparison.md) - Akita's ...
+* **Update**: [Close-day / .active pointer gotchas](close-day-active-pointer.md) - ...
+```
+
+Three verbs count as a knowledge write: `new`, `update`, and `add` (the bash
+`work-kb` spelling of `new`, retired at the Python port but still throughout an
+older store's history). `index` and `lint` commits are the tool's own
+bookkeeping and are filtered, as are workbench writes and merge commits. One
+entry per doc per day, a creation beating an update.
+
+| Flag | Default | Notes |
+|------|---------|-------|
+| `--workspace <ws>` | active session pointer | Which workspace's `knowledge/` to read |
+| `--since <date>` | unset | Passed to `git log --since`; the way to window the derived file |
+| `--max <n>` | `100` | Caps stdout only. `--write` is uncapped, like `kb index` |
+| `--write` | off | Derive `knowledge/log.md`, banner-marked, no frontmatter (§9) |
+
+Two honest limits, both deliberate:
+
+- **No git, no log.** A store is only a repo once somebody runs `git init`
+  (usually via `cortex sync setup`). Without one there is no source, so `log`
+  says so and writes nothing rather than deriving an empty file. Not an error.
+- **A rename hides what came before it.** `git log` reads the directory's
+  current path, and `--follow` handles a renamed file rather than a renamed
+  directory, so a workspace that was renamed leaves its earlier writes under the
+  old path. The header stays truthful because it reports the range actually
+  read, which is why it names a range at all.
+
+`log.md` and `index.md` are both reserved by OKF, so neither is ever read back
+as a knowledge doc: they stay out of the index, out of `search`, out of the viz
+graph, and out of `lint --check okf`, which would otherwise report a file cortex
+derived itself as having no `type`.
 
 **`ingest`** reads a source (a codebase, an OpenAPI spec, SQL schemas) and
 writes knowledge entries into a workspace. Also dry-run by default; `--only`

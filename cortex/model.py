@@ -13,6 +13,23 @@ STATUS_UNKNOWN = None
 ALL_STATUSES = (STATUS_OPEN, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_RESOLVED)
 
 NODE_KINDS = ("root", "workspace", "session", "task", "knowledge", "workbench")
+
+# OKF v0.2 reserves these filenames at any level of a bundle: §8 `index.md` and
+# §9 `log.md`. Both are derived, both carry no frontmatter, and neither is a
+# knowledge doc. Keeping the set here (rather than in `kb`) is what lets the
+# parser share it without importing the command layer.
+#
+# A reserved file that leaked through would be read as knowledge: listed in its
+# own index, returned by `search`, drawn in the viz, and -- having no `type` --
+# reported by `kb lint --check okf` as a violation in a file cortex derived
+# itself, advising a regeneration that would recreate it.
+RESERVED_DOC_NAMES = frozenset({"index.md", "log.md"})
+
+
+def is_reserved(name: str) -> bool:
+    """True for an OKF-reserved filename, case-insensitively so a legacy
+    `INDEX.md` is excluded by the same rule as the lowercase one."""
+    return name.lower() in RESERVED_DOC_NAMES
 AUTHORED_EDGE_KINDS = ("blocked", "related", "follows", "mentions")
 ALL_EDGE_KINDS = AUTHORED_EDGE_KINDS + ("contains",)
 

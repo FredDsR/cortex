@@ -9,7 +9,7 @@ from typing import Optional
 
 from cortex import atomic
 from cortex import model
-from cortex.model import World, Doc, DocId, Edge
+from cortex.model import World, Doc, DocId, Edge, is_reserved
 
 _PACKAGE_DIR = Path(__file__).parent
 _VENDOR_SRC = _PACKAGE_DIR / "templates" / "vendor"
@@ -83,7 +83,7 @@ def _copy_supplementary_md(world: World, out_dir: Path) -> None:
                 continue
             if rel.parts[0] in ("tasks", "workbench") and len(rel.parts) == 2:
                 continue
-            if rel.name == "index.md":
+            if is_reserved(rel.name):
                 continue
             dest = out_sess / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -98,7 +98,7 @@ def _copy_supplementary_md(world: World, out_dir: Path) -> None:
         out_k = out_dir / "workspaces" / doc.id.workspace / "knowledge"
         for md in k_dir.rglob("*.md"):
             rel = md.relative_to(k_dir)
-            if rel.name == "index.md":
+            if is_reserved(rel.name):
                 continue
             if len(rel.parts) == 1:
                 continue  # already copied by _copy_markdown
