@@ -1,5 +1,9 @@
 """OKF v0.2 conformance: the required `type`, the §8 index, and the lint check."""
+import re
+from pathlib import Path
+
 from cortex import cli
+from cortex import kb
 
 
 # ---- §11: type is required on knowledge ----
@@ -324,3 +328,40 @@ def test_lint_okf_leaves_the_root_index_alone_for_one_workspace(kbhome, capsys):
     (root_kdir / "INDEX.md").write_text("stale\n")
     _lint(["--workspace", "ws-a", "--check", "okf"])
     assert "~/.cortex" not in capsys.readouterr().out
+
+
+# ---- the `type` vocabulary ----
+
+def test_gotcha_is_canonical(kbhome, capsys):
+    # 68 docs in a real store, and three docs already teach it by example.
+    # A "canonical set" that omits the most-used value is descriptively wrong.
+    assert "Gotcha" in kb.TYPE_VOCABULARY
+    cli.main(["kb", "new", "knowledge", "untyped", "--body", "b"])
+    assert "Gotcha" in capsys.readouterr().err
+
+
+def test_vocabulary_matches_every_doc_that_lists_it():
+    """The vocabulary is prose in four files and a tuple in one. Nothing made
+    them agree, and they had drifted: `docs/cli.md` taught `Gotcha` as its
+    first example while the canonical list omitted it, 31 lines from a README
+    example that used it. This is the check that keeps them honest."""
+    root = Path(__file__).resolve().parents[2]
+    listing = ", ".join(kb.TYPE_VOCABULARY)
+    for rel in ("README.md", "skills/cortex-kb/SKILL.md",
+                "skills/cortex-kb/README.md", "docs/cli.md"):
+        text = (root / rel).read_text(encoding="utf-8")
+        # Prose backticks each value and wraps lines; compare on the words.
+        flat = " ".join(text.replace("`", "").split())
+        assert listing in flat, f"{rel} does not list the vocabulary in order"
+
+
+def test_every_type_taught_by_example_is_canonical():
+    """A worked example using a type the vocabulary omits is how the drift
+    started. Any `--type X` or `type: X` in the docs must be a value the
+    vocabulary names."""
+    root = Path(__file__).resolve().parents[2]
+    pat = re.compile(r"(?:--type|type:)\s+([A-Z][A-Za-z]+)")
+    for rel in ("README.md", "docs/cli.md", "docs/store.md",
+                "skills/cortex-kb/SKILL.md", "skills/cortex-kb/README.md"):
+        for found in pat.findall((root / rel).read_text(encoding="utf-8")):
+            assert found in kb.TYPE_VOCABULARY, f"{rel} teaches non-canonical {found}"
