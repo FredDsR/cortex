@@ -17,6 +17,7 @@ from cortex.errors import CortexError
 _CC_MATCHER = "startup|clear|compact"
 _CC_MARK = "inject here --format=claude-code"
 
+
 class Adapter:
     """Per-harness wiring + stdout envelope. Every adapter provides `format`;
     the config methods are filled in per harness."""

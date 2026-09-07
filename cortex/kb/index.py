@@ -19,6 +19,7 @@ from cortex import model
 from cortex.kb.common import (INDEX_NAME, LEGACY_INDEX_NAME, md_escape,
                               more_notice)
 
+
 def _doc_rows(dir_path: Path) -> list[tuple[str, str, str, str]]:
     """(type, slug, title, description) per non-index doc in DIR_PATH, ordered
     by lowercased type (untyped last) then slug.
@@ -47,6 +48,7 @@ def _doc_rows(dir_path: Path) -> list[tuple[str, str, str, str]]:
     rows.sort(key=lambda r: (r[0].lower() if r[0] else "~~~", r[1]))
     return rows
 
+
 def _okf_entry(text: str, target: str, desc: str) -> str:
     """One OKF v0.2 §8 index entry: `* [Title](relative-url) - description`.
 
@@ -58,6 +60,8 @@ def _okf_entry(text: str, target: str, desc: str) -> str:
     closes the link text early, which breaks the link for a bundle consumer and
     makes `cortex kb lint` read its own freshly derived index as hand-edited."""
     return f"* [{md_escape(text)}]({target}) - {desc}"
+
+
 def _okf_heading(display_ty: str, first: bool) -> list[str]:
     """A §8 group heading, blank-line separated from what precedes it."""
     return ([] if first else [""]) + [f"## {display_ty or '(untyped)'}", ""]
@@ -83,10 +87,14 @@ def render_section(dir_path: Path, max_n: int | None, *, okf: bool = False) -> l
         out += [_okf_entry(title or slug, f"{slug}.md", desc)
                 for _ty, slug, title, desc in group]
     return out + more_notice(len(rows), max_n)
+
+
 def _knowledge_rows(kdir: Path, ws_name: str) -> list[tuple[str, str, str, str, str]]:
     """(type, slug, workspace, title, description) per non-index knowledge doc."""
     return [(ty, slug, ws_name, title, desc)
             for ty, slug, title, desc in _doc_rows(kdir)]
+
+
 def render_all(workspaces_root: Path, max_n: int | None, *, okf: bool = False) -> list[str]:
     """Cross-workspace dictionary: `## <type>` sections (untyped last), each
     sorted by slug then workspace and capped per section. Scope is the global
@@ -114,6 +122,8 @@ def render_all(workspaces_root: Path, max_n: int | None, *, okf: bool = False) -
                       for _ty, slug, ws, _title, desc in entries[:max_n]]
         lines += more_notice(len(entries), max_n)
     return lines
+
+
 def _retire_legacy_index(kdir: Path) -> None:
     """Remove a pre-conformance `INDEX.md` so the directory holds one index.
 

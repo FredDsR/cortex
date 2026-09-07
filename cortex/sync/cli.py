@@ -10,6 +10,7 @@ from pathlib import Path
 from cortex.sync.repo import git, is_enabled, pull, push, work_dir
 from cortex.sync.setup import interactive_setup, setup
 
+
 def cmd_push(args) -> int:
     return push(args.message, home=Path.home())
 

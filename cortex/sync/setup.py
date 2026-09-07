@@ -15,14 +15,17 @@ from pathlib import Path
 from cortex import atomic
 from cortex.sync.repo import git, work_dir
 
+# <repo>/cortex/sync/setup.py -> parents[2] is the repo root, which is where
+# `skills/` lives. Counted from this file's own depth: the package split moved
+# it one level deeper, and a stale `.parent.parent` here silently skips the
+# .gitignore on `setup --init`.
 _TEMPLATE_GITIGNORE = (
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parents[2]
     / "skills" / "cortex-sync" / "templates" / "gitignore"
 )
 
 
 def _ensure_gh_authed() -> None:
-    import shutil
     if shutil.which("gh") is None:
         raise SystemExit("setup: gh CLI not found. Install https://cli.github.com/")
     if subprocess.run(["gh", "auth", "status"],
@@ -48,7 +51,6 @@ def setup(mode: str, *, home, url: str | None = None, name: str = "work-tracking
                 raise SystemExit(
                     f"setup: {wd} is not empty; refusing to clone over existing content.")
         _ensure_gh_authed()
-        import shutil
         shutil.rmtree(wd)
         if git(["clone", "-q", url, str(wd)], cwd=Path(home)).returncode != 0:
             raise SystemExit(f"setup: clone of {url} failed")

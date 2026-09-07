@@ -20,6 +20,7 @@ SENTINEL_NAME = ".inject-enabled"
 _DEFAULT_MAX_BYTES = 8192
 _TRUNCATE_NOTICE = "... truncated; run 'cortex kb index'"
 
+
 def _max_bytes() -> int:
     raw = os.environ.get("CORTEX_INJECT_MAX_BYTES", "")
     if raw.isdigit():

@@ -15,6 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def work_dir(home) -> Path:
     return Path(home) / ".cortex"
 

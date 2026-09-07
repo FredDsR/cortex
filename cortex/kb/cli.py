@@ -21,6 +21,7 @@ from cortex.kb.common import (AUTHOR_DEFAULT, INDEX_NAME, SLUG,
                               today)
 from cortex.kb.index import render_all, render_section, write_index
 
+
 def _validate_slug(slug: str, kind: str = "knowledge") -> None:
     if not SLUG.match(slug):
         raise CortexError(f"invalid slug: '{slug}' (must match [a-z0-9][a-z0-9-]*)")
@@ -33,6 +34,8 @@ def _validate_slug(slug: str, kind: str = "knowledge") -> None:
         raise CortexError(
             f"'{slug}' is reserved in knowledge/: {slug}.md is derived by cortex "
             f"(OKF §8 index.md / §9 log.md) and would be overwritten")
+
+
 def _resolve_author(args) -> str:
     if args.author is not None:
         a = args.author
@@ -68,6 +71,8 @@ def _read_body(args, *, allow_stdin: bool) -> str:
     if allow_stdin and not sys.stdin.isatty():
         return sys.stdin.read()
     return ""
+
+
 def _maybe_open(args, path: Path) -> None:
     # bash exec's $EDITOR; we spawn+wait so an in-process caller survives.
     if args.open:
@@ -90,6 +95,8 @@ def _require_type(args) -> None:
             "knowledge docs require --type (OKF v0.2 §11 makes it the one "
             "required field). Canonical values: "
             + ", ".join(TYPE_VOCABULARY) + "; custom values are accepted.")
+
+
 def cmd_new(args) -> int:
     _validate_slug(args.slug, args.kind)
     _require_type(args)
@@ -107,6 +114,8 @@ def cmd_new(args) -> int:
     sync_after("new", args.kind, args.slug)
     _maybe_open(args, path)
     return 0
+
+
 def cmd_index(args) -> int:
     # `--max` bounds the printed listing only. `--write` derives a file that
     # `cortex okf export` ships and a bundle consumer reads as the catalog, so

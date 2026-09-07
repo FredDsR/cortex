@@ -238,9 +238,8 @@ def test_here_byte_ceiling_strictly_bounded(kbhome, monkeypatch):
     for i in range(50):
         _mk_knowledge(kbhome, f"doc-{i:03d}", "Reference", "y" * 60 + f" n{i}")
     monkeypatch.setenv("CORTEX_INJECT_MAX_BYTES", "600")
-    from cortex.inject import render as inject_render
-    block = inject_render.render_block(home=kbhome, cwd=kbhome, workspace="ws-a",
-                                session="", max_n=100)
+    block = inject_render.render_block(home=kbhome, cwd=kbhome,
+                                       workspace="ws-a", session="", max_n=100)
     assert len(block.encode("utf-8")) <= 600            # notice now counted
     assert "truncated" in block
 

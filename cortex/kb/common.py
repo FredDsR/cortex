@@ -39,12 +39,15 @@ TYPE_VOCABULARY = ("Decision", "Design", "Reference", "Runbook",
 INDEX_NAME = "index.md"
 LEGACY_INDEX_NAME = "INDEX.md"
 
+
 def today() -> str:
     return datetime.date.today().isoformat()
 
 
 def home_dir() -> Path:
     return Path(os.environ.get("HOME") or str(Path.home()))
+
+
 def parse_max(value, flag: str = "--max") -> int:
     """Validate --max like bash did (^[0-9]+$ or die, exit 1). `flag` names the
     option in the error, so a caller reusing this for another numeric flag does
@@ -52,6 +55,8 @@ def parse_max(value, flag: str = "--max") -> int:
     if not re.fullmatch(r"[0-9]+", str(value)):
         raise CortexError(f"{flag} must be a non-negative integer")
     return int(value)
+
+
 def sync_after(verb: str, kind: str, slug: str) -> None:
     # Best-effort: cortex.sync.push is a no-op when sync is not enabled.
     from cortex.sync import repo as sync_repo
@@ -59,6 +64,7 @@ def sync_after(verb: str, kind: str, slug: str) -> None:
         sync_repo.push(f"track(kb): {verb} {kind} {slug}", home=home_dir())
     except Exception:
         pass
+
 
 def more_notice(total: int, max_n: int | None) -> list[str]:
     """`max_n=None` means uncapped, and an uncapped render has nothing to
@@ -68,6 +74,8 @@ def more_notice(total: int, max_n: int | None) -> list[str]:
     if max_n is None or total <= max_n:
         return []
     return [f"... {total - max_n} more (raise --max)"]
+
+
 def md_escape(text: str) -> str:
     """Escape the two characters that can end a §8 entry's link text early."""
     return text.replace("[", r"\[").replace("]", r"\]")

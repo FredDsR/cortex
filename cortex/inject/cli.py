@@ -16,6 +16,7 @@ from cortex.inject.adapters import ADAPTERS, get_adapter
 from cortex.inject.render import render_block, sentinel
 from cortex.kb import common as kb_common
 
+
 def cmd_here(args) -> int:
     # Validate --max up front so a bad value reports an error like every other
     # command; only the render itself is wrapped in the never-error guard.
