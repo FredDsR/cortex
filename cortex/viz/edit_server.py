@@ -142,7 +142,7 @@ class EditHandler(http.server.SimpleHTTPRequestHandler):
             return
         # Best-effort: cortex.sync.push is a no-op when sync is not enabled.
         try:
-            from cortex import sync
+            from cortex.sync import repo as sync
             sync.push(f"track(viz): edit {cid}", home=os.path.expanduser("~"))
         except Exception:
             pass

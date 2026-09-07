@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from cortex import sync
+from cortex.sync import repo as sync
+from cortex.sync import setup as sync_setup
 
 
 def _git(*a, cwd):
@@ -142,7 +143,7 @@ def test_pull_task_conflict_surfaces_exit_2(tmp_path):
 
 
 def test_setup_skip_writes_sentinel(tmp_path):
-    assert sync.setup("skip", home=tmp_path) == 0
+    assert sync_setup.setup("skip", home=tmp_path) == 0
     assert (tmp_path / ".cortex" / ".sync-disabled").exists()
 
 
@@ -151,5 +152,5 @@ def test_setup_clone_refuses_nonempty_store(tmp_path):
     wd.mkdir()
     (wd / "data").write_text("x")     # pre-existing content
     with pytest.raises(SystemExit):
-        sync.setup("clone", home=tmp_path, url="https://example.com/x.git")
+        sync_setup.setup("clone", home=tmp_path, url="https://example.com/x.git")
     assert (wd / "data").exists()     # not clobbered

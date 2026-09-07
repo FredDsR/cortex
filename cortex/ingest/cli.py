@@ -14,7 +14,7 @@ from cortex import store
 from cortex.errors import CortexError, UsageError
 from cortex.ingest.extract import extract_all
 from cortex.ingest.scan import scan
-from cortex.kb import _home, sync_after, today, parse_max, _SLUG
+from cortex.kb.common import SLUG, home_dir, parse_max, sync_after, today
 from cortex.sanitize import sanitize
 
 
@@ -27,7 +27,7 @@ def cmd_ingest(args) -> int:
     if only and only not in ("openapi", "sql"):
         raise UsageError("--only must be openapi or sql")
 
-    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
+    ws_root = store.resolve_workspace(args.workspace, home=home_dir(), cwd=Path.cwd())
     kdir = ws_root / "knowledge"
 
     structured, worklist = scan(src, only)
@@ -39,7 +39,7 @@ def cmd_ingest(args) -> int:
     count = overflow = 0
     for r in records:
         slug = r["slug"]
-        if not _SLUG.match(slug):
+        if not SLUG.match(slug):
             warnings.append(f"skipping record with invalid slug: {slug}")
             continue
         target = kdir / f"{slug}.md"

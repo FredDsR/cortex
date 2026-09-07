@@ -6,7 +6,7 @@ from pathlib import Path
 from cortex import store
 from cortex.changelog import LOG_NAME
 from cortex.errors import CortexError
-from cortex.kb import INDEX_NAME, _home, sync_after
+from cortex.kb.common import INDEX_NAME, home_dir, sync_after
 from cortex.okf import bundle
 from cortex.sanitize import sanitize
 
@@ -30,7 +30,7 @@ def _print_warnings(warnings) -> None:
 
 
 def cmd_export(args) -> int:
-    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
+    ws_root = store.resolve_workspace(args.workspace, home=home_dir(), cwd=Path.cwd())
     kdir = ws_root / "knowledge"
     if not kdir.is_dir():
         raise CortexError(f"{kdir} does not exist, so there is nothing to export")
@@ -60,7 +60,7 @@ def cmd_import(args) -> int:
     # is the caller's typo, and reporting an ambiguous workspace instead sends
     # them after the wrong thing.
     res = bundle.read_bundle(Path(args.bundle))
-    ws_root = store.resolve_workspace(args.workspace, home=_home(), cwd=Path.cwd())
+    ws_root = store.resolve_workspace(args.workspace, home=home_dir(), cwd=Path.cwd())
     kdir = ws_root / "knowledge"
 
     created, skipped = bundle.write_concepts(res.concepts, kdir, write=args.write)

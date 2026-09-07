@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cortex import address
-from cortex import kb
+from cortex.kb import common as kb_common
 from cortex import parser
 from cortex.model import AUTHORED_EDGE_KINDS, Doc, World
 from cortex.query import LINKABLE_KINDS
@@ -319,7 +319,7 @@ def _stale(doc: Doc, today: datetime.date, days: int) -> list:
 # blank lines) is not an entry and is not checked against this.
 #
 # The link text is `.+` and greedy rather than `[^\]]+`: a title carrying a
-# bracket (escaped by `kb._md_escape`, or literal in an index derived before
+# bracket (escaped by `kb.common.md_escape`, or literal in an index derived before
 # that) still ends its link at the last `](`, and reading such a line as a hand
 # edit would flag a freshly derived index that nothing can fix.
 OKF_ENTRY = re.compile(r"^\* \[.+\]\([^)]+\)")
@@ -354,11 +354,11 @@ def _okf_index(kdir: Path, label: str) -> list:
     # A directory rather than a doc, so the id column names it as one. It is
     # still a store path, which is what the column promises: openable as typed.
     out, doc = [], f"{label}/knowledge/"
-    legacy, current = kdir / kb.LEGACY_INDEX_NAME, kdir / kb.INDEX_NAME
+    legacy, current = kdir / kb_common.LEGACY_INDEX_NAME, kdir / kb_common.INDEX_NAME
     if legacy.exists() and not (current.exists() and legacy.samefile(current)):
-        out.append(Finding("okf", doc, f"{kb.LEGACY_INDEX_NAME} alongside the "
+        out.append(Finding("okf", doc, f"{kb_common.LEGACY_INDEX_NAME} alongside the "
                                        f"index (§8 reserves lowercase "
-                                       f"{kb.INDEX_NAME}); regenerate with "
+                                       f"{kb_common.INDEX_NAME}); regenerate with "
                                        f"cortex kb index --write"))
     if not current.is_file():
         return out
@@ -371,7 +371,7 @@ def _okf_index(kdir: Path, label: str) -> list:
         if (not stripped or stripped.startswith(("#", "<!--", "..."))
                 or OKF_ENTRY.match(stripped)):
             continue
-        out.append(Finding("okf", doc, f"{kb.INDEX_NAME}:{n} is not a §8 entry "
+        out.append(Finding("okf", doc, f"{kb_common.INDEX_NAME}:{n} is not a §8 entry "
                                        f"(`* [Title](url) - description`); "
                                        f"regenerate with cortex kb index --write"))
         break                          # one finding per index; the fix is the same
@@ -449,7 +449,7 @@ def collect(world: World, *, names, checks, repos, today: datetime.date,
             if "okf" in checks:
                 # knowledge/ only: workbench is session-scoped and never
                 # exported, so §11 does not reach it. Same exemption as
-                # `kb new`. See cortex.kb._require_type.
+                # `kb new`. See cortex.kb.cli._require_type.
                 found += _okf_doc(doc)
         if doc.id.kind in KB_KINDS:
             if "stale" in checks:

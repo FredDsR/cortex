@@ -13,7 +13,7 @@ from pathlib import Path
 from cortex import parser
 from cortex import store
 from cortex.errors import CortexError, UsageError
-from cortex.kb import _home, parse_max, sync_after
+from cortex.kb.common import home_dir, parse_max, sync_after
 from cortex.lint.checks import (CHECKS, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
                                 SELECTABLE, WORKLIST, Finding, collect,
                                 index_repo, overlaps)
@@ -37,7 +37,7 @@ def _scope(args) -> store.Scope:
     `cortex query search` and `cortex query related` need the identical scope,
     so the logic lives in `store`, beside every other piece of workspace
     resolution."""
-    return store.resolve_scope(args.workspace, home=_home(), cwd=Path.cwd())
+    return store.resolve_scope(args.workspace, home=home_dir(), cwd=Path.cwd())
 
 
 def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:
@@ -56,7 +56,7 @@ def _repo_for(root: Path, ws: str, explicit: str) -> Path | None:
     # skips dead-ref and asks for a --repo that is the directory it is standing
     # in. Guarded on the root as well as the name, since a global workspace may
     # itself be called `.cortex` and its root is not anybody's repo.
-    if ws == ".cortex" and root.resolve() != (_home() / ".cortex" / "workspaces").resolve():
+    if ws == ".cortex" and root.resolve() != (home_dir() / ".cortex" / "workspaces").resolve():
         return root
     return None
 
@@ -117,7 +117,7 @@ def cmd_lint(args) -> int:
     # invisible is the same stale artefact the per-workspace check exists for.
     index_dirs = [(root / ws / "knowledge", ws) for ws in sorted(names)]
     if args.workspace == "all":
-        index_dirs.append((_home() / ".cortex" / "knowledge", "~/.cortex"))
+        index_dirs.append((home_dir() / ".cortex" / "knowledge", "~/.cortex"))
 
     findings = collect(world, names=names, checks=checks, repos=repos,
                        today=datetime.date.today(), stale_days=stale_days,

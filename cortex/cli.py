@@ -8,11 +8,11 @@ import argparse
 import sys
 
 from cortex import changelog
-from cortex import kb
+from cortex.kb import cli as kb_cli
 from cortex import query
-from cortex import inject
+from cortex.inject import cli as inject_cli
 from cortex import migrate_store
-from cortex import sync
+from cortex.sync import cli as sync_cli
 from cortex.errors import CortexError
 from cortex.ingest import cli as ingest_cli
 from cortex.lint import checks as lint_checks
@@ -193,9 +193,9 @@ def _glue_flag_values(argv):
 
 
 _KB_DISPATCH = {
-    "new": kb.cmd_new,
-    "update": kb.cmd_update,
-    "index": kb.cmd_index,
+    "new": kb_cli.cmd_new,
+    "update": kb_cli.cmd_update,
+    "index": kb_cli.cmd_index,
     "log": changelog.cmd_log,
     "ingest": ingest_cli.cmd_ingest,
     "lint": lint_cli.cmd_lint,
@@ -213,17 +213,17 @@ _OKF_DISPATCH = {
 }
 
 _INJECT_DISPATCH = {
-    "here": inject.cmd_here,
-    "enable": inject.cmd_enable,
-    "disable": inject.cmd_disable,
-    "status": inject.cmd_status,
+    "here": inject_cli.cmd_here,
+    "enable": inject_cli.cmd_enable,
+    "disable": inject_cli.cmd_disable,
+    "status": inject_cli.cmd_status,
 }
 
 _SYNC_DISPATCH = {
-    "push": sync.cmd_push,
-    "pull": sync.cmd_pull,
-    "setup": sync.cmd_setup,
-    "status": sync.cmd_status,
+    "push": sync_cli.cmd_push,
+    "pull": sync_cli.cmd_pull,
+    "setup": sync_cli.cmd_setup,
+    "status": sync_cli.cmd_status,
 }
 
 _GROUP_DISPATCH = {
