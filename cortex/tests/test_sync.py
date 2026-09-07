@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from cortex import sync
+from cortex.sync import repo as sync
+from cortex.sync import setup as sync_setup
 
 
 def _git(*a, cwd):
@@ -142,7 +143,7 @@ def test_pull_task_conflict_surfaces_exit_2(tmp_path):
 
 
 def test_setup_skip_writes_sentinel(tmp_path):
-    assert sync.setup("skip", home=tmp_path) == 0
+    assert sync_setup.setup("skip", home=tmp_path) == 0
     assert (tmp_path / ".cortex" / ".sync-disabled").exists()
 
 
@@ -151,5 +152,47 @@ def test_setup_clone_refuses_nonempty_store(tmp_path):
     wd.mkdir()
     (wd / "data").write_text("x")     # pre-existing content
     with pytest.raises(SystemExit):
-        sync.setup("clone", home=tmp_path, url="https://example.com/x.git")
+        sync_setup.setup("clone", home=tmp_path, url="https://example.com/x.git")
     assert (wd / "data").exists()     # not clobbered
+
+# ---- setup --init ----------------------------------------------------------
+# This branch shells out to `gh`, so nothing reached it until now. The package
+# split then broke it twice over (a dropped `atomic` import and a template path
+# that was correct one directory shallower) with the whole suite green.
+
+def test_gitignore_template_path_resolves():
+    """The cheap invariant that both of those bugs violated. It is a plain
+    path computation, so it breaks silently: `setup --init` just skips the
+    .gitignore and commits everything the template exists to exclude."""
+    assert sync_setup._TEMPLATE_GITIGNORE.is_file(), (
+        f"{sync_setup._TEMPLATE_GITIGNORE} does not exist; the path is relative "
+        f"to this module's depth and a move breaks it")
+
+
+def test_init_writes_the_gitignore_and_commits(tmp_path, monkeypatch):
+    """The whole --init path with `gh` stubbed: it must write the store's
+    .gitignore from the template and leave a commit behind."""
+    calls = []
+    real_run = subprocess.run
+
+    def fake_run(argv, *a, **kw):
+        # Only `gh` is stubbed. git must really run, or the test asserts
+        # nothing about the half of --init that builds the repo.
+        calls.append(list(argv))
+        if list(argv)[:1] == ["gh"]:
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+        return real_run(argv, *a, **kw)
+
+    monkeypatch.setattr(sync_setup.shutil, "which", lambda _: "/usr/bin/gh")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert sync_setup.setup("init", home=tmp_path, name="probe-repo") == 0
+
+    gitignore = tmp_path / ".cortex" / ".gitignore"
+    assert gitignore.is_file(), "setup --init did not write the store .gitignore"
+    assert gitignore.read_text() == sync_setup._TEMPLATE_GITIGNORE.read_text()
+    assert (tmp_path / ".cortex" / ".git").is_dir()
+    assert any(c[:2] == ["gh", "repo"] for c in calls), calls
+    log = real_run(["git", "log", "--format=%s"], cwd=tmp_path / ".cortex",
+                   capture_output=True, text=True).stdout
+    assert "track: initial sync state" in log

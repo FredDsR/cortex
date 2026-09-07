@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from cortex import cli
-from cortex import kb
+from cortex.kb import common as kb_common
 
 
 # ---- §11: type is required on knowledge ----
@@ -335,7 +335,7 @@ def test_lint_okf_leaves_the_root_index_alone_for_one_workspace(kbhome, capsys):
 def test_gotcha_is_canonical(kbhome, capsys):
     # 68 docs in a real store, and three docs already teach it by example.
     # A "canonical set" that omits the most-used value is descriptively wrong.
-    assert "Gotcha" in kb.TYPE_VOCABULARY
+    assert "Gotcha" in kb_common.TYPE_VOCABULARY
     cli.main(["kb", "new", "knowledge", "untyped", "--body", "b"])
     assert "Gotcha" in capsys.readouterr().err
 
@@ -346,7 +346,7 @@ def test_vocabulary_matches_every_doc_that_lists_it():
     first example while the canonical list omitted it, 31 lines from a README
     example that used it. This is the check that keeps them honest."""
     root = Path(__file__).resolve().parents[2]
-    listing = ", ".join(kb.TYPE_VOCABULARY)
+    listing = ", ".join(kb_common.TYPE_VOCABULARY)
     for rel in ("README.md", "skills/cortex-kb/SKILL.md",
                 "skills/cortex-kb/README.md", "docs/cli.md"):
         text = (root / rel).read_text(encoding="utf-8")
@@ -364,4 +364,4 @@ def test_every_type_taught_by_example_is_canonical():
     for rel in ("README.md", "docs/cli.md", "docs/store.md",
                 "skills/cortex-kb/SKILL.md", "skills/cortex-kb/README.md"):
         for found in pat.findall((root / rel).read_text(encoding="utf-8")):
-            assert found in kb.TYPE_VOCABULARY, f"{rel} teaches non-canonical {found}"
+            assert found in kb_common.TYPE_VOCABULARY, f"{rel} teaches non-canonical {found}"

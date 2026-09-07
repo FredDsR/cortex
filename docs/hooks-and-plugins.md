@@ -68,7 +68,8 @@ Only Claude Code has an adapter today. For anything else, the recipe is: have
 that harness's session-start hook run `cortex inject here` and inject its
 stdout. `here` prints plain text and is the universal renderer, so no adapter is
 strictly required to use the feature. A native adapter is added by registering
-one in `cortex/inject.py`.
+one in `cortex/inject/adapters.py`, which is the only module that knows any
+particular harness exists.
 
 ---
 

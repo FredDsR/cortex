@@ -19,7 +19,7 @@ of them into `...`.
 from __future__ import annotations
 import re
 
-from cortex.kb import _md_escape
+from cortex.kb.common import md_escape
 from cortex.lint.checks import FENCE
 
 # `[[...]]` with no nested bracket. Single-bracket `[slug]` mentions are left
@@ -81,7 +81,7 @@ def to_markdown(text: str, resolve) -> str:
         if hit is None:
             return ref.rsplit("/", 1)[-1]
         slug, title = hit
-        return f"[{_md_escape(title or slug)}](/{slug}.md)"
+        return f"[{md_escape(title or slug)}](/{slug}.md)"
 
     return _rewrite(text, _WIKILINK, _one)
 

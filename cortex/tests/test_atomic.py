@@ -176,7 +176,7 @@ def test_viz_build_does_not_fsync_regenerable_output(workspaces_root, tmp_path, 
 
 def test_store_writes_are_still_fsynced(kbhome, monkeypatch):
     """The counterpart: a knowledge doc is source, so it keeps its fsyncs."""
-    from cortex import kb
+    from cortex.kb import cli as kb
     calls = []
     real_fsync = os.fsync
     monkeypatch.setattr(atomic.os, "fsync", lambda fd: (calls.append(fd), real_fsync(fd))[1])
@@ -283,7 +283,7 @@ def test_no_bare_file_write_remains_in_the_package():
 def test_kb_new_does_not_leave_a_partial_doc(kbhome, monkeypatch):
     """kb writes are followed by sync_after(), which commits and pushes, so a
     torn doc here propagates to every other device."""
-    from cortex import kb
+    from cortex.kb import cli as kb
     monkeypatch.setattr(atomic.os, "replace",
                         lambda s, d: (_ for _ in ()).throw(KeyboardInterrupt))
     args = _kb_new_args(workspace="ws-a", slug="probe")
@@ -295,7 +295,7 @@ def test_kb_new_does_not_leave_a_partial_doc(kbhome, monkeypatch):
 
 
 def test_kb_index_does_not_leave_a_partial_index(kbhome, monkeypatch):
-    from cortex import kb
+    from cortex.kb import cli as kb
     kb.cmd_new(_kb_new_args(workspace="ws-a", slug="probe"))
     kdir = kbhome / ".cortex" / "workspaces" / "ws-a" / "knowledge"
     kb.cmd_index(_kb_index_args(workspace="ws-a"))
@@ -312,7 +312,7 @@ def test_kb_index_does_not_leave_a_partial_index(kbhome, monkeypatch):
 def test_inject_wire_does_not_corrupt_settings_json(tmp_path, monkeypatch):
     """A torn ~/.claude/settings.json breaks every session on the machine,
     including ones that never touch cortex."""
-    from cortex import inject
+    from cortex.inject import adapters as inject
     settings = tmp_path / ".claude" / "settings.json"
     settings.parent.mkdir(parents=True)
     original = {"model": "opus", "hooks": {"SessionStart": []}}

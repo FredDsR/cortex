@@ -1,6 +1,7 @@
 import json
 
-from cortex import cli, inject
+from cortex import cli
+from cortex.inject import render as inject_render
 from pathlib import Path
 
 
@@ -98,7 +99,7 @@ def test_here_silent_on_corrupt_file(kbhome, capsys, monkeypatch):
 
     def boom(*a, **k):
         raise ValueError("corrupt")
-    monkeypatch.setattr("cortex.inject.kb._render_section", boom)
+    monkeypatch.setattr("cortex.inject.render.kb_index.render_section", boom)
     assert cli.main(["inject", "here", "--workspace", "ws-a"]) == 0
     assert capsys.readouterr().out == ""
 
@@ -151,7 +152,7 @@ def _settings(kbhome):
 
 
 def test_wire_creates_entry_and_is_idempotent(kbhome):
-    from cortex.inject import ClaudeCodeAdapter
+    from cortex.inject.adapters import ClaudeCodeAdapter
     a = ClaudeCodeAdapter()
     assert a.wire(home=kbhome) is True
     assert a.is_wired(home=kbhome) is True
@@ -169,7 +170,7 @@ def test_wire_creates_entry_and_is_idempotent(kbhome):
 
 
 def test_wire_preserves_unrelated_hooks(kbhome):
-    from cortex.inject import ClaudeCodeAdapter
+    from cortex.inject.adapters import ClaudeCodeAdapter
     _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
     _settings(kbhome).write_text(json.dumps({
         "hooks": {"SessionStart": [
@@ -187,7 +188,7 @@ def test_wire_preserves_unrelated_hooks(kbhome):
 
 
 def test_wire_refuses_to_clobber_malformed_settings(kbhome):
-    from cortex.inject import ClaudeCodeAdapter
+    from cortex.inject.adapters import ClaudeCodeAdapter
     from cortex.errors import CortexError
     import pytest
     _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
@@ -200,7 +201,7 @@ def test_wire_refuses_to_clobber_malformed_settings(kbhome):
 
 
 def test_wire_refuses_non_dict_hooks(kbhome):
-    from cortex.inject import ClaudeCodeAdapter
+    from cortex.inject.adapters import ClaudeCodeAdapter
     from cortex.errors import CortexError
     import pytest
     _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
@@ -220,8 +221,8 @@ def test_status_survives_malformed_settings(kbhome, capsys):
 
 
 def test_wire_command_uses_passed_home_when_cortex_not_on_path(kbhome, monkeypatch):
-    from cortex.inject import ClaudeCodeAdapter
-    monkeypatch.setattr("cortex.inject.shutil.which", lambda _: None)
+    from cortex.inject.adapters import ClaudeCodeAdapter
+    monkeypatch.setattr("cortex.inject.adapters.shutil.which", lambda _: None)
     a = ClaudeCodeAdapter()
     a.wire(home=kbhome)
     cmd = json.loads(_settings(kbhome).read_text())["hooks"]["SessionStart"][0]["hooks"][0]["command"]
@@ -237,15 +238,14 @@ def test_here_byte_ceiling_strictly_bounded(kbhome, monkeypatch):
     for i in range(50):
         _mk_knowledge(kbhome, f"doc-{i:03d}", "Reference", "y" * 60 + f" n{i}")
     monkeypatch.setenv("CORTEX_INJECT_MAX_BYTES", "600")
-    from cortex import inject
-    block = inject.render_block(home=kbhome, cwd=kbhome, workspace="ws-a",
-                                session="", max_n=100)
+    block = inject_render.render_block(home=kbhome, cwd=kbhome,
+                                       workspace="ws-a", session="", max_n=100)
     assert len(block.encode("utf-8")) <= 600            # notice now counted
     assert "truncated" in block
 
 
 def test_unwire_removes_only_our_entry(kbhome):
-    from cortex.inject import ClaudeCodeAdapter
+    from cortex.inject.adapters import ClaudeCodeAdapter
     _settings(kbhome).parent.mkdir(parents=True, exist_ok=True)
     _settings(kbhome).write_text(json.dumps({
         "hooks": {"SessionStart": [

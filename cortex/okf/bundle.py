@@ -22,7 +22,8 @@ from pathlib import Path
 from cortex import atomic
 from cortex import changelog
 from cortex import frontmatter as fm
-from cortex import kb
+from cortex.kb import common as kb_common
+from cortex.kb import index as kb_index
 from cortex import model
 from cortex.errors import CortexError
 from cortex.lint.checks import OKF_ENTRY
@@ -108,7 +109,7 @@ def read_bundle(root: Path) -> ReadResult:
     for path in files:
         rel = sanitize(path.relative_to(root).as_posix())
         slug = path.stem
-        if not kb._SLUG.match(slug):
+        if not kb_common.SLUG.match(slug):
             res.warnings.append(f"invalid slug, skipping: {rel}")
             continue
         if slug in seen:
@@ -146,7 +147,7 @@ def _concept(slug: str, text: str, rel: str) -> Concept:
         body = text
     block = sanitize(block or "")
     gen = _generated(block)
-    when = _date(gen.get("at", ""), kb.today())
+    when = _date(gen.get("at", ""), kb_common.today())
     author = gen.get("by", "")
     return Concept(
         slug=slug,
@@ -156,7 +157,7 @@ def _concept(slug: str, text: str, rel: str) -> Concept:
         # cortex's `author` is a two-value field (human | agent), so a
         # generator's name cannot go in it. The `generated:` block rides
         # through in `extra`, which is what actually preserves that provenance.
-        author=author if author in ("human", "agent") else kb.AUTHOR_DEFAULT,
+        author=author if author in ("human", "agent") else kb_common.AUTHOR_DEFAULT,
         # §5 calls `generated.at` "the content's last meaningful change", which
         # is what `updated` means here -- but a bundle cortex exported carries
         # both fields already, so its own win. Neither is stamped with today:
@@ -243,7 +244,7 @@ def export_bundle(kdir: Path, out: Path, *, since: str = "") -> ExportResult:
         atomic.write_text(out / f"{slug}.md", text, encoding="utf-8")
 
     res = ExportResult(out=out, docs=len(docs))
-    atomic.write_text(out / kb.INDEX_NAME, "\n".join(_index_lines(kdir)) + "\n",
+    atomic.write_text(out / kb_common.INDEX_NAME, "\n".join(_index_lines(kdir)) + "\n",
                       encoding="utf-8")
     res.logged = changelog.is_git_repo(kdir)
     hist = (changelog.read_history(kdir, since=since) if res.logged
@@ -262,7 +263,7 @@ def _index_lines(kdir: Path) -> list[str]:
     The frontmatter is §8's one exception to index files carrying none, and it
     is the only place a recipient can read which format version they hold."""
     return ["---", f"okf_version: {OKF_VERSION}", "---", "",
-            "# Knowledge index", ""] + kb._render_section(kdir, None, okf=True)
+            "# Knowledge index", ""] + kb_index.render_section(kdir, None, okf=True)
 
 
 def validate(out: Path) -> list[str]:
@@ -282,7 +283,7 @@ def validate(out: Path) -> list[str]:
         elif not fm.read_field(block, "type").strip():
             findings.append(f"{rel}: no type: field (§11); "
                             f"set one with cortex kb update --type")
-    index = out / kb.INDEX_NAME
+    index = out / kb_common.INDEX_NAME
     if index.is_file():
         _, body = fm.split(index.read_text(encoding="utf-8"))
         for n, line in enumerate((body or "").split("\n"), 1):
@@ -290,7 +291,7 @@ def validate(out: Path) -> list[str]:
             if (not stripped or stripped.startswith(("#", "<!--"))
                     or OKF_ENTRY.match(stripped)):
                 continue
-            findings.append(f"{kb.INDEX_NAME}:{n} is not a §8 entry: {stripped}")
+            findings.append(f"{kb_common.INDEX_NAME}:{n} is not a §8 entry: {stripped}")
             break
     return findings
 
