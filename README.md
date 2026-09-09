@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/cortex-logo.svg" alt="cortex" width="340">
+  <img src="https://raw.githubusercontent.com/FredDsR/cortex/main/assets/cortex-logo.svg" alt="cortex" width="340">
 </p>
 
 # cortex
@@ -67,13 +67,13 @@ concepts, the CLI, and the ingest path the table above compares.
 **Light theme**
 
 <p align="center">
-  <img src="assets/screenshots/viz-light.png" alt="cortex viz dashboard, light theme: tree, graph, and content panes" width="900">
+  <img src="https://raw.githubusercontent.com/FredDsR/cortex/main/assets/screenshots/viz-light.png" alt="cortex viz dashboard, light theme: tree, graph, and content panes" width="900">
 </p>
 
 **Dark theme**
 
 <p align="center">
-  <img src="assets/screenshots/viz-dark.png" alt="cortex viz dashboard, dark theme: tree, graph, and content panes" width="900">
+  <img src="https://raw.githubusercontent.com/FredDsR/cortex/main/assets/screenshots/viz-dark.png" alt="cortex viz dashboard, dark theme: tree, graph, and content panes" width="900">
 </p>
 
 ## Concepts
