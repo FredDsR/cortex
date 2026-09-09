@@ -8,6 +8,10 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
+          "type": "generic",
+          "path": "src/cortex/__init__.py"
+        },
+        {
           "type": "json",
           "path": ".claude-plugin/plugin.json",
           "jsonpath": "$.version"
@@ -19,16 +23,49 @@
         }
       ],
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "perf", "section": "Performance" },
-        { "type": "refactor", "section": "Refactoring" },
-        { "type": "docs", "section": "Documentation" },
-        { "type": "build", "section": "Build" },
-        { "type": "revert", "section": "Reverts" },
-        { "type": "ci", "section": "CI", "hidden": true },
-        { "type": "test", "section": "Tests", "hidden": true },
-        { "type": "chore", "section": "Chores", "hidden": true }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "perf",
+          "section": "Performance"
+        },
+        {
+          "type": "refactor",
+          "section": "Refactoring"
+        },
+        {
+          "type": "docs",
+          "section": "Documentation"
+        },
+        {
+          "type": "build",
+          "section": "Build"
+        },
+        {
+          "type": "revert",
+          "section": "Reverts"
+        },
+        {
+          "type": "ci",
+          "section": "CI",
+          "hidden": true
+        },
+        {
+          "type": "test",
+          "section": "Tests",
+          "hidden": true
+        },
+        {
+          "type": "chore",
+          "section": "Chores",
+          "hidden": true
+        }
       ]
     }
   }

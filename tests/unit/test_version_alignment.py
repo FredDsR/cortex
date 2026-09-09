@@ -47,8 +47,10 @@ def test_release_please_updates_both_plugin_manifests():
     """These two are the files that previously drifted, so the extra-files
     entries that keep them in step are worth asserting."""
     cfg = _json("release-please-config.json")
-    targets = {e["path"] for e in cfg["packages"]["."]["extra-files"]}
-    assert targets == {
+    entries = cfg["packages"]["."]["extra-files"]
+    json_targets = {e["path"] for e in entries
+                    if isinstance(e, dict) and e.get("type") == "json"}
+    assert json_targets == {
         ".claude-plugin/plugin.json",
         ".claude-plugin/marketplace.json",
     }
@@ -58,3 +60,35 @@ def test_distribution_name_is_not_the_taken_pypi_name():
     """`cortex` and `cortex-cli` are taken on PyPI. The import package and the
     console script stay `cortex`; only the distribution differs."""
     assert _pyproject_name() not in ("cortex", "cortex-cli")
+
+
+def test_version_line_carries_the_release_please_annotation():
+    """release-please derives the __init__.py path from the DISTRIBUTION name,
+    so for `agentic-cortex` it looks for src/agentic_cortex/__init__.py and
+    never finds ours. The generic updater targets the real path, and it only
+    acts on an annotated line. Without both, tags advance while the published
+    version stays put.
+    """
+    src = (REPO_ROOT / "src" / "cortex" / "__init__.py").read_text()
+    version_line = next(
+        line for line in src.splitlines()
+        if line.startswith("__version__")
+    )
+    assert "x-release-please-version" in version_line
+
+
+def test_release_please_updates_the_version_file_via_the_generic_updater():
+    cfg = _json("release-please-config.json")
+    entries = cfg["packages"]["."]["extra-files"]
+    generic = [e for e in entries
+               if isinstance(e, dict) and e.get("type") == "generic"]
+    assert {e["path"] for e in generic} == {"src/cortex/__init__.py"}
+
+
+def test_pyproject_version_is_dynamic():
+    """hatchling reads __init__.py, which is why the generic updater above is
+    the only thing that moves the version. release-please skips a dynamic
+    pyproject, and that is correct rather than a gap."""
+    text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert 'dynamic = ["version"]' in text
+    assert 'path = "src/cortex/__init__.py"' in text
