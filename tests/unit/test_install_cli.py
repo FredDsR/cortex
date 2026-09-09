@@ -1,4 +1,4 @@
-from cortex.install.cli import main, packaged_skills_dir
+from cortex.install.cli import DISTRIBUTION_NAME, main, packaged_skills_dir
 
 
 def test_packaged_skills_dir_finds_the_shipped_skills():
@@ -80,7 +80,7 @@ def test_upgrade_pins_a_requested_version(monkeypatch, capsys):
     monkeypatch.setattr("cortex.install.cli.install_skills",
                         lambda **kw: ["ok"])
     main(["upgrade", "--to", "0.2.0"])
-    assert any("cortex-tracking==0.2.0" in part for part in calls[0])
+    assert any(f"{DISTRIBUTION_NAME}==0.2.0" in part for part in calls[0])
 
 
 def test_upgrade_reports_a_failed_engine_upgrade(monkeypatch, capsys):

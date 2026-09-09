@@ -23,7 +23,7 @@ from cortex.okf import cli as okf_cli
 from cortex.search import cli as search_cli
 from cortex.store import StoreError
 
-DISTRIBUTION_NAME = "cortex-tracking"
+DISTRIBUTION_NAME = "agentic-cortex"
 
 
 def resolve_version() -> str:

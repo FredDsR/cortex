@@ -11,7 +11,7 @@ from cortex.paths import skills_dir
 
 from .links import install_skills, uninstall_skills
 
-DISTRIBUTION_NAME = "cortex-tracking"
+DISTRIBUTION_NAME = "agentic-cortex"
 
 
 def packaged_skills_dir() -> Path:

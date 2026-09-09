@@ -322,9 +322,9 @@ curl -fsSL https://raw.githubusercontent.com/FredDsR/cortex/main/install.sh | ba
 Or install the engine yourself and let it link its own skills:
 
 ```bash
-uv tool install cortex-tracking && cortex install-skills
-pip install cortex-tracking && cortex install-skills   # same thing, via pip
-uvx --from cortex-tracking cortex --help               # try it without installing
+uv tool install agentic-cortex && cortex install-skills
+pip install agentic-cortex && cortex install-skills   # same thing, via pip
+uvx --from agentic-cortex cortex --help               # try it without installing
 ```
 
 Upgrade with `cortex upgrade`, or `cortex upgrade --to 0.2.0` to pin a version.
@@ -347,7 +347,7 @@ is how you update it.
 | Setting | Effect |
 |---------|--------|
 | `CORTEX_INSTALL_MODE` | `auto` (default), `package`, or `clone` |
-| `CORTEX_SPEC` | What package mode installs (default `cortex-tracking`) |
+| `CORTEX_SPEC` | What package mode installs (default `agentic-cortex`) |
 | `CORTEX_DIR` | Clone mode: where to clone (default `~/cortex`) |
 | `CORTEX_REPO` | Clone mode: which repo to clone, for forks |
 | `--project [path]` | Install into `<path>/.<harness>/skills/` instead of `$HOME` (defaults to `$PWD`) |

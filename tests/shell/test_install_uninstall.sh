@@ -223,7 +223,10 @@ STUB
     bash "$INSTALL" >/dev/null 2>&1
 
   calls="$(cat "$log")"
-  assert_contains "$calls" "uv tool install --force cortex-tracking"
+  # Read the name from the package rather than restating it, so a rename
+  # cannot leave this asserting a distribution that no longer exists.
+  dist="$(cd "$REPO" && python3 -c 'import sys; sys.path.insert(0,"src"); from cortex.install.cli import DISTRIBUTION_NAME as d; print(d)')"
+  assert_contains "$calls" "uv tool install --force $dist"
   assert_contains "$calls" "cortex install-skills"
   teardown_tmp
 }

@@ -31,7 +31,7 @@ fi
 #            existing checkout keeps using.
 #
 # CORTEX_INSTALL_MODE   auto (default) | package | clone
-# CORTEX_SPEC           what package mode installs (default: cortex-tracking)
+# CORTEX_SPEC           what package mode installs (default: agentic-cortex)
 # CORTEX_NO_UV_INSTALL  1 = never install uv; auto then falls back to clone
 INSTALL_MODE="${CORTEX_INSTALL_MODE:-auto}"
 
@@ -53,13 +53,13 @@ Installs the cortex engine, then links its skills into each harness you use.
   --project [path]   link into <path>/.<harness>/skills/ instead of $HOME
 
   CORTEX_INSTALL_MODE=clone   force the git-checkout install instead
-  CORTEX_SPEC=<spec>          install something other than cortex-tracking
+  CORTEX_SPEC=<spec>          install something other than agentic-cortex
 PKGUSAGE
             exit 0
             ;;
     esac
 
-    CORTEX_SPEC="${CORTEX_SPEC:-cortex-tracking}"
+    CORTEX_SPEC="${CORTEX_SPEC:-agentic-cortex}"
 
     if command -v uv >/dev/null 2>&1; then
         echo "==> Installing $CORTEX_SPEC with uv"
@@ -253,7 +253,7 @@ fi
 
 echo "cortex: skills installed. This is the clone install, which does not"
 echo "  provide the \`cortex\` command itself. Install the engine with:"
-echo "    uv tool install cortex-tracking   # or: pip install cortex-tracking"
+echo "    uv tool install agentic-cortex   # or: pip install agentic-cortex"
 echo "  Then: cortex kb ... / cortex viz ... / cortex inject ..."
 
 # --- slash command install (Claude Code symlink path) ---

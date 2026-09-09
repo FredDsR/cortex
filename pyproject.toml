@@ -3,7 +3,7 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cortex-tracking"
+name = "agentic-cortex"
 dynamic = ["version"]
 description = "File-based work tracking and knowledge base for AI coding agents"
 readme = "README.md"
