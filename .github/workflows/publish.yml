@@ -1,0 +1,24 @@
+name: publish
+
+# Manual recovery path only. The automatic publish runs as a job inside
+# release-please.yml; see the comment there for why it cannot live behind
+# `on: release`. Dispatch this against a tag to re-publish that tag, for
+# instance after a transient upload failure.
+on:
+  workflow_dispatch:
+
+jobs:
+  pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --quiet build
+      - run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1

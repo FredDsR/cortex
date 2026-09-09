@@ -1,0 +1,32 @@
+name: shell
+
+on:
+  pull_request:
+    paths:
+      - "install.sh"
+      - "uninstall.sh"
+      - "update-skills.sh"
+      - "tests/shell/**"
+      - "skills/**"
+      - "commands/**"
+      - ".githooks/**"
+      - ".conventional-types"
+      - ".github/actions/setup-cortex/**"
+      - ".github/workflows/shell.yml"
+  push:
+    branches: [main]
+
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-cortex
+
+      - name: Installer syntax
+        run: bash -n install.sh && bash -n uninstall.sh && bash -n update-skills.sh
+
+      # One runner covers the session/task scripts, the CLI entry point, the
+      # install round trip, and the commit message hook.
+      - name: Shell suites
+        run: bash tests/shell/run.sh

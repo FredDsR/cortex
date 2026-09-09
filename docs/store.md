@@ -19,7 +19,6 @@ never both, and moving between them is always explicit through
 
 ```
 ~/.cortex/
-├── bin/cortex                     the CLI symlink
 ├── knowledge/index.md             cross-workspace synthesis (the "brain")
 └── workspaces/
     └── <workspace-slug>/
@@ -97,7 +96,7 @@ branch:
 ```
 
 `status` is one of **`Open`**, **`In Progress`**, **`Blocked`**, **`Resolved`**.
-That vocabulary is fixed in `cortex/model.py`. There is deliberately no
+That vocabulary is fixed in the engine. There is deliberately no
 "dropped" or "won't do" status: work that gets abandoned is archived with its
 tasks still Open, so the archive records what really happened instead of
 claiming a completion that never occurred.
@@ -167,7 +166,7 @@ in place, once.
 ## Writes are atomic
 
 Every file write cortex's Python performs into the store, and into the harness
-settings, goes through `cortex/atomic.py`. It writes a temp file beside the
+settings, is atomic. It writes a temp file beside the
 target, fsyncs it, renames it over the target, then fsyncs the directory. A
 reader always sees either the old file or the new one, never a partial one.
 

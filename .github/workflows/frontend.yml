@@ -1,0 +1,42 @@
+name: frontend
+
+on:
+  pull_request:
+    paths:
+      - "src/cortex/viz/**"
+      - "tests/e2e/**"
+      - ".github/actions/setup-cortex/**"
+      - ".github/workflows/frontend.yml"
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-cortex
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install e2e dependencies
+        working-directory: tests/e2e
+        run: bun install
+
+      # No --with-deps: that runs apt-get, and the runner's Google Chrome apt
+      # index intermittently fails with a hash-sum mismatch. ubuntu-latest
+      # already ships the shared libraries Chromium needs, so install only the
+      # browser binary.
+      - name: Install Playwright browsers
+        working-directory: tests/e2e
+        run: bunx playwright install chromium
+
+      - name: Run e2e
+        run: bash tests/e2e/run-e2e.sh
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            tests/e2e/run.log
+            tests/e2e/server.log

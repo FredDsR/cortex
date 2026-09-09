@@ -122,7 +122,7 @@ rest are sub-skills the main skill invokes when it needs them. See
 
 ## The `cortex` CLI
 
-One command fronts the family, installed at `~/.cortex/bin/cortex`.
+One command fronts the family. Installing the package puts it on your `PATH`.
 
 It exists for two reasons, both about what an agent would otherwise do instead.
 
@@ -307,9 +307,11 @@ skipped and reported, so re-running after adding sources only fills gaps.
 
 ## Install
 
-`install.sh` serves Claude Code, Codex, and Copilot CLI, symlinking each skill
-into the harness's own `skills/` directory. Antigravity installs itself from the
-repo and needs no symlinks. Claude Code additionally has a `/plugin` route.
+cortex installs in two parts: the **engine**, which provides the `cortex`
+command, and the **skills**, which are symlinked into each harness's own
+`skills/` directory. `install.sh` does both. It serves Claude Code, Codex and
+Copilot CLI; Antigravity installs itself from the repo and needs no symlinks,
+and Claude Code additionally has a `/plugin` route.
 
 ### Quickest path: one-liner
 
@@ -317,15 +319,37 @@ repo and needs no symlinks. Claude Code additionally has a `/plugin` route.
 curl -fsSL https://raw.githubusercontent.com/FredDsR/cortex/main/install.sh | bash
 ```
 
-Piped, `install.sh` has no repo to symlink into, so it clones one to `~/cortex`
-and re-runs itself from there. Re-running updates that checkout instead of
-cloning again. If `~/cortex` exists and is not a cortex checkout, it stops
-rather than writing over it.
+Or install the engine yourself and let it link its own skills:
+
+```bash
+uv tool install agentic-cortex && cortex install-skills
+pip install agentic-cortex && cortex install-skills   # same thing, via pip
+uvx --from agentic-cortex cortex --help               # try it without installing
+```
+
+Upgrade with `cortex upgrade`, or `cortex upgrade --to 0.2.0` to pin a version.
+
+### Two install modes
+
+`install.sh` picks one automatically, and `CORTEX_INSTALL_MODE` overrides it.
+
+**Package mode** (the default when `uv` or `pip` is available) installs the
+engine from PyPI, then runs `cortex install-skills`. Nothing is cloned, and the
+engine and its skills always come from one version.
+
+**Clone mode** (the fallback) is the original path: a git checkout plus symlinks
+into each harness. Piped, it clones to `~/cortex` and re-runs itself from there;
+re-running updates that checkout rather than cloning again, and if `~/cortex`
+exists but is not a cortex checkout it stops rather than writing over it. Clone
+mode installs the skills only, not the `cortex` command, and `update-skills.sh`
+is how you update it.
 
 | Setting | Effect |
 |---------|--------|
-| `CORTEX_DIR` | Where to clone (default `~/cortex`) |
-| `CORTEX_REPO` | Which repo to clone, for forks |
+| `CORTEX_INSTALL_MODE` | `auto` (default), `package`, or `clone` |
+| `CORTEX_SPEC` | What package mode installs (default `agentic-cortex`) |
+| `CORTEX_DIR` | Clone mode: where to clone (default `~/cortex`) |
+| `CORTEX_REPO` | Clone mode: which repo to clone, for forks |
 | `--project [path]` | Install into `<path>/.<harness>/skills/` instead of `$HOME` (defaults to `$PWD`) |
 | `-h`, `--help` | `install.sh` usage |
 
@@ -404,10 +428,18 @@ relying on it.
 
 ## Update
 
-Because `install.sh` symlinks each skill into the harness directories, a single
-`git pull` in this clone is enough for content changes; you only need to re-run
-`install.sh` when a new skill folder appears, a new harness is detected, or
-vendored assets need refreshing.
+**Package mode:** one command, which upgrades the engine and relinks the skills
+so the two cannot drift apart.
+
+```bash
+cortex upgrade                 # newest release
+cortex upgrade --to 0.2.0      # pin a version, or roll back to one
+```
+
+**Clone mode:** because `install.sh` symlinks each skill into the harness
+directories, a single `git pull` in this clone is enough for content changes;
+you only need to re-run `install.sh` when a new skill folder appears, a new
+harness is detected, or vendored assets need refreshing.
 
 The bundled `update-skills.sh` does both in one shot, fails fast on uncommitted
 changes, and prints which commits arrived:
@@ -434,8 +466,8 @@ bash install.sh   # only if a new skill / harness / vendor asset
 ## Uninstall
 
 `uninstall.sh` removes what the installer created: the skill symlinks in each
-harness, the `close-day` slash command, and `~/.cortex/bin/cortex`. A wired
-session-start hook is unwired first.
+harness and the `close-day` slash command. It also prunes a `cortex` bin left
+by an older install. A wired session-start hook is unwired first.
 
 ```bash
 bash uninstall.sh

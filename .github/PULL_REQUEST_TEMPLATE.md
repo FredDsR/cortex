@@ -14,7 +14,5 @@ CI blocks on this.
 <!-- Which suites you ran, and their output. -->
 
 - [ ] `python -m pytest -q`
-- [ ] `bash skills/cortex-tracking/scripts/tests/run.sh`
-- [ ] `bash tests/test_install_uninstall.sh`
-- [ ] `bash tests/test_conventional.sh`
+- [ ] `bash tests/shell/run.sh`
 - [ ] Docs updated, if behavior changed

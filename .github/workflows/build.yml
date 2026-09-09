@@ -1,0 +1,91 @@
+name: build
+
+# Deliberately unfiltered. Packaging breaks from changes almost anywhere, and a
+# force-include typo ships a wheel with no skills, which fails silently until a
+# user runs `cortex install-skills` and gets nothing.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install --quiet build twine
+
+      - run: python -m build
+
+      - run: python -m twine check dist/*
+
+      - name: Assert wheel contents
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          wheel = sorted(glob.glob("dist/*.whl"))[-1]
+          names = set(zipfile.ZipFile(wheel).namelist())
+          required = [
+              "cortex/cli.py",
+              "cortex/paths.py",
+              "cortex/install/harnesses.py",
+              "cortex/install/links.py",
+              "cortex/install/cli.py",
+              "cortex/viz/assets/app.js",
+              "cortex/viz/assets/app.css",
+              "cortex/viz/assets/shell.html",
+              "cortex/viz/vendor/cytoscape.min.js",
+              "cortex/viz/vendor/marked.min.js",
+              "cortex/viz/vendor/minisearch.min.js",
+              "cortex/viz/vendor/vendor.lock.json",
+              "cortex/commands/close-day.md",
+          ]
+          missing = [n for n in required if n not in names]
+          if missing:
+              raise SystemExit(f"missing from wheel: {missing}")
+
+          skills = [n for n in names
+                    if n.startswith("cortex/skills/") and n.endswith("SKILL.md")]
+          if len(skills) != 7:
+              raise SystemExit(
+                  f"expected 7 SKILL.md in wheel, found {len(skills)}: {skills}")
+
+          # Test scripts are not part of what users install.
+          leaked = [n for n in names if "/tests/" in n or n.startswith("tests/")]
+          if leaked:
+              raise SystemExit(f"test files leaked into wheel: {leaked}")
+
+          print(f"{wheel}: OK, {len(names)} entries, {len(skills)} skills")
+          PY
+
+      - name: Verify vendored assets against the lockfile
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib
+          vendor = pathlib.Path("src/cortex/viz/vendor")
+          lock = json.loads((vendor / "vendor.lock.json").read_text())
+          listed = {e["name"] for e in lock["files"]}
+          present = {p.name for p in vendor.iterdir()
+                     if p.name != "vendor.lock.json"}
+          if present != listed:
+              raise SystemExit(
+                  f"vendor/ and lockfile disagree: {present ^ listed}")
+          for entry in lock["files"]:
+              blob = (vendor / entry["name"]).read_bytes()
+              digest = hashlib.sha256(blob).hexdigest()
+              if digest != entry["sha256"]:
+                  raise SystemExit(
+                      f"{entry['name']}: sha256 {digest} != {entry['sha256']}")
+          print(f"{len(lock['files'])} vendored files verified")
+          PY
+
+      - name: Install the wheel and smoke test the console script
+        run: |
+          python -m pip install --quiet dist/*.whl
+          cortex version
+          cortex kb --help >/dev/null
+          cortex install-skills --help >/dev/null

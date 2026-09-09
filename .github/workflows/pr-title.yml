@@ -1,0 +1,46 @@
+name: pr-title
+
+# Squash-merge makes the PR title the commit message that lands on main, so
+# this is the gate that actually protects history. No path filter: it applies
+# to every pull request.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  pr-title:
+    # Squash-merge makes the PR title the commit message that lands on main,
+    # so this is the gate that actually protects history.
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # .conventional-types is the single source of truth, shared with the
+      # local commit-msg hook, so the two can never drift.
+      - id: types
+        run: |
+          {
+            echo 'list<<CORTEX_EOF'
+            grep -v '^#' .conventional-types | sed '/^[[:space:]]*$/d'
+            echo 'CORTEX_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: ${{ steps.types.outputs.list }}
+
+      # Advisory only. Fork contributors routinely name a branch before
+      # reading any guidelines, and the name never reaches main's history.
+      - name: Check branch name (warning only)
+        run: |
+          branch="${{ github.head_ref }}"
+          types="$(grep -v '^#' .conventional-types | sed '/^[[:space:]]*$/d' | paste -sd '|' -)"
+          if [[ ! "$branch" =~ ^(${types})/[a-z0-9._-]+$ ]]; then
+            echo "::warning::Branch '$branch' is not <type>/<short-description>. Not blocking."
+          else
+            echo "Branch name OK: $branch"
+          fi
