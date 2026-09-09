@@ -75,6 +75,43 @@ warns on other shapes but does not block, since the branch name never reaches
 The local hook gives you the same check at commit time. It is convenience
 rather than enforcement, and `--no-verify` skips it.
 
+## Releasing
+
+Releases are automated. `feat` and `fix` commits on `main` make release-please
+open a release pull request; merging that pull request tags the version,
+publishes a GitHub Release, and uploads to PyPI. `refactor`, `docs`, `perf` and
+the rest appear in the changelog but do not trigger a release on their own, so
+a refactor-heavy stretch stays unreleased until a `feat` or `fix` lands.
+
+To force a version, or to release when no commit would otherwise qualify, put a
+`Release-As` footer in the commit body:
+
+```bash
+git commit --allow-empty -m "chore: release 0.3.0" -m "Release-As: 0.3.0"
+```
+
+The PyPI upload waits on an environment approval, so a publish never happens
+without someone clicking it.
+
+### If a PyPI upload fails with "filename was previously used"
+
+PyPI blocks a distribution filename **globally and permanently**, and that block
+survives project deletion and change of ownership. So a version can be
+unpublishable even when the project name itself is unregistered and the whole
+pipeline is correct. It means someone once published that exact
+name-and-version and deleted it, possibly years ago and possibly not you.
+
+Two things worth knowing, because both cost time to rediscover:
+
+- **A 404 from PyPI's JSON API only means the name is free to claim.** It does
+  not mean every version is free to publish, and PyPI exposes no way to
+  enumerate blocked filenames. The only signal is the upload itself failing.
+- **A failed upload costs nothing.** The rejection happens before anything is
+  stored, so no filename is consumed and retrying is free.
+
+The remedy is PyPI's own: pick a version you have not uploaded before and
+release that instead, using the `Release-As` footer above.
+
 ## Conventions worth knowing
 
 **Write tests.** Python goes in `tests/unit/`, with shared paths in
