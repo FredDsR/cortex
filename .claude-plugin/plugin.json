@@ -1,7 +1,7 @@
 {
   "name": "cortex",
   "description": "cortex: file-based session/task tracking + knowledge base for AI coding agents, fronted by the `cortex` CLI (cortex kb / cortex viz / cortex sync). Bundles the main cortex-tracking skill + github/migration/sync/kb/viz/inject sub-skills. Works with Claude Code, Codex, Copilot CLI, Antigravity (any harness reading SKILL.md).",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "FredDsR"
   },
