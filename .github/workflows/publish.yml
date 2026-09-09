@@ -1,10 +1,11 @@
 name: publish
 
-# Triggered by the GitHub Release that release-please publishes when its
-# release PR is merged.
+# Manual recovery path only. The automatic publish runs as a job inside
+# release-please.yml; see the comment there for why it cannot live behind
+# `on: release`. Dispatch this against a tag to re-publish that tag, for
+# instance after a transient upload failure.
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 jobs:
   pypi:
@@ -12,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      # Trusted Publishing exchanges this OIDC token for a short-lived PyPI
-      # credential, so no API token is stored anywhere. Mandatory.
       id-token: write
     steps:
       - uses: actions/checkout@v4
