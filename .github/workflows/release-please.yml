@@ -1,0 +1,21 @@
+name: release-please
+
+# Version bumps are derived from the conventional commits this repo already
+# enforces via .conventional-types and the PR title gate. Squash-merge makes
+# each PR title the commit message on main, which is what release-please reads.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
