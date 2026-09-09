@@ -21,6 +21,71 @@ if [[ -n "$SELF" ]]; then
     REPO_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 fi
 
+# --- mode selection ---------------------------------------------------------
+# Two ways to install, because the engine can now install its own skills.
+#
+#   package  install the engine (PyPI or CORTEX_SPEC), then let it link the
+#            skills. No clone, so this is the right path for `curl | bash`.
+#   clone    the original path: a git checkout plus symlinks into each harness.
+#            Still what runs when uv and pip are both unavailable, and what an
+#            existing checkout keeps using.
+#
+# CORTEX_INSTALL_MODE   auto (default) | package | clone
+# CORTEX_SPEC           what package mode installs (default: cortex-tracking)
+# CORTEX_NO_UV_INSTALL  1 = never install uv; auto then falls back to clone
+INSTALL_MODE="${CORTEX_INSTALL_MODE:-auto}"
+
+if [[ "$INSTALL_MODE" == "auto" ]]; then
+    if command -v uv >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+        INSTALL_MODE="package"
+    else
+        INSTALL_MODE="clone"
+    fi
+fi
+
+if [[ "$INSTALL_MODE" == "package" ]]; then
+    case "${1:-}" in
+        -h|--help)
+            cat >&2 <<'PKGUSAGE'
+Usage: install.sh [--project [path]]
+
+Installs the cortex engine, then links its skills into each harness you use.
+  --project [path]   link into <path>/.<harness>/skills/ instead of $HOME
+
+  CORTEX_INSTALL_MODE=clone   force the git-checkout install instead
+  CORTEX_SPEC=<spec>          install something other than cortex-tracking
+PKGUSAGE
+            exit 0
+            ;;
+    esac
+
+    CORTEX_SPEC="${CORTEX_SPEC:-cortex-tracking}"
+
+    if command -v uv >/dev/null 2>&1; then
+        echo "==> Installing $CORTEX_SPEC with uv"
+        uv tool install --force "$CORTEX_SPEC"
+        # uv places tool binaries here and warns rather than failing when the
+        # directory is off PATH, so make it reachable for the call below.
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        echo "==> Installing $CORTEX_SPEC with pip"
+        pip install --upgrade "$CORTEX_SPEC"
+    fi
+
+    if ! command -v cortex >/dev/null 2>&1; then
+        echo "error: cortex was installed but is not on PATH." >&2
+        echo "  Add the install directory to PATH, then run: cortex install-skills" >&2
+        exit 1
+    fi
+
+    echo "==> Linking skills"
+    cortex install-skills "$@"
+
+    echo ""
+    echo "cortex $(cortex version) installed. Restart your agent session."
+    exit 0
+fi
+
 # --- bootstrap: acquire a repo when we were piped ---------------------------
 # Guarded by CORTEX_BOOTSTRAPPED so a clone that somehow lacks skills/ fails
 # loudly instead of cloning and re-execing forever.
@@ -244,7 +309,10 @@ if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "cortex: installed. Add $VIZ_BIN_DIR to PATH if not already, then run: cortex kb ... / cortex viz ... / cortex inject ..."
+echo "cortex: skills installed. This is the clone install, which does not"
+echo "  provide the \`cortex\` command itself. Install the engine with:"
+echo "    uv tool install cortex-tracking   # or: pip install cortex-tracking"
+echo "  Then: cortex kb ... / cortex viz ... / cortex inject ..."
 # --- end cortex-viz install ---
 
 # --- slash command install (Claude Code symlink path) ---

@@ -14,6 +14,11 @@ UNINSTALL="$REPO/uninstall.sh"
 setup_claude_only() {
   setup_tmp
   mkdir -p "$TEST_HOME/.claude"
+  # Pin the clone path. install.sh now auto-selects package mode when uv or
+  # pip is present, and these assertions are about the checkout-and-symlink
+  # install, which must keep working offline. Package mode is covered by
+  # test_package_mode_delegates_to_the_engine below, with stubbed binaries.
+  export CORTEX_INSTALL_MODE=clone
 }
 
 skills_dir() { echo "$1/.claude/skills"; }
@@ -196,6 +201,78 @@ test_piped_install_updates_existing_checkout() {
 
 # --- docs -------------------------------------------------------------------
 
+test_package_mode_delegates_to_the_engine() {
+  # Package mode's job is delegation: install the engine, then let it link the
+  # skills. Stubbing uv and cortex keeps that assertion offline.
+  setup_tmp
+  mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/stub"
+  log="$TEST_HOME/calls.log"
+
+  cat > "$TEST_HOME/stub/uv" <<STUB
+#!/bin/sh
+echo "uv \$*" >> "$log"
+STUB
+  cat > "$TEST_HOME/stub/cortex" <<STUB
+#!/bin/sh
+echo "cortex \$*" >> "$log"
+[ "\$1" = "version" ] && echo "0.1.0"
+exit 0
+STUB
+  chmod +x "$TEST_HOME/stub/uv" "$TEST_HOME/stub/cortex"
+
+  PATH="$TEST_HOME/stub:$PATH" CORTEX_INSTALL_MODE=package \
+    bash "$INSTALL" >/dev/null 2>&1
+
+  calls="$(cat "$log")"
+  assert_contains "$calls" "uv tool install --force cortex-tracking"
+  assert_contains "$calls" "cortex install-skills"
+  teardown_tmp
+}
+
+test_package_mode_honours_cortex_spec() {
+  setup_tmp
+  mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/stub"
+  log="$TEST_HOME/calls.log"
+  cat > "$TEST_HOME/stub/uv" <<STUB
+#!/bin/sh
+echo "uv \$*" >> "$log"
+STUB
+  cat > "$TEST_HOME/stub/cortex" <<STUB
+#!/bin/sh
+echo "cortex \$*" >> "$log"
+exit 0
+STUB
+  chmod +x "$TEST_HOME/stub/uv" "$TEST_HOME/stub/cortex"
+
+  PATH="$TEST_HOME/stub:$PATH" CORTEX_INSTALL_MODE=package \
+    CORTEX_SPEC="/local/checkout" bash "$INSTALL" >/dev/null 2>&1
+
+  assert_contains "$(cat "$log")" "uv tool install --force /local/checkout"
+  teardown_tmp
+}
+
+test_package_mode_forwards_project_flag() {
+  setup_tmp
+  mkdir -p "$TEST_HOME/.claude" "$TEST_HOME/stub" "$TEST_HOME/proj"
+  log="$TEST_HOME/calls.log"
+  cat > "$TEST_HOME/stub/uv" <<STUB
+#!/bin/sh
+exit 0
+STUB
+  cat > "$TEST_HOME/stub/cortex" <<STUB
+#!/bin/sh
+echo "cortex \$*" >> "$log"
+exit 0
+STUB
+  chmod +x "$TEST_HOME/stub/uv" "$TEST_HOME/stub/cortex"
+
+  PATH="$TEST_HOME/stub:$PATH" CORTEX_INSTALL_MODE=package \
+    bash "$INSTALL" --project "$TEST_HOME/proj" >/dev/null 2>&1
+
+  assert_contains "$(cat "$log")" "cortex install-skills --project $TEST_HOME/proj"
+  teardown_tmp
+}
+
 test_readme_documents_antigravity_install() {
   # CI-safe: asserts the command is documented without requiring `agy`.
   readme="$REPO/README.md"
@@ -258,6 +335,9 @@ run_test test_purge_dry_run_deletes_nothing
 run_test test_piped_install_clones_and_installs
 run_test test_piped_install_refuses_foreign_directory
 run_test test_piped_install_updates_existing_checkout
+run_test test_package_mode_delegates_to_the_engine
+run_test test_package_mode_honours_cortex_spec
+run_test test_package_mode_forwards_project_flag
 run_test test_readme_documents_antigravity_install
 run_test test_readme_one_liner_matches_real_script
 run_test test_docs_exist_and_are_linked
