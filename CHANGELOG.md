@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/FredDsR/cortex/compare/v0.2.0...v0.2.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **ci:** release 0.2.1 and document the PyPI filename trap ([#70](https://github.com/FredDsR/cortex/issues/70)) ([69880b5](https://github.com/FredDsR/cortex/commit/69880b53b8d775a97b207df6e429ae25520f8dd5))
+
 ## [0.2.0](https://github.com/FredDsR/cortex/compare/v0.1.0...v0.2.0) (2026-09-09)
 
 
