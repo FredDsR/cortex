@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/FredDsR/cortex/compare/v0.2.1...v0.2.2) (2026-09-09)
+
+
+### Documentation
+
+* use absolute image URLs so the README renders on PyPI ([#72](https://github.com/FredDsR/cortex/issues/72)) ([a85453b](https://github.com/FredDsR/cortex/commit/a85453b127f6c7d80543da51ed71b9b75c03ab60))
+
 ## [0.2.1](https://github.com/FredDsR/cortex/compare/v0.2.0...v0.2.1) (2026-09-09)
 
 

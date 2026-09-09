@@ -3,4 +3,4 @@
 # x-release-please-version marks this line for release-please. hatchling
 # reads the version from here (see [tool.hatch.version] in pyproject),
 # so if release-please cannot update it the published version never moves.
-__version__ = "0.2.1"  # x-release-please-version
+__version__ = "0.2.2"  # x-release-please-version
