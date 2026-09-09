@@ -3,7 +3,12 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from .harnesses import LEGACY_SKILL_NAMES, install_targets
+from .harnesses import (
+    CURRENT_SKILL_NAMES,
+    HARNESSES,
+    LEGACY_SKILL_NAMES,
+    install_targets,
+)
 
 
 def link_skill(src: Path, dest: Path) -> str:
@@ -72,3 +77,32 @@ def install_skills(*, skills_src: Path, target_root: Path,
             action = link_skill(skill_dir, dest_root / skill_dir.name)
             log.append(f"[{harness.name}] {action} {skill_dir.name}")
     return log
+
+
+def uninstall_skills(*, target_root: Path, owner_root: Path,
+                     dry_run: bool = False) -> tuple[list[str], list[str]]:
+    """Remove this install's skill symlinks from every harness.
+
+    Visits every harness in HARNESSES, not just the install targets, because a
+    superseded target may still hold links from an older install. Returns
+    (removed, kept); `kept` holds paths that exist but are not ours.
+    """
+    removed: list[str] = []
+    kept: list[str] = []
+    names = CURRENT_SKILL_NAMES + LEGACY_SKILL_NAMES
+
+    for harness in HARNESSES:
+        dest_root = target_root / harness.skills_rel
+        if not dest_root.is_dir():
+            continue
+        for name in names:
+            path = dest_root / name
+            if not (path.exists() or path.is_symlink()):
+                continue
+            if is_owned_link(path, owner_root):
+                if not dry_run:
+                    path.unlink()
+                removed.append(str(path))
+            else:
+                kept.append(str(path))
+    return removed, kept
