@@ -92,3 +92,12 @@ def test_pyproject_version_is_dynamic():
     text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert 'dynamic = ["version"]' in text
     assert 'path = "src/cortex/__init__.py"' in text
+
+
+def test_release_tags_are_not_component_prefixed():
+    """include-component-in-tag defaults to true, which tags a single-package
+    repo as agentic-cortex-v0.2.0 rather than v0.2.0. The docs and the
+    `cortex upgrade --to` examples assume the plain form, and tag format is
+    painful to change once tags exist."""
+    cfg = _json("release-please-config.json")
+    assert cfg["include-component-in-tag"] is False
