@@ -15,16 +15,20 @@ git config core.hooksPath .githooks   # enables the commit message check
 
 `bash install.sh` symlinks the skills into your harness. It is safe to re-run.
 
-PyYAML is the one runtime dependency: `cortex/parser.py` imports it directly,
+PyYAML is the one runtime dependency, declared in `pyproject.toml`,
 so anything touching the graph (`query`, `viz`, `inject`) needs it. Everything
 else is stdlib.
+
+Adding a harness adapter for session-start injection: register it in
+`src/cortex/inject/adapters.py`, the only module that knows any particular
+harness exists.
 
 ## Running the tests
 
 There is no single runner. Each suite stands alone, and CI runs all of them:
 
 ```bash
-python -m pytest -q                                    # 276 tests
+python -m pytest -q                                    # the Python suite
 bash skills/cortex-tracking/scripts/tests/run.sh       # session/task scripts
 bash skills/cortex-tracking/tests/test_cortex.sh       # CLI entry point
 bash tests/test_install_uninstall.sh                   # install round trip

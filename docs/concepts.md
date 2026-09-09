@@ -110,7 +110,7 @@ not a state machine the code validates. The arrows show the usual path, not a
 rule.
 
 
-That list is fixed in `cortex/model.py`. There is deliberately **no "dropped" or
+That list is fixed in the engine. There is deliberately **no "dropped" or
 "won't do"** status. Work that gets abandoned is archived with its tasks still
 `Open`, so the archive records what actually happened rather than claiming a
 completion that never occurred.

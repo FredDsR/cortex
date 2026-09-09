@@ -42,8 +42,8 @@ cortex inject here    [--format text|claude-code] [--workspace W] [--session S] 
   that runs `cortex inject here --format=claude-code`.
 - **Other harnesses** (Codex, Copilot, Gemini): no adapter yet. Recipe: add that
   harness's session-start hook to run `cortex inject here` and inject its stdout.
-  A native adapter is added by registering one in `cortex/inject/adapters.py`,
-  which is the only module that knows any particular harness exists.
+  A native adapter is added by registering one in the inject adapter registry,
+  which is the only place that knows any particular harness exists.
 
 ## Refresh
 

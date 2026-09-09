@@ -66,7 +66,7 @@ Files stay on disk locally; only the index entries are removed.
 
 ## Tests
 
-Behavior is covered by `cortex/tests/test_sync.py` (the gate, push to a local origin, and clean/`SUMMARY`-resolve pulls), using tempdir git repos with no real GitHub calls.
+Behavior is covered by the test suite (the gate, push to a local origin, and clean/`SUMMARY`-resolve pulls), using tempdir git repos with no real GitHub calls.
 
 ## References
 

@@ -282,7 +282,7 @@ Reads somebody else's bundle into a workspace. **Dry run until you pass
 **A bundle is untrusted input.** Its `description:` fields land in the
 `<cortex-index>` block `cortex inject` hands a fresh agent at SessionStart,
 before the user has said anything. So every string read out of a bundle goes
-through `cortex/sanitize.py` -- not the ones that look risky, all of them,
+through one sanitizer -- not the ones that look risky, all of them,
 frontmatter values and body alike. The one cost is that NFKC normalization
 touches a foreign doc's text, which is the right trade in this direction: the
 rule that keeps cortex from rewriting your own notes is the same rule that says
