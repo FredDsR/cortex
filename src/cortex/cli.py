@@ -6,6 +6,8 @@ Invoked as `python -m cortex.cli <group> <cmd> ...` by the cortex dispatcher.
 from __future__ import annotations
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as metadata_version
 
 from cortex import changelog
 from cortex.kb import cli as kb_cli
@@ -20,6 +22,22 @@ from cortex.lint import cli as lint_cli
 from cortex.okf import cli as okf_cli
 from cortex.search import cli as search_cli
 from cortex.store import StoreError
+
+DISTRIBUTION_NAME = "cortex-tracking"
+
+
+def resolve_version() -> str:
+    """The installed distribution's version, falling back to the source string.
+
+    An installed console script reads real metadata. A run-from-clone
+    invocation via PYTHONPATH has no distribution to read, so it reads
+    __version__ instead.
+    """
+    try:
+        return metadata_version(DISTRIBUTION_NAME)
+    except PackageNotFoundError:
+        from cortex import __version__
+        return __version__
 
 
 def _add_write_flags(sp) -> None:
@@ -39,6 +57,8 @@ def _add_write_flags(sp) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cortex")
     groups = p.add_subparsers(dest="group", required=True)
+
+    groups.add_parser("version", help="Print the installed cortex version")
 
     kbp = groups.add_parser("kb", help="Author/query knowledge & workbench docs")
     kbcmds = kbp.add_subparsers(dest="cmd", required=True)
@@ -261,6 +281,9 @@ def main(argv=None) -> int:
         args = parser.parse_args(_glue_flag_values(argv))
     except SystemExit as e:               # argparse usage error -> exit 2
         return _exit_code(e)
+    if args.group == "version":
+        print(resolve_version())
+        return 0
     if args.group == "migrate-store":
         return migrate_store.cmd_migrate_store(args)
     try:

@@ -2,7 +2,17 @@
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SELF_DIR/../../.." && pwd)"
-CORTEX="$REPO/skills/cortex-tracking/bin/cortex"
+# The console script is what users get. Fall back to the repo venv so the
+# suite runs in a checkout, and skip loudly if neither exists rather than
+# passing vacuously.
+if command -v cortex >/dev/null 2>&1; then
+    CORTEX="$(command -v cortex)"
+elif [ -x "$REPO/.venv/bin/cortex" ]; then
+    CORTEX="$REPO/.venv/bin/cortex"
+else
+    echo "SKIP test_cortex: no cortex on PATH (run: uv pip install -e .)" >&2
+    exit 0
+fi
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
@@ -89,8 +99,11 @@ set +e; HOME="$home" "$bindir/cortex" kb lint --workspace ws-a --check orphan --
 # top-level help lists all groups, exit 0
 hout="$(HOME="$home" "$bindir/cortex" --help 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] || fail "cortex --help exit $rc"
-for g in kb okf viz query inject sync migrate-store; do
-    printf '%s\n' "$hout" | grep -q "cortex $g" || fail "help missing group $g"
+# argparse lists groups as bare names in the subcommand block. The shim used
+# to print "cortex <group>" lines; that usage text is now the parser's.
+for g in version kb okf viz query inject sync migrate-store; do
+    printf '%s\n' "$hout" | grep -qE "^ +$g +| \{.*\b$g\b.*\}" \
+        || fail "help missing group $g"
 done
 
 # unknown group exits 2
@@ -100,16 +113,5 @@ set +e; HOME="$home" "$bindir/cortex" bogus >/dev/null 2>&1; rc=$?; set -e
 # bare via PATH self-locates
 set +e; PATH="$bindir:$PATH" HOME="$home" cortex kb new knowledge bare --type Reference --workspace ws-a --body b >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 0 ] || fail "bare-via-PATH invocation failed ($rc)"
-
-# harness-dir install shape: cortex is reached through a symlinked skill dir
-# (mimics ~/.claude/skills/cortex-tracking/bin/cortex). Physical path resolution
-# must still find the real repo root (where the top-level cortex/ package is).
-hdir="$(mktemp -d "${TMPDIR:-/tmp}/cortex-harness-XXXXXX")"
-trap 'rm -rf "$bindir" "$home" "$hdir"' EXIT
-mkdir -p "$hdir/skills"
-ln -s "$REPO/skills/cortex-tracking" "$hdir/skills/cortex-tracking"
-HOME="$home" "$hdir/skills/cortex-tracking/bin/cortex" kb new knowledge harness --type Reference --workspace ws-a --body b >/dev/null \
-    || fail "harness-dir invocation did not route to the cortex engine"
-[ -f "$home/.cortex/workspaces/ws-a/knowledge/harness.md" ] || fail "harness-dir kb new wrote no file"
 
 echo "test_cortex: PASS"

@@ -26,6 +26,9 @@ Homepage = "https://github.com/FredDsR/cortex"
 Repository = "https://github.com/FredDsR/cortex"
 Changelog = "https://github.com/FredDsR/cortex/blob/main/CHANGELOG.md"
 
+[project.scripts]
+cortex = "cortex.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 

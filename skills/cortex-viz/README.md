@@ -10,7 +10,7 @@ From the repo root:
 
     bash install.sh
 
-This symlinks the unified `cortex` bin to `~/.cortex/bin/cortex` (reach the viewer via `cortex viz ...`) and fetches two third-party JS files (Cytoscape, marked) into `cortex/viz/templates/vendor/`. The generator stages those into the build output at build time. Add `~/.cortex/bin` to your `PATH` if it isn't already.
+Installing the package puts `cortex` on your `PATH`, so the viewer is reached via `cortex viz ...`. The third-party JS the viewer needs (Cytoscape, marked, minisearch) ships with the package, and the generator stages it into the build output at build time.
 
 ## Usage
 

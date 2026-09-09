@@ -13,7 +13,7 @@ cortex sync  <command>   Sync the store to a private repo
 cortex migrate-store     Move a legacy ~/.work store to ~/.cortex
 ```
 
-Installed at `~/.cortex/bin/cortex`. Add that directory to `PATH`.
+Installing the package puts `cortex` on your `PATH`.
 
 Most commands resolve the workspace and session from the active session pointer,
 so you rarely pass `--workspace` or `--session` by hand. Pass them when no

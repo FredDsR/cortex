@@ -122,7 +122,7 @@ rest are sub-skills the main skill invokes when it needs them. See
 
 ## The `cortex` CLI
 
-One command fronts the family, installed at `~/.cortex/bin/cortex`.
+One command fronts the family. Installing the package puts it on your `PATH`.
 
 It exists for two reasons, both about what an agent would otherwise do instead.
 
@@ -434,8 +434,8 @@ bash install.sh   # only if a new skill / harness / vendor asset
 ## Uninstall
 
 `uninstall.sh` removes what the installer created: the skill symlinks in each
-harness, the `close-day` slash command, and `~/.cortex/bin/cortex`. A wired
-session-start hook is unwired first.
+harness and the `close-day` slash command. It also prunes a `cortex` bin left
+by an older install. A wired session-start hook is unwired first.
 
 ```bash
 bash uninstall.sh

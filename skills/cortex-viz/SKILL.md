@@ -9,7 +9,7 @@ Static browser-based viewer for `~/.cortex/workspaces/`. The CLI builds a folder
 
 ## Invocation
 
-The user-facing command is `cortex viz` (the unified `cortex` bin, which `install.sh` symlinks to `~/.cortex/bin/cortex` and routes to the `cortex` engine via `python -m cortex.cli viz`; the viz code lives at `cortex/viz/`). The user must have `~/.cortex/bin/` on their `PATH` (or invoke via the absolute path).
+The user-facing command is `cortex viz`. Installing the package puts `cortex` on the user's `PATH`; it can also be invoked as `python -m cortex viz`.
 
 | Command | What happens |
 |---|---|

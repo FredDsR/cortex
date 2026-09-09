@@ -86,15 +86,22 @@ test_dry_run_changes_nothing() {
   teardown_tmp
 }
 
-test_global_uninstall_removes_bin_and_command() {
+test_global_uninstall_removes_the_slash_command() {
+  # The `cortex` bin is no longer installed here: the console script from the
+  # installed package provides it. Only the slash command is install.sh's.
   setup_claude_only
   bash "$INSTALL" >/dev/null 2>&1
-  assert_file_exists "$TEST_HOME/.cortex/bin/cortex"
   assert_file_exists "$TEST_HOME/.claude/commands/close-day.md"
 
   bash "$UNINSTALL" >/dev/null 2>&1
-  assert_file_absent "$TEST_HOME/.cortex/bin/cortex"
   assert_file_absent "$TEST_HOME/.claude/commands/close-day.md"
+  teardown_tmp
+}
+
+test_install_does_not_create_a_bin_symlink() {
+  setup_claude_only
+  bash "$INSTALL" >/dev/null 2>&1
+  assert_file_absent "$TEST_HOME/.cortex/bin/cortex"
   teardown_tmp
 }
 
@@ -242,7 +249,8 @@ run_test test_uninstall_is_idempotent
 run_test test_real_directory_is_never_deleted
 run_test test_foreign_symlink_is_never_deleted
 run_test test_dry_run_changes_nothing
-run_test test_global_uninstall_removes_bin_and_command
+run_test test_global_uninstall_removes_the_slash_command
+run_test test_install_does_not_create_a_bin_symlink
 run_test test_store_data_survives_default_uninstall
 run_test test_purge_without_sync_refuses_single_yes
 run_test test_purge_deletes_store_when_double_confirmed

@@ -180,10 +180,9 @@ VIZ_VENDOR="$REPO_DIR/src/cortex/viz/templates/vendor"
 
 mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
 
-# Unified cortex bin (replaces the former work-viz / work-kb bins).
-ln -sf "$REPO_DIR/skills/cortex-tracking/bin/cortex" "$VIZ_BIN_DIR/cortex"
-# Remove superseded bins from prior installs (symlinks only).
-for old in work-viz work-kb; do
+# The `cortex` command now comes from the installed package's console script,
+# so there is no bin to symlink here. Prune bins earlier installs created.
+for old in cortex work-viz work-kb; do
     [ -L "$VIZ_BIN_DIR/$old" ] && rm -f "$VIZ_BIN_DIR/$old"
 done
 

@@ -19,7 +19,6 @@ never both, and moving between them is always explicit through
 
 ```
 ~/.cortex/
-├── bin/cortex                     the CLI symlink
 ├── knowledge/index.md             cross-workspace synthesis (the "brain")
 └── workspaces/
     └── <workspace-slug>/
