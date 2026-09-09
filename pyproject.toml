@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cortex-tracking"
+dynamic = ["version"]
+description = "File-based work tracking and knowledge base for AI coding agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0"]
+authors = [{ name = "FredDsR", email = "freddalsoglio@gmail.com" }]
+keywords = ["agents", "knowledge-base", "claude", "skills", "work-tracking"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/FredDsR/cortex"
+Repository = "https://github.com/FredDsR/cortex"
+Changelog = "https://github.com/FredDsR/cortex/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.version]
+path = "src/cortex/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cortex"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills" = "cortex/skills"
+"commands" = "cortex/commands"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests/unit"]
+addopts = "--import-mode=importlib"

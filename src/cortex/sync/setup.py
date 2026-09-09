@@ -13,15 +13,14 @@ import subprocess
 from pathlib import Path
 
 from cortex import atomic
+from cortex.paths import skills_dir
 from cortex.sync.repo import git, work_dir
 
-# <repo>/cortex/sync/setup.py -> parents[2] is the repo root, which is where
-# `skills/` lives. Counted from this file's own depth: the package split moved
-# it one level deeper, and a stale `.parent.parent` here silently skips the
-# .gitignore on `setup --init`.
+# Resolved through cortex.paths so this does not depend on how deep the
+# package sits. A stale hand-counted depth here silently skips the .gitignore
+# on `setup --init`, which has happened before.
 _TEMPLATE_GITIGNORE = (
-    Path(__file__).resolve().parents[2]
-    / "skills" / "cortex-sync" / "templates" / "gitignore"
+    skills_dir() / "cortex-sync" / "templates" / "gitignore"
 )
 
 

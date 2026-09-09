@@ -1,7 +1,9 @@
 import sys
-from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
+from support import SKILL_SCRIPTS
+
+# The module under test is a cortex-kb skill script, not part of the package.
+SCRIPTS = SKILL_SCRIPTS / "cortex-kb" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import migrate_kb_frontmatter as m
 

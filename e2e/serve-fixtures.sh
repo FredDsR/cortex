@@ -12,7 +12,7 @@ for ws in demo-ws other-ws kb-ghosts-ws authored-ws; do
 done
 
 OUT="$(mktemp -d)/out"
-PYTHONPATH="$REPO" "$PY" -m cortex.cli viz build "$ROOT" --out "$OUT" >/dev/null
+PYTHONPATH="$REPO/src" "$PY" -m cortex.cli viz build "$ROOT" --out "$OUT" >/dev/null
 
-exec env PYTHONPATH="$REPO" "$PY" -m cortex.cli viz serve "$OUT" \
+exec env PYTHONPATH="$REPO/src" "$PY" -m cortex.cli viz serve "$OUT" \
     --host 127.0.0.1 --port 8799 --no-open

@@ -1,11 +1,6 @@
-import sys
-from pathlib import Path
-
 import pytest
 
-# Ensure the repo root (parent of the cortex package) is importable so
-# `import cortex.frontmatter` works regardless of pytest's invocation dir.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from support import FIXTURES
 
 
 @pytest.fixture
@@ -21,9 +16,6 @@ def kbhome(tmp_path, monkeypatch):
         "---\nslug: sess-a\nstatus: Active\n---\n\n# sess-a\n")
     monkeypatch.setenv("HOME", str(home))
     return home
-
-
-FIXTURES = Path(__file__).parent / "tests" / "fixtures"
 
 
 @pytest.fixture

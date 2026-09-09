@@ -1,7 +1,7 @@
 import shutil
 
 from cortex import cli as cortex_cli
-from cortex.conftest import FIXTURES
+from support import FIXTURES
 
 
 def _home_with_fixtures(tmp_path, monkeypatch):

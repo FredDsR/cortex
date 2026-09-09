@@ -6,7 +6,7 @@ from cortex import cli as cortex_cli
 
 def _home_with_fixtures(tmp_path, monkeypatch):
     """Build $HOME/.cortex/workspaces/ from the shared fixture tree."""
-    from cortex.conftest import FIXTURES
+    from support import FIXTURES
     root = tmp_path / ".cortex" / "workspaces"
     root.mkdir(parents=True)
     for sub in ("demo-ws", "other-ws", "kb-ghosts-ws", "authored-ws"):

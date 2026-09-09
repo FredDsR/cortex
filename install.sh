@@ -176,7 +176,7 @@ echo "cortex skills installed. Restart your agent session to pick up changes."
 
 # --- cortex-viz install ---
 VIZ_BIN_DIR="$HOME/.cortex/bin"
-VIZ_VENDOR="$REPO_DIR/cortex/viz/templates/vendor"
+VIZ_VENDOR="$REPO_DIR/src/cortex/viz/templates/vendor"
 
 mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
 
