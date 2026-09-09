@@ -239,81 +239,22 @@ done
 echo ""
 echo "cortex skills installed. Restart your agent session to pick up changes."
 
-# --- cortex-viz install ---
+# --- viz assets + stale bin cleanup ---
+# The viewer's JS ships in the repo (and in the wheel), verified against
+# src/cortex/viz/vendor/vendor.lock.json at build time, so there is nothing to
+# fetch here any more. Earlier installs created a bin symlink; prune it, since
+# the `cortex` command now comes from the installed package.
 VIZ_BIN_DIR="$HOME/.cortex/bin"
-VIZ_VENDOR="$REPO_DIR/src/cortex/viz/templates/vendor"
-
-mkdir -p "$VIZ_BIN_DIR" "$VIZ_VENDOR"
-
-# The `cortex` command now comes from the installed package's console script,
-# so there is no bin to symlink here. Prune bins earlier installs created.
-for old in cortex work-viz work-kb; do
-    [ -L "$VIZ_BIN_DIR/$old" ] && rm -f "$VIZ_BIN_DIR/$old"
-done
-
-# Vendored JS (only fetched if missing). The generator stages templates/vendor/
-# into out/vendor/ at build time, so populating templates/vendor/ is the only
-# install-time requirement.
-fetch_if_missing() {
-  local dest="$1"
-  local url="$2"
-  if [ ! -s "$dest" ]; then
-    echo "Fetching $(basename "$dest")"
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL "$url" -o "$dest"
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q "$url" -O "$dest"
-    else
-      echo "warning: neither curl nor wget available; skip $url" >&2
-      return 1
-    fi
-  fi
-}
-
-REQUIRED_VENDOR=(
-  "cytoscape.min.js|https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"
-  "marked.min.js|https://unpkg.com/marked@12.0.2/marked.min.js"
-  "minisearch.min.js|https://unpkg.com/minisearch@7.1.0/dist/umd/index.js"
-)
-
-VIZ_FETCH_FAILED=()
-for entry in "${REQUIRED_VENDOR[@]}"; do
-  name="${entry%%|*}"
-  url="${entry#*|}"
-  if ! fetch_if_missing "$VIZ_VENDOR/$name" "$url"; then
-    VIZ_FETCH_FAILED+=("$name")
-  fi
-done
-
-# Verify every required third-party file landed in templates/vendor/.
-VIZ_MISSING=()
-for entry in "${REQUIRED_VENDOR[@]}"; do
-  name="${entry%%|*}"
-  if [ ! -s "$VIZ_VENDOR/$name" ]; then
-    VIZ_MISSING+=("$name")
-  fi
-done
-
-if [ ${#VIZ_MISSING[@]} -gt 0 ]; then
-  echo "" >&2
-  echo "ERROR: cortex-viz install incomplete." >&2
-  echo "  Missing vendor file(s) in $VIZ_VENDOR/:" >&2
-  for m in "${VIZ_MISSING[@]}"; do
-    echo "    - $m" >&2
-  done
-  if [ ${#VIZ_FETCH_FAILED[@]} -gt 0 ]; then
-    echo "  (fetch_if_missing failed for: ${VIZ_FETCH_FAILED[*]})" >&2
-  fi
-  echo "  The viewer will not work until these are present. Re-run install.sh with network access," >&2
-  echo "  or copy the files manually. See SKILL.md for the canonical URLs." >&2
-  exit 1
+if [ -d "$VIZ_BIN_DIR" ]; then
+    for old in cortex work-viz work-kb; do
+        [ -L "$VIZ_BIN_DIR/$old" ] && rm -f "$VIZ_BIN_DIR/$old"
+    done
 fi
 
 echo "cortex: skills installed. This is the clone install, which does not"
 echo "  provide the \`cortex\` command itself. Install the engine with:"
 echo "    uv tool install cortex-tracking   # or: pip install cortex-tracking"
 echo "  Then: cortex kb ... / cortex viz ... / cortex inject ..."
-# --- end cortex-viz install ---
 
 # --- slash command install (Claude Code symlink path) ---
 # Plugin/marketplace installs pick up commands/ natively. For symlink installs,

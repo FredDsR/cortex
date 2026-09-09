@@ -14,7 +14,7 @@ from pathlib import Path
 from cortex.model import World, Doc, DocId, Edge
 from .layout import children_of, content_path, write_out
 
-_SHELL_TEMPLATE = (Path(__file__).parent / "templates" / "shell.html").read_text(encoding="utf-8")
+_SHELL_TEMPLATE = (Path(__file__).parent / "assets" / "shell.html").read_text(encoding="utf-8")
 
 
 # ---- graph payload ----

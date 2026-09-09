@@ -12,14 +12,26 @@ from cortex import model
 from cortex.model import World, Doc, is_reserved
 from .layout import children_of, content_path, doc_out_path, write_out
 
-_VENDOR_SRC = Path(__file__).parent / "templates" / "vendor"
+# First-party page code and third-party libraries are kept apart at rest
+# and staged into one out/vendor/ directory, because the built pages load
+# both from a single relative prefix.
+ASSETS_SRC = Path(__file__).parent / "assets"
+VENDOR_SRC = Path(__file__).parent / "vendor"
+
+# Staged for the browser; everything else in these directories is not.
+_NOT_STAGED = {"vendor.lock.json", "shell.html"}
 
 
 def stage_vendor(out_dir: Path) -> None:
     vendor_out = out_dir / "vendor"
     if vendor_out.exists():
         shutil.rmtree(vendor_out)
-    shutil.copytree(_VENDOR_SRC, vendor_out)
+    vendor_out.mkdir(parents=True)
+    for src in (VENDOR_SRC, ASSETS_SRC):
+        for item in src.iterdir():
+            if item.name in _NOT_STAGED:
+                continue
+            shutil.copy2(item, vendor_out / item.name)
 
 
 def copy_markdown(world: World, out_dir: Path) -> None:

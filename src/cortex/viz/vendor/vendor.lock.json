@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "name": "cytoscape.min.js",
+      "version": "3.30.2",
+      "url": "https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js",
+      "sha256": "83e8c54a6bec655bfd81df07df605649c268af69aeca67a5ea2da54ea42dac81",
+      "bytes": 373304
+    },
+    {
+      "name": "marked.min.js",
+      "version": "12.0.2",
+      "url": "https://unpkg.com/marked@12.0.2/marked.min.js",
+      "sha256": "15fabce5b65898b32b03f5ed25e9f891a729ad4c0d6d877110a7744aa847a894",
+      "bytes": 35479
+    },
+    {
+      "name": "minisearch.min.js",
+      "version": "7.1.0",
+      "url": "https://unpkg.com/minisearch@7.1.0/dist/umd/index.js",
+      "sha256": "bd47ccf2b0028aaee23a301b018f238e0e511b6e8439fd9cdaf8e4242c46e149",
+      "bytes": 88694
+    }
+  ]
+}
