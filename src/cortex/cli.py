@@ -269,6 +269,14 @@ def _exit_code(e: SystemExit) -> int:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("install-skills", "uninstall-skills", "upgrade"):
+        # Own parser, like viz: these verbs are about the filesystem, not the
+        # store, and share no flags with the groups below.
+        from cortex.install.cli import main as install_main
+        try:
+            return install_main(argv)
+        except SystemExit as e:
+            return _exit_code(e)
     if argv and argv[0] == "viz":
         # Delegate to viz's own parser (keeps its flags + `cortex viz` help verbatim).
         from cortex.viz.cli import main as viz_main
