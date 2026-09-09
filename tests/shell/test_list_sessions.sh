@@ -3,8 +3,8 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/list_sessions.sh"
-RESOLVE="$(cd .. && pwd)/resolve_workspace.sh"
+SCRIPT="$SKILL_SCRIPTS/list_sessions.sh"
+RESOLVE="$SKILL_SCRIPTS/resolve_workspace.sh"
 
 test_lists_global_and_local_merged() {
   setup_tmp

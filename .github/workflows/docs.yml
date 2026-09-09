@@ -1,0 +1,19 @@
+name: docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "**/*.md"
+      - "tests/unit/test_doc_paths.py"
+      - ".github/actions/setup-cortex/**"
+      - ".github/workflows/docs.yml"
+
+jobs:
+  path-citations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-cortex
+      - name: No implementation paths in prose docs
+        run: python -m pytest tests/unit/test_doc_paths.py -v

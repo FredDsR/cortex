@@ -3,7 +3,7 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/session_start.sh"
+SCRIPT="$SKILL_SCRIPTS/session_start.sh"
 
 test_emits_structured_header() {
   setup_tmp

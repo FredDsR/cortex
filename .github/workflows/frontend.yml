@@ -1,8 +1,12 @@
-name: e2e
+name: frontend
 
-# Manual only. The suite drives a real browser and takes minutes, which is too
-# slow to block every pull request.
 on:
+  pull_request:
+    paths:
+      - "src/cortex/viz/**"
+      - "tests/e2e/**"
+      - ".github/actions/setup-cortex/**"
+      - ".github/workflows/frontend.yml"
   workflow_dispatch:
 
 jobs:
@@ -10,23 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+      - uses: ./.github/actions/setup-cortex
       - uses: oven-sh/setup-bun@v2
 
       - name: Install e2e dependencies
-        working-directory: e2e
+        working-directory: tests/e2e
         run: bun install
 
       - name: Install Playwright browsers
-        working-directory: e2e
+        working-directory: tests/e2e
         run: bunx playwright install --with-deps chromium
 
       - name: Run e2e
-        run: bash e2e/run-e2e.sh
+        run: bash tests/e2e/run-e2e.sh
 
       - name: Upload logs on failure
         if: failure()
@@ -34,5 +34,5 @@ jobs:
         with:
           name: e2e-logs
           path: |
-            e2e/run.log
-            e2e/server.log
+            tests/e2e/run.log
+            tests/e2e/server.log

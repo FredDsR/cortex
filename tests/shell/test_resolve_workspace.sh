@@ -3,7 +3,7 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/resolve_workspace.sh"
+SCRIPT="$SKILL_SCRIPTS/resolve_workspace.sh"
 
 test_git_remote_wins() {
   setup_tmp

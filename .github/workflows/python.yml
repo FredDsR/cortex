@@ -1,0 +1,28 @@
+name: python
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/unit/**"
+      - "tests/conftest.py"
+      - "tests/support.py"
+      - "pyproject.toml"
+      - ".github/actions/setup-cortex/**"
+      - ".github/workflows/python.yml"
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-cortex
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pytest -q

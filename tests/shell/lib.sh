@@ -3,6 +3,12 @@
 
 set -u
 
+# Repo paths, defined once here rather than each test counting directory
+# levels up from its own location. lib.sh lives at tests/shell/lib.sh.
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$_LIB_DIR/../.." && pwd)"
+SKILL_SCRIPTS="$REPO/skills/cortex-tracking/scripts"
+
 _pass=0
 _fail=0
 _current_test=""

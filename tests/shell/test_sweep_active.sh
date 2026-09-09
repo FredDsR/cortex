@@ -3,7 +3,7 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/sweep_active.sh"
+SCRIPT="$SKILL_SCRIPTS/sweep_active.sh"
 
 test_removes_old_and_keeps_new() {
   setup_tmp

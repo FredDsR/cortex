@@ -1,0 +1,24 @@
+name: Set up cortex
+description: Python, an editable install, and a git identity for suites that shell out to git.
+inputs:
+  python-version:
+    description: Python version to install
+    required: false
+    default: "3.11"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install the package and test dependencies
+      shell: bash
+      run: python -m pip install --quiet -e ".[dev]"
+
+    # Runners have no global identity, and several suites shell out to git.
+    - name: Configure git identity
+      shell: bash
+      run: |
+        git config --global user.name "ci"
+        git config --global user.email "ci@example.com"

@@ -3,7 +3,7 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/close_day.sh"
+SCRIPT="$SKILL_SCRIPTS/close_day.sh"
 
 # Build a workspace with an active session pointing at <session>.
 # Slug resolves to basename(TEST_CWD) == "cwd".

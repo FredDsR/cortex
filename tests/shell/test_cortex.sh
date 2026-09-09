@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SELF_DIR/../../.." && pwd)"
+REPO="$(cd "$SELF_DIR/../.." && pwd)"
 # The console script is what users get. Fall back to the repo venv so the
 # suite runs in a checkout, and skip loudly if neither exists rather than
 # passing vacuously.

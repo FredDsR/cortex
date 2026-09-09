@@ -25,20 +25,29 @@ harness exists.
 
 ## Running the tests
 
-There is no single runner. Each suite stands alone, and CI runs all of them:
+Two runners, one per language:
 
 ```bash
-python -m pytest -q                                    # the Python suite
-bash skills/cortex-tracking/scripts/tests/run.sh       # session/task scripts
-bash skills/cortex-tracking/tests/test_cortex.sh       # CLI entry point
-bash tests/test_install_uninstall.sh                   # install round trip
-bash tests/test_conventional.sh                        # commit message hook
+python -m pytest -q          # the Python suite
+bash tests/shell/run.sh      # every shell suite
 ```
+
+`tests/shell/run.sh` runs each `test_*.sh` beside it, covering the session and
+task scripts, the CLI entry point, the install round trip, and the commit
+message hook.
 
 The e2e suite drives a real browser and is not part of PR CI:
 
 ```bash
-bash e2e/run-e2e.sh
+bash tests/e2e/run-e2e.sh
+```
+
+The Python suite needs no install: `pythonpath` in `pyproject.toml` puts `src`
+and `tests` on the path. The shell suite exercises the `cortex` command, so
+install the package first:
+
+```bash
+uv pip install -e ".[dev]"   # or: pip install -e ".[dev]"
 ```
 
 ## Commits and pull requests
@@ -68,9 +77,11 @@ rather than enforcement, and `--no-verify` skips it.
 
 ## Conventions worth knowing
 
-**Write tests.** Python goes in `cortex/tests/`. Bash suites source
-`skills/cortex-tracking/scripts/tests/lib.sh` and use `run_test` / `report`;
-copy the shape from `tests/test_install_uninstall.sh`.
+**Write tests.** Python goes in `tests/unit/`, with shared paths in
+`tests/support.py`. Bash suites go in `tests/shell/`, source the `lib.sh`
+beside them, and use `run_test` / `report`; copy the shape from any
+`test_*.sh` already there. `tests/shell/run.sh` picks up a new file
+automatically.
 
 **Never use an em dash or en dash** in code, docs, or commit messages.
 

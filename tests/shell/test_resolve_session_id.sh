@@ -3,7 +3,7 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/resolve_session_id.sh"
+SCRIPT="$SKILL_SCRIPTS/resolve_session_id.sh"
 
 test_explicit_override_wins() {
   setup_tmp

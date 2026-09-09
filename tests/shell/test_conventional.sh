@@ -3,9 +3,8 @@
 # pull-request, which is tested upstream and not re-tested here.
 set -u
 cd "$(dirname "$0")"
-. ../skills/cortex-tracking/scripts/tests/lib.sh
+. ./lib.sh
 
-REPO="$(cd .. && pwd)"
 HOOK="$REPO/.githooks/commit-msg"
 TYPES="$REPO/.conventional-types"
 

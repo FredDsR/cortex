@@ -3,7 +3,7 @@ set -u
 cd "$(dirname "$0")"
 . ./lib.sh
 
-SCRIPT="$(cd .. && pwd)/manifest.sh"
+SCRIPT="$SKILL_SCRIPTS/manifest.sh"
 
 mk_task_fm() {
   local path="$1" status="$2" pr="${3:-}"

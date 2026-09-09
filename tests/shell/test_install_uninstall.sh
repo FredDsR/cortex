@@ -3,9 +3,8 @@
 # Every test runs against a temp HOME, so nothing touches the real install.
 set -u
 cd "$(dirname "$0")"
-. ../skills/cortex-tracking/scripts/tests/lib.sh
+. ./lib.sh
 
-REPO="$(cd .. && pwd)"
 INSTALL="$REPO/install.sh"
 UNINSTALL="$REPO/uninstall.sh"
 
