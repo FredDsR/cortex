@@ -2,6 +2,14 @@
   <img src="https://raw.githubusercontent.com/FredDsR/cortex/main/assets/cortex-logo.svg" alt="cortex" width="340">
 </p>
 
+<p align="center">
+  <a href="https://pypi.org/project/agentic-cortex/"><img src="https://img.shields.io/pypi/v/agentic-cortex.svg?logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/agentic-cortex/"><img src="https://img.shields.io/pypi/pyversions/agentic-cortex.svg?logo=python&logoColor=white" alt="Supported Python versions"></a>
+  <a href="https://github.com/FredDsR/cortex/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/FredDsR/cortex/build.yml?branch=main&label=build&logo=github" alt="Build status"></a>
+  <a href="https://github.com/FredDsR/cortex/actions/workflows/python.yml"><img src="https://img.shields.io/github/actions/workflow/status/FredDsR/cortex/python.yml?branch=main&label=tests&logo=github" alt="Test status"></a>
+  <a href="https://github.com/FredDsR/cortex/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/agentic-cortex.svg" alt="MIT license"></a>
+</p>
+
 # cortex
 
 Portable bundle of file-based work-tracking skills for AI coding agents. Designed to work with any harness that reads `SKILL.md` from a skills directory: Claude Code, Codex, Copilot CLI, Antigravity.
