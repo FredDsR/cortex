@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/FredDsR/cortex/compare/v0.2.2...v0.2.3) (2026-09-11)
+
+
+### Documentation
+
+* add PyPI, CI, and license badges to the README ([#74](https://github.com/FredDsR/cortex/issues/74)) ([57fb8d7](https://github.com/FredDsR/cortex/commit/57fb8d7c88500034f40421433178e306cc6214d0))
+
 ## [0.2.2](https://github.com/FredDsR/cortex/compare/v0.2.1...v0.2.2) (2026-09-09)
 
 
